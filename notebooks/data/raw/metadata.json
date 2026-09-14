@@ -1,0 +1,537 @@
+{
+ "Data": {
+  "records": {
+   "theme": "Economy & Prices",
+   "subject": "Consumer Price Index",
+   "topic": "Average Retail Prices of Selected Consumer Items",
+   "id": "M213761",
+   "groupTitle": "Average Retail Prices Of Selected Consumer Items",
+   "title": "Average Retail Prices Of Selected Consumer Items, Monthly",
+   "frequency": "Monthly",
+   "adjustmentType": "",
+   "dataSource": "SINGAPORE DEPARTMENT OF STATISTICS",
+   "footnote": "Prices of items starting from January 2024 are based on the 2024-based CPI basket.  While they are indicative of the average transaction price levels in the same base period, they are not a measure of pure price movements across CPI baskets due to changes in the sample of brands/ varieties and outlets priced.",
+   "dataLastUpdated": "24/08/2026",
+   "startPeriod": "2015 Jan",
+   "endPeriod": "2026 Jul",
+   "total": 9547,
+   "row": [
+    {
+     "seriesNo": "1",
+     "rowText": "Premium Thai Rice (Per 5 Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "2",
+     "rowText": "Wholemeal Bread (Per 400 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "3",
+     "rowText": "Sausage Bun (Each)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "4",
+     "rowText": "Instant Noodles (Per 5 Packets)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "5",
+     "rowText": "Cracker (Per 100 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "6",
+     "rowText": "Canned Baked Beans (Per 100 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "7",
+     "rowText": "Canned Sardines (Per 100 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "8",
+     "rowText": "Canned Luncheon Meat (Per 100 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "9",
+     "rowText": "Lean Pork, Chilled (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "10",
+     "rowText": "Streaky Pork, Chilled (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "11",
+     "rowText": "Pork Rib Bones, Chilled (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "12",
+     "rowText": "Ribeye Beef, Chilled (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "13",
+     "rowText": "Mutton, Chilled (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "14",
+     "rowText": "Whole Chicken, Chilled (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "15",
+     "rowText": "Chicken Wing, Chilled (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "16",
+     "rowText": "Lean Pork, Frozen (Per 500 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "17",
+     "rowText": "Pork Rib Bones, Frozen (Per 500 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "18",
+     "rowText": "Beef Cube, Frozen (Per 500 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "19",
+     "rowText": "Whole Chicken, Frozen (Each)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "20",
+     "rowText": "Chicken Wing, Frozen (Per 2 Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "21",
+     "rowText": "Cod Fish (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "22",
+     "rowText": "Flowery Grouper (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "23",
+     "rowText": "White Pomfret (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "24",
+     "rowText": "Salmon (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "25",
+     "rowText": "Sea Bass (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "26",
+     "rowText": "Golden Snapper (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "27",
+     "rowText": "Spanish Mackerel (Batang) (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "28",
+     "rowText": "Threadfin (Kurau) (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "29",
+     "rowText": "Medium Prawns (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "30",
+     "rowText": "Squids (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "31",
+     "rowText": "Fresh Milk (Per Litre)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "32",
+     "rowText": "Infant Milk Powder (Per 100 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "33",
+     "rowText": "Cheese (Per 12 Slices)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "34",
+     "rowText": "Hen Eggs (Per 10)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "35",
+     "rowText": "Cooking Oil (Per 2 Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "36",
+     "rowText": "Bananas (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "37",
+     "rowText": "Papaya (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "38",
+     "rowText": "Watermelon (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "39",
+     "rowText": "Grapes (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "40",
+     "rowText": "Orange (Each)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "41",
+     "rowText": "Apple (Each)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "42",
+     "rowText": "Broccoli (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "43",
+     "rowText": "Cabbage (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "44",
+     "rowText": "Chinese Kale (Kailan) (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "45",
+     "rowText": "Small Mustard (Chye Sim) (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "46",
+     "rowText": "Tomatoes (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "47",
+     "rowText": "Potatoes (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "48",
+     "rowText": "Carrots (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "49",
+     "rowText": "Small Onions (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "50",
+     "rowText": "Old Ginger (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "51",
+     "rowText": "Light Soy Sauce (640 Ml)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "52",
+     "rowText": "White Sugar (Per 2 Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "53",
+     "rowText": "Instant Coffee (Per 200 Gram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "54",
+     "rowText": "Aerated Soft Drinks (Per 4 Cans)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "55",
+     "rowText": "Non-Aerated Soft Drinks (Per 6 Packets)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "56",
+     "rowText": "Beer (Per 6 Cans)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "57",
+     "rowText": "Cigarettes (Per Pack)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "58",
+     "rowText": "Coffee/Tea Without Milk (Per Cup)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "59",
+     "rowText": "Coffee/Tea With Condensed Milk (Per Cup)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "60",
+     "rowText": "Milo With Condensed Milk (Per Cup)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "61",
+     "rowText": "Canned Drink With Ice (Per Can)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "62",
+     "rowText": "Fishball Noodles (Per Bowl)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "63",
+     "rowText": "Mee Rebus (Per Bowl)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "64",
+     "rowText": "Mee Siam (Per Bowl)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "65",
+     "rowText": "Char Kway Teow (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "66",
+     "rowText": "Sliced Fish Bee Hoon (Per Bowl)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "67",
+     "rowText": "Wanton Noodles (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "68",
+     "rowText": "Char Siew Rice (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "69",
+     "rowText": "Chicken Rice (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "70",
+     "rowText": "Duck Rice (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "71",
+     "rowText": "Chicken Nasi Briyani (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "72",
+     "rowText": "Economical Rice (1 Meat & 2 Vegetables) (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "73",
+     "rowText": "Saba Fish With Rice (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "74",
+     "rowText": "Chicken Chop (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "75",
+     "rowText": "Roti Prata (Plain) (Per Piece)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "76",
+     "rowText": "Fried Carrot Cake (Per Plate)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "77",
+     "rowText": "Ice Kachang (Per Bowl)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "78",
+     "rowText": "Laundry Liquid Detergent (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "79",
+     "rowText": "Toilet Paper (10 Rolls)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "80",
+     "rowText": "Baby Diapers (60 Pieces Per Pack)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "81",
+     "rowText": "Petrol, 98 Octane (Per Litre)",
+     "uoM": "Dollar",
+     "footnote": "Average retail prices of petrol and diesel are inclusive of onsite and loyalty discounts that are widely available to consumers."
+    },
+    {
+     "seriesNo": "82",
+     "rowText": "Petrol, 95 Octane (Per Litre)",
+     "uoM": "Dollar",
+     "footnote": "Average retail prices of petrol and diesel are inclusive of onsite and loyalty discounts that are widely available to consumers."
+    },
+    {
+     "seriesNo": "83",
+     "rowText": "Petrol, 92 Octane (Per Litre)",
+     "uoM": "Dollar",
+     "footnote": "Average retail prices of petrol and diesel are inclusive of onsite and loyalty discounts that are widely available to consumers."
+    },
+    {
+     "seriesNo": "84",
+     "rowText": "Liquefied Petroleum Gas (LPG) (Per Kilogram)",
+     "uoM": "Dollar",
+     "footnote": ""
+    },
+    {
+     "seriesNo": "85",
+     "rowText": "Diesel (Per Litre)",
+     "uoM": "Dollar",
+     "footnote": "Average retail prices of petrol and diesel are inclusive of onsite and loyalty discounts that are widely available to consumers."
+    }
+   ]
+  },
+  "generatedBy": "SingStat Table Builder",
+  "dateGenerated": "14/09/2026"
+ },
+ "DataCount": 1,
+ "StatusCode": 200,
+ "Message": ""
+}

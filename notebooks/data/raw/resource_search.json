@@ -1,0 +1,28 @@
+{
+ "Data": {
+  "generatedBy": "SingStat Table Builder",
+  "dateGenerated": "14/09/2026",
+  "total": 2,
+  "records": [
+   {
+    "theme": "Economy & Prices",
+    "subject": "Consumer Price Index",
+    "topic": "Average Retail Prices of Selected Consumer Items",
+    "id": "M213821",
+    "title": "Average Retail Prices Of Selected Consumer Items, Annual",
+    "tableType": "time series"
+   },
+   {
+    "theme": "Economy & Prices",
+    "subject": "Consumer Price Index",
+    "topic": "Average Retail Prices of Selected Consumer Items",
+    "id": "M213761",
+    "title": "Average Retail Prices Of Selected Consumer Items, Monthly",
+    "tableType": "time series"
+   }
+  ]
+ },
+ "DataCount": 1,
+ "StatusCode": 200,
+ "Message": ""
+}
