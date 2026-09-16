@@ -1,0 +1,4 @@
+ml/data/interim/*
+ml/data/processed/*
+ml/artifacts/*
+**/.venv/
