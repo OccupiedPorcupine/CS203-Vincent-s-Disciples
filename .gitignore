@@ -4,3 +4,4 @@ ml/artifacts/*
 **/.venv/
 __pycache__/
 .pytest_cache/
+**/catboost_info/

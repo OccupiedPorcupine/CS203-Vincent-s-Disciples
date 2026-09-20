@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import sklearn
 import xgboost
+import catboost
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
@@ -23,6 +24,7 @@ from sklearn.model_selection import ParameterSampler
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBRegressor
+from catboost import CatBoostRegressor
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -163,20 +165,69 @@ def make_preprocessor(numeric: list[str], *, scale: bool) -> ColumnTransformer:
     ])
 
 
-def make_model(name: str, numeric: list[str], params: dict | None = None) -> Pipeline:
+# def make_model(name: str, numeric: list[str], params: dict | None = None) -> Pipeline:
+#     params = params or {}
+#     if name == "Ridge":
+#         estimator = Ridge(alpha=1.0)
+#     elif name == "Random Forest":
+#         estimator = RandomForestRegressor(random_state=SEED, n_jobs=1, **params)
+#     elif name == "XGBoost":
+#         estimator = XGBRegressor(random_state=SEED, n_jobs=1, tree_method="hist", objective="reg:squarederror", **params)
+#     else:
+#         raise ValueError(f"Unknown model: {name}")
+#     return Pipeline([
+#         ("preprocessing", make_preprocessor(numeric, scale=name == "Ridge")),
+#         ("model", estimator),
+#     ])
+
+def make_model(name: str, numeric: list[str], params: dict | None = None):
     params = params or {}
+
     if name == "Ridge":
         estimator = Ridge(alpha=1.0)
+
+        return Pipeline([
+            ("preprocessing", make_preprocessor(numeric, scale=True)),
+            ("model", estimator),
+        ])
+
     elif name == "Random Forest":
-        estimator = RandomForestRegressor(random_state=SEED, n_jobs=1, **params)
+        estimator = RandomForestRegressor(
+            random_state=SEED,
+            n_jobs=1,
+            **params
+        )
+
+        return Pipeline([
+            ("preprocessing", make_preprocessor(numeric, scale=False)),
+            ("model", estimator),
+        ])
+
     elif name == "XGBoost":
-        estimator = XGBRegressor(random_state=SEED, n_jobs=1, tree_method="hist", objective="reg:squarederror", **params)
+        estimator = XGBRegressor(
+            random_state=SEED,
+            n_jobs=1,
+            tree_method="hist",
+            objective="reg:squarederror",
+            **params
+        )
+
+        return Pipeline([
+            ("preprocessing", make_preprocessor(numeric, scale=False)),
+            ("model", estimator),
+        ])
+
+    elif name == "CatBoost":
+        return CatBoostRegressor(
+            random_seed=SEED,
+            cat_features=["DISH"],
+            loss_function="RMSE",
+            verbose=False,
+            **params
+        )
+
     else:
         raise ValueError(f"Unknown model: {name}")
-    return Pipeline([
-        ("preprocessing", make_preprocessor(numeric, scale=name == "Ridge")),
-        ("model", estimator),
-    ])
 
 
 def candidate_params(name: str, count: int = 20) -> list[dict]:
@@ -195,6 +246,13 @@ def candidate_params(name: str, count: int = 20) -> list[dict]:
             "min_child_weight": [1, 3, 6],
             "subsample": [0.8, 1.0],
             "colsample_bytree": [0.8, 1.0],
+        }
+    elif name == "CatBoost":
+        space = {
+            "iterations": [200, 500, 800],            
+            "depth": [4, 6, 8],
+            "learning_rate": [0.03, 0.05, 0.1],
+            "l2_leaf_reg": [3, 5, 10],
         }
     else:
         raise ValueError(name)
@@ -264,7 +322,7 @@ def run(raw_path: Path = RAW_DATA, output_dir: Path = OUTPUT_DIR, candidates: in
 
     selected = {}
     cv_records = []
-    for name in ("Random Forest", "XGBoost"):
+    for name in ("Random Forest", "XGBoost", "CatBoost"):
         print(f"Tuning {name} on training dates only ({candidates} candidates, 3 folds)...", flush=True)
         params, records = tune(name, train, numeric, candidates)
         selected[name] = params
@@ -273,7 +331,7 @@ def run(raw_path: Path = RAW_DATA, output_dir: Path = OUTPUT_DIR, candidates: in
 
     models = {}
     x_train = train[["DISH", *numeric]]
-    for name in ("Ridge", "Random Forest", "XGBoost"):
+    for name in ("Ridge", "Random Forest", "XGBoost", "CatBoost"):
         model = make_model(name, numeric, selected.get(name))
         model.fit(x_train, train["DEMAND"])
         models[name] = model
@@ -287,7 +345,7 @@ def run(raw_path: Path = RAW_DATA, output_dir: Path = OUTPUT_DIR, candidates: in
         }
 
     validation_rows, validation_predictions = evaluate("validation", validation, predict(validation))
-    contenders = ("Ridge", "Random Forest", "XGBoost")
+    contenders = ("Ridge", "Random Forest", "XGBoost", "CatBoost")
     validation_winner = min(
         (row for row in validation_rows if row["dish"] == "ALL" and row["model"] in contenders),
         key=lambda row: (row["MAE"], contenders.index(row["model"])),
@@ -322,10 +380,14 @@ def run(raw_path: Path = RAW_DATA, output_dir: Path = OUTPUT_DIR, candidates: in
             for name, frame in splits.items()
         },
         "lag_audit": audit,
-        "versions": {"python": platform.python_version(), "pandas": pd.__version__,
-                     "numpy": np.__version__, "scikit_learn": sklearn.__version__,
-                     "xgboost": xgboost.__version__},
-    }
+        "versions": {
+            "python": platform.python_version(), 
+            "pandas": pd.__version__,
+            "numpy": np.__version__, 
+            "scikit_learn": sklearn.__version__,
+            "xgboost": xgboost.__version__},
+            "catboost": catboost.__version__,
+        }
     (output_dir / "run.json").write_text(json.dumps(metadata, indent=2) + "\n")
     print(metric_table[metric_table["dish"] == "ALL"].to_string(index=False))
     print(f"Saved results to {output_dir}")
