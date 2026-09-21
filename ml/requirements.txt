@@ -1,0 +1,6 @@
+# Reproducible comparison environment, Python 3.13
+numpy==2.3.3
+pandas==2.3.3
+scikit-learn==1.7.2
+xgboost==3.0.5
+pytest==8.4.2
