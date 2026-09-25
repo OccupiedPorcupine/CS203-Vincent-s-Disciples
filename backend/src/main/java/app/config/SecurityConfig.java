@@ -33,9 +33,18 @@ public class SecurityConfig {
             HttpSecurity http,
             SecurityContextRepository securityContextRepository
     ) throws Exception {
+        //comment this out to block future views of db
+        // var h2Console = PathRequest.toH2Console();
+
         http
                 .cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
+                .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()
+                        )
+                        //comment this out to block future views of db
+                        // The H2 console does not send the application's CSRF token - allows access to localhost:8080/h2-console
+                        // This exception should only exist for local development.
+                        // .ignoringRequestMatchers(h2Console)
+                        )
                 .securityContext(context -> context
                         .securityContextRepository(securityContextRepository)
                         .requireExplicitSave(true)
@@ -48,6 +57,8 @@ public class SecurityConfig {
                                 "/api/auth/login"
                         ).permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
+                        //change back to the previous line if you don't want to view db anymore to preserve security
+                        // .requestMatchers(h2Console).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions
