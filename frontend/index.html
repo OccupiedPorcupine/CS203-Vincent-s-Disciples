@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Public runtime configuration. Will be reconfigured to Port 5500 to connect w backend -->
+  <!-- Public runtime configuration. Google configuration is loaded from the backend. -->
   <meta name="api-base-url" content="http://localhost:8080">
 
 
@@ -19,14 +19,13 @@
   <main class="sign-in-card">
     <div class="visual-placeholder" aria-hidden="true">PLACEHOLDER</div>
 
-    <section class="sign-in-panel" aria-labelledby="welcome-heading">
+    <section id="login-panel" class="sign-in-panel" aria-labelledby="welcome-heading">
       <h1 id="welcome-heading">Welcome back to <span>Chicky</span></h1>
 
-      <form class="sign-in-form" action="#" method="post">
+      <form id="login-form" class="sign-in-form">
         <div class="field">
           <label for="email">Email</label>
-          <input id="email" name="email" type="email" 
-                  placeholder="Email Address" autocomplete="email" required>
+          <input id="email" name="email" type="email" placeholder="Email Address" autocomplete="email" required>
         </div>
 
         <div class="field password-field">
@@ -38,23 +37,25 @@
         <button class="primary-button login-button" type="submit">Log In</button>
       </form>
 
-      <!--send submit request, controlled by Javascript-->
       <p id="login-status" class="form-status" role="status" aria-live="polite"></p>
 
       <div class="separator"><span>OR</span></div>
 
-      <!-- Using Google's button container with their default font -->
+      <!-- Google Identity Services button, so we are using the default font. -->
       <div id="google-button" class="google-button-container"></div>
       <p id="google-help" class="google-help" hidden>
+        <!--it will throw this error if client id is not inputted, but i think bean creation throws this first anyway if you initialise backend first-->
         Google sign-in is not configured on the backend.
       </p>
 
       <div class="sign-up-row">
         <span>Don’t have an account?</span>
-        <a class="primary-button sign-up-button" href="#">Sign Up</a>
+        <button id="show-signup" class="primary-button sign-up-button" type="button">Sign Up</button>
       </div>
     </section>
 
+    <!--this part, in fact, is NOT designed yet!!!-->
+    <!--it's for signing up-->
     <section id="signup-panel" class="sign-in-panel" aria-labelledby="signup-heading" hidden>
       <h1 id="signup-heading">Create your <span>Chicky account</span></h1>
 
