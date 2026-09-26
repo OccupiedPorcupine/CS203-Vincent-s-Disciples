@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: sales_forecast
+      POSTGRES_USER: sales_forecast
+      POSTGRES_PASSWORD: sales_forecast
+    ports:
+      - "5432:5432"
+    volumes:
+      - sales-forecast-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sales_forecast"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  ml-service:
+    build:
+      context: .
+      dockerfile: ml/Dockerfile
+    environment:
+      MODEL_STORAGE_PATH: /data/models
+      BOOTSTRAP_WORKBOOK: /app/hawker_datasets/hawker_sales.xlsx
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./.local-data:/data
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/sales_forecast
+      DATABASE_USERNAME: sales_forecast
+      DATABASE_PASSWORD: sales_forecast
+      ML_BASE_URL: http://ml-service:8000
+      STORAGE_PATH: /data
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./.local-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    ports:
+      - "8000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  sales-forecast-db:

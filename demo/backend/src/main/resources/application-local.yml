@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:h2:file:../.local-data/backend/sales-forecast;MODE=PostgreSQL;AUTO_SERVER=TRUE
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: update
+app:
+  ml-base-url: http://127.0.0.1:8001
+  storage-path: ../.local-data

@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:salesforecast;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+app:
+  ml-base-url: http://localhost:8000
+  storage-path: ${java.io.tmpdir}/sales-forecast-tests

@@ -4,3 +4,10 @@ ml/artifacts/*
 **/.venv/
 __pycache__/
 .pytest_cache/
+demo/.local-data/
+demo/frontend/node_modules/
+demo/frontend/.next/
+demo/frontend/dist/
+demo/frontend/.wrangler/
+demo/backend/target/
+.DS_Store

@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: sales-forecast-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/sales_forecast}
+    username: ${DATABASE_USERNAME:sales_forecast}
+    password: ${DATABASE_PASSWORD:sales_forecast}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+  threads:
+    virtual:
+      enabled: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+app:
+  ml-base-url: ${ML_BASE_URL:http://localhost:8000}
+  storage-path: ${STORAGE_PATH:../.local-data}
