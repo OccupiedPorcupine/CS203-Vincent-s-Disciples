@@ -2,6 +2,12 @@
 
 A self-contained three-service demo for registering Excel sales data and estimating tomorrow's revenue and orders.
 
+## Included flows
+
+- Forecast page at `/` with tomorrow's revenue, order estimate, item forecast, editable conditions, and interactive sales bars.
+- Sources page at `/sources` with the active datasets and Excel workbook upload.
+- Spring Boot API between the browser and the internal Python forecasting service.
+
 ## Services
 
 - `frontend/`: React and TypeScript dashboard.
@@ -10,6 +16,18 @@ A self-contained three-service demo for registering Excel sales data and estimat
 
 The repository's separate model experiments remain in the root-level `../ml/` directory.
 
+## Layout
+
+```text
+demo/
+├── frontend/          # React UI
+├── backend/           # Spring Boot API
+├── ml/                # FastAPI forecasting service
+├── hawker_datasets/   # Demo workbook
+├── compose.yaml       # Complete local stack
+└── .env.example       # Configuration reference
+```
+
 ## Run the complete application
 
 ```bash
@@ -17,7 +35,12 @@ cd demo
 docker compose up --build
 ```
 
-Open `http://localhost:8000`. The Spring API runs at `http://localhost:8080` and the internal ML service runs at `http://localhost:8001`.
+Local endpoints:
+
+- Frontend: `http://localhost:8000`
+- Data sources: `http://localhost:8000/sources`
+- Spring API: `http://localhost:8080`
+- ML service: `http://localhost:8001`
 
 The first forecast bootstraps a model from `hawker_datasets/hawker_sales.xlsx`. Uploaded files and trained model artifacts are written to the ignored `.local-data/` directory. PostgreSQL records sources, training runs, active models, and forecast history.
 
