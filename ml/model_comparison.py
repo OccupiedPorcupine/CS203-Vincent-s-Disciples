@@ -25,6 +25,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBRegressor
 from catboost import CatBoostRegressor
+from ml.src.features.history import (
+    recompute_same_weekday_features,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -51,7 +54,12 @@ TRANSLATIONS = {
 
 
 def load_dish_days(path: Path = RAW_DATA) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Reproduce PR #2's EDA renaming and modeling notebook's long table."""
+    """
+    Load and transform the restaurant dataset into wide and long model tables.
+
+    The source same-weekday mean features are recomputed from observed
+    weekday history to avoid misalignment around missing calendar dates.
+    """
     wide = pd.read_csv(path, sep=";").drop(columns="Unnamed: 0")
     translated = []
     for column in wide.columns:
@@ -59,16 +67,43 @@ def load_dish_days(path: Path = RAW_DATA) -> tuple[pd.DataFrame, pd.DataFrame]:
             column = column.replace(german, english)
         translated.append(column)
     wide.columns = translated
+
     # Source dates are month.day.year (e.g. 10.13.2013); make this explicit.
     wide["DEMAND_DATE"] = pd.to_datetime(wide["DEMAND_DATE"], format="%m.%d.%Y")
+
     wide = wide.sort_values("DEMAND_DATE").reset_index(drop=True)
+
     if wide["DEMAND_DATE"].duplicated().any():
         raise ValueError("Duplicate source dates would mix date groups")
+
+    # Recompute same-weekday demand means from the actual observed
+    # weekday sequence rather than trusting the source's precomputed
+    # columns, which become misaligned around 5 missing calendar dates.
+    wide = recompute_same_weekday_features(
+        wide,
+        DISHES,
+    )
+
+    same_weekday_columns = [
+        f"{dish}_MEAN_SAME_WDAY_DEMANDS_W{weeks}"
+        for dish in DISHES
+        for weeks in (2, 3, 4)
+    ]
+
+    wide = (
+        wide
+        .dropna(
+            subset=same_weekday_columns,
+        )
+        .reset_index(drop=True)
+    )
 
     parts = []
     for dish in DISHES:
         part = pd.DataFrame({
-            "DEMAND_DATE": wide["DEMAND_DATE"], "DISH": dish, "DEMAND": wide[dish],
+            "DEMAND_DATE": wide["DEMAND_DATE"],
+            "DISH": dish,
+            "DEMAND": wide[dish],
         })
         for lag in range(1, 8):
             part[f"DEMAND_T{lag}"] = wide[f"{dish}_DEMAND_T{lag}"]
@@ -165,21 +200,6 @@ def make_preprocessor(numeric: list[str], *, scale: bool) -> ColumnTransformer:
     ])
 
 
-# def make_model(name: str, numeric: list[str], params: dict | None = None) -> Pipeline:
-#     params = params or {}
-#     if name == "Ridge":
-#         estimator = Ridge(alpha=1.0)
-#     elif name == "Random Forest":
-#         estimator = RandomForestRegressor(random_state=SEED, n_jobs=1, **params)
-#     elif name == "XGBoost":
-#         estimator = XGBRegressor(random_state=SEED, n_jobs=1, tree_method="hist", objective="reg:squarederror", **params)
-#     else:
-#         raise ValueError(f"Unknown model: {name}")
-#     return Pipeline([
-#         ("preprocessing", make_preprocessor(numeric, scale=name == "Ridge")),
-#         ("model", estimator),
-#     ])
-
 def make_model(name: str, numeric: list[str], params: dict | None = None):
     params = params or {}
 
@@ -249,7 +269,7 @@ def candidate_params(name: str, count: int = 20) -> list[dict]:
         }
     elif name == "CatBoost":
         space = {
-            "iterations": [200, 500, 800],            
+            "iterations": [200, 500, 800],
             "depth": [4, 6, 8],
             "learning_rate": [0.03, 0.05, 0.1],
             "l2_leaf_reg": [3, 5, 10],
@@ -313,8 +333,23 @@ def run(raw_path: Path = RAW_DATA, output_dir: Path = OUTPUT_DIR, candidates: in
     audit = lag_audit(wide)
     splits = split_by_date(long)
     numeric = [column for column in long.columns if column not in ("DEMAND_DATE", "DISH", "DEMAND")]
-    if len(wide) != 760 or len(numeric) != 45 or [len(splits[k]) for k in ("train", "validation", "test")] != [3724, 798, 798]:
-        raise ValueError("Data or features differ from PR #2's experiment")
+
+    if (
+        len(wide) != 732
+        or len(numeric) != 45
+        or [
+            len(splits[k])
+            for k in (
+                "train",
+                "validation",
+                "test",
+            )
+        ] != [3584, 770, 770]
+    ):
+        raise ValueError(
+            "Corrected data or features differ from the expected experiment shape"
+        )
+
     train, validation, test = (splits[name] for name in ("train", "validation", "test"))
     for name, expected in (("validation", validation), ("test", test)):
         if set(train["DEMAND_DATE"]).intersection(expected["DEMAND_DATE"]):
@@ -381,9 +416,9 @@ def run(raw_path: Path = RAW_DATA, output_dir: Path = OUTPUT_DIR, candidates: in
         },
         "lag_audit": audit,
         "versions": {
-            "python": platform.python_version(), 
+            "python": platform.python_version(),
             "pandas": pd.__version__,
-            "numpy": np.__version__, 
+            "numpy": np.__version__,
             "scikit_learn": sklearn.__version__,
             "xgboost": xgboost.__version__},
             "catboost": catboost.__version__,

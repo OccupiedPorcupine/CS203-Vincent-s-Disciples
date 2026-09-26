@@ -20,15 +20,21 @@ def prepared():
 
 def test_same_original_observations_and_grouped_chronological_splits(prepared):
     wide, long, splits = prepared
-    assert len(wide) == 760
-    assert len(long) == 5320
-    assert [len(splits[name]) for name in ("train", "validation", "test")] == [3724, 798, 798]
+    assert len(wide) == 732
+    assert len(long) == len(wide) * len(DISHES)
+
+    assert (
+        len(splits["train"])
+        + len(splits["validation"])
+        + len(splits["test"])
+        == len(long)
+    )
     assert [(splits[name]["DEMAND_DATE"].min().strftime("%Y-%m-%d"),
              splits[name]["DEMAND_DATE"].max().strftime("%Y-%m-%d"))
             for name in ("train", "validation", "test")] == [
-                ("2013-10-04", "2015-03-24"),
-                ("2015-03-25", "2015-07-16"),
-                ("2015-07-17", "2015-11-07"),
+                ("2013-11-01", "2015-04-01"),
+                ("2015-04-02", "2015-07-20"),
+                ("2015-07-21", "2015-11-07"),
             ]
     groups = [set(frame["DEMAND_DATE"]) for frame in splits.values()]
     assert not (groups[0] & groups[1] or groups[0] & groups[2] or groups[1] & groups[2])
@@ -36,19 +42,51 @@ def test_same_original_observations_and_grouped_chronological_splits(prepared):
                for frame in splits.values())
 
 
-def test_expanding_folds_never_cross_dates_or_leave_training(prepared):
+def test_expanding_folds_never_cross_dates_or_leave_training(
+    prepared,
+):
     train = prepared[2]["train"]
-    folds = list(expanding_date_folds(train))
+    folds = list(
+        expanding_date_folds(train)
+    )
     assert len(folds) == 3
-    score_dates = []
+    train_dates = set(
+        train["DEMAND_DATE"].unique()
+    )
+    score_dates_seen = set()
     for fit_idx, score_idx in folds:
-        fit, score = train.iloc[fit_idx], train.iloc[score_idx]
-        assert fit["DEMAND_DATE"].nunique() >= 322
-        assert score["DEMAND_DATE"].nunique() == 70
-        assert fit["DEMAND_DATE"].max() < score["DEMAND_DATE"].min()
-        assert len(score) == 490
-        score_dates.append(set(score["DEMAND_DATE"]))
-    assert not (score_dates[0] & score_dates[1] or score_dates[1] & score_dates[2])
+        fit = train.iloc[fit_idx]
+        score = train.iloc[score_idx]
+        fit_dates = set(
+            fit["DEMAND_DATE"].unique()
+        )
+        score_dates = set(
+            score["DEMAND_DATE"].unique()
+        )
+        # each scoring fold should contain 70 dates
+        assert len(score_dates) == 70
+        # training happens  before scoring
+        assert (
+            fit["DEMAND_DATE"].max()
+            < score["DEMAND_DATE"].min()
+        )
+        # fit and score portions must not overlap
+        assert fit_dates.isdisjoint(
+            score_dates
+        )
+        assert fit_dates.issubset(
+            train_dates
+        )
+        assert score_dates.issubset(
+            train_dates
+        )
+        # scoring folds themselves must not overlap
+        assert score_dates_seen.isdisjoint(
+            score_dates
+        )
+        score_dates_seen.update(
+            score_dates
+        )
 
 
 def test_prior_row_audit_detects_current_target_contamination(prepared):
@@ -62,18 +100,92 @@ def test_prior_row_audit_detects_current_target_contamination(prepared):
         lag_audit(changed)
 
 
-def test_ridge_and_baselines_reproduce_original_validation(prepared):
+def test_ridge_and_baselines_reproduce_corrected_validation(prepared):
     long, splits = prepared[1:]
-    numeric = [c for c in long if c not in ("DEMAND_DATE", "DISH", "DEMAND")]
+
+    numeric = [
+        c
+        for c in long
+        if c not in (
+            "DEMAND_DATE",
+            "DISH",
+            "DEMAND",
+        )
+    ]
+
     assert len(numeric) == 45
-    train, val = splits["train"], splits["validation"]
-    ridge = make_model("Ridge", numeric)
-    ridge.fit(train[["DISH", *numeric]], train["DEMAND"])
-    ridge_scores = metrics(val["DEMAND"].to_numpy(), ridge.predict(val[["DISH", *numeric]]))
-    naive = metrics(val["DEMAND"].to_numpy(), val["DEMAND_T1"].to_numpy())
-    seasonal = metrics(val["DEMAND"].to_numpy(), val["DEMAND_T7"].to_numpy())
-    assert ridge_scores["MAE"] == pytest.approx(4.954089116003066, abs=1e-6)
-    assert ridge_scores["RMSE"] == pytest.approx(7.092024393249851, abs=1e-6)
-    assert naive["MAE"] == pytest.approx(7.6441102757, abs=1e-6)
-    assert seasonal["MAE"] == pytest.approx(6.3947368421, abs=1e-6)
-    assert np.isfinite(ridge_scores["WAPE_pct"])
+
+    train = splits["train"]
+    val = splits["validation"]
+
+    ridge = make_model(
+        "Ridge",
+        numeric,
+    )
+
+    ridge.fit(
+        train[["DISH", *numeric]],
+        train["DEMAND"],
+    )
+
+    ridge_scores = metrics(
+        val["DEMAND"].to_numpy(),
+        ridge.predict(
+            val[["DISH", *numeric]]
+        ),
+    )
+
+    naive_scores = metrics(
+        val["DEMAND"].to_numpy(),
+        val["DEMAND_T1"].to_numpy(),
+    )
+
+    seasonal_scores = metrics(
+        val["DEMAND"].to_numpy(),
+        val["DEMAND_T7"].to_numpy(),
+    )
+
+    assert ridge_scores["MAE"] == pytest.approx(
+        4.951362011964557,
+        abs=1e-6,
+    )
+
+    assert ridge_scores["RMSE"] == pytest.approx(
+        7.057543378645058,
+        abs=1e-6,
+    )
+
+    assert ridge_scores["WAPE_pct"] == pytest.approx(
+        27.98200916853364,
+        abs=1e-6,
+    )
+
+    assert naive_scores["MAE"] == pytest.approx(
+        7.397402597402597,
+        abs=1e-6,
+    )
+
+    assert naive_scores["RMSE"] == pytest.approx(
+        11.12432691674644,
+        abs=1e-6,
+    )
+
+    assert naive_scores["WAPE_pct"] == pytest.approx(
+        41.80550458715596,
+        abs=1e-6,
+    )
+
+    assert seasonal_scores["MAE"] == pytest.approx(
+        6.364935064935065,
+        abs=1e-6,
+    )
+
+    assert seasonal_scores["RMSE"] == pytest.approx(
+        9.494974747441168,
+        abs=1e-6,
+    )
+
+    assert seasonal_scores["WAPE_pct"] == pytest.approx(
+        35.97064220183486,
+        abs=1e-6,
+    )
