@@ -3,4 +3,9 @@ numpy==2.3.3
 pandas==2.3.3
 scikit-learn==1.7.2
 xgboost==3.0.5
+catboost
 pytest==8.4.2
+fastapi
+uvicorn
+httpx
+#pip install -r ml/requirements.txt
