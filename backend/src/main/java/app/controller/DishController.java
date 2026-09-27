@@ -1,7 +1,7 @@
 package app.controller;
 
-import app.dish.Dish;
 import app.dto.CreateDishRequest;
+import app.dto.DishResponse;
 import app.service.DishService;
 import app.user.AuthenticatedUser;
 
@@ -21,13 +21,13 @@ public class DishController {
     }
 
     @PostMapping
-    public Dish createDish(
+    public DishResponse createDish(
             @AuthenticationPrincipal AuthenticatedUser user,
             @RequestBody CreateDishRequest request
     ) {
-        return dishService.createDish(
+        return DishResponse.from(dishService.createDish(
                 request.name(),
                 user.id()
-        );
+        ));
     }
 }
