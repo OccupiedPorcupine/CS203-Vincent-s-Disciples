@@ -18,6 +18,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@Tag(name = "Authentication", description = "User authentication operations")
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -35,7 +42,13 @@ public class AuthController {
         this.appUserService = appUserService;
         this.sessionAuthenticationService = sessionAuthenticationService;
     }
-
+    
+    @Operation(summary = "Login with Google", description = "Authenticates a user using a Google ID token and creates an authenticated session.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Authentication successful"),
+            @ApiResponse(responseCode = "400", description = "Invalid login request", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Invalid Google credential", content = @Content)
+    })
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> loginWithGoogle(
             @Valid @RequestBody GoogleLoginRequest request,
