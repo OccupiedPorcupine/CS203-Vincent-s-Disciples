@@ -22,6 +22,9 @@
         <java.version>21</java.version>
         <google-api-client.version>2.9.1</google-api-client.version>
         <google-http-client.version>2.2.0</google-http-client.version>
+        <!-- Tests tagged "integration" need external services (e.g. the ML API) and are
+             skipped by default. Run them with: ./mvnw test -DexcludedGroups= -Dgroups=integration -->
+        <excludedGroups>integration</excludedGroups>
     </properties>
 
     <dependencies>
@@ -51,6 +54,23 @@
             <groupId>com.google.http-client</groupId>
             <artifactId>google-http-client-gson</artifactId>
             <version>${google-http-client.version}</version>
+        </dependency>
+
+        <!-- Schema migrations. On Spring Boot 4 the starter is required: flyway-core alone
+             is not auto-configured, so migrations would silently never run. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <!-- Supabase Postgres -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
         </dependency>
 
         <!--temporary dependency to view h2-console, remove during actual production so ppl can't view user database-->
