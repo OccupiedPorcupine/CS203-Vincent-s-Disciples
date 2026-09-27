@@ -109,6 +109,8 @@ backend/src/main/resources/db/migration/
 └── h2/            # H2-only SQL, normally empty
 ```
 
+On Supabase, the history table starts with a `<< Flyway Baseline >>` row at version 0. New projects are not empty: the "Enable automatic RLS" option installs a helper function, `public.rls_auto_enable()`, and Flyway refuses to migrate a non-empty schema unless it records a starting point first. Baselining at version 0 still runs every migration from V1. The helper is harmless: it turns on RLS for new tables, which the migrations do anyway.
+
 `spring.jpa.hibernate.ddl-auto=validate` makes Hibernate check every entity against the tables on startup. The app refuses to start if they differ, for example `Schema validation: missing column [price] in table [dishes]`.
 
 ## Changing the schema
@@ -166,5 +168,6 @@ Everyone whose `.env` points at the project shares one database, so:
 | `Schema validation: missing column/table` | An entity changed without a migration. See [Changing the schema](#changing-the-schema) |
 | `Validate failed: Migration checksum mismatch` | A migration that already ran on Supabase was edited. Revert the edit and add a new migration |
 | `Detected applied migration not resolved locally` | Someone ran a newer branch against Supabase. Pull the latest `main` |
-| `Public holiday sync failed; using stored holidays` | data.gov.sg was unreachable. The app keeps running with the holidays already stored |
+| `Public holiday sync failed; using stored holidays` | data.gov.sg was unreachable, or the app was stopped while the startup sync was still running (the API starts answering before the sync finishes). The app keeps running with the holidays already stored |
+| `Found non-empty schema(s) "public" but no schema history table` | Flyway ran without the Supabase profile's baseline settings. Check that `spring.profiles.active=supabase` is set. Do not run `baseline` by hand: it would skip V1 |
 | `remaining connection slots are reserved` or `too many clients` | Too many backends running at once. Stop one |
