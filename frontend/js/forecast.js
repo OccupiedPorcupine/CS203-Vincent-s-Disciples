@@ -6,10 +6,10 @@
 
 const USE_MOCK_DATA = true;
 
-// How far ahead the date picker allows.
-// The real backend (NeaWeatherForecastService) only accepts dates inside NEA's
-// 24-hour forecast window, so in real mode this is effectively tomorrow.
-const MAX_DAYS_AHEAD = USE_MOCK_DATA ? 7 : 1;
+// Forecast periods offered: 1, 2 or 4 days ahead (set in forecast.html).
+// NOTE: the real backend (NeaWeatherForecastService) currently only accepts
+// dates inside NEA's 24-hour forecast. "2 days" and "4 days" need it switched
+// to NEA's 4-day outlook before they will work with real data.
 
 const PAST_DAYS_SHOWN = 14;
 
@@ -159,7 +159,7 @@ const longDate = (s) =>
 
 const els = {
   dish: document.getElementById("dish-select"),
-  date: document.getElementById("forecast-date"),
+  periods: document.querySelectorAll(".period-button"),
   chart: document.getElementById("chart"),
   headline: document.getElementById("headline"),
   status: document.getElementById("status"),
@@ -171,18 +171,11 @@ const els = {
   toggle: document.getElementById("sidebar-toggle"),
 };
 
-const state = { dishId: null, date: null, requestId: 0 };
+const state = { dishId: null, days: 1, requestId: 0 };
 let lastRender = null;
 
 async function init() {
   setupSidebar();
-
-  // Date picker: tomorrow by default, limited to the supported range.
-  const tomorrow = isoDate(addDays(today(), 1));
-  els.date.min = isoDate(today());
-  els.date.max = isoDate(addDays(today(), MAX_DAYS_AHEAD));
-  els.date.value = tomorrow;
-  state.date = tomorrow;
 
   try {
     const dishes = await getDishes();
@@ -204,15 +197,13 @@ async function init() {
     refresh();
   });
 
-  els.date.addEventListener("change", () => {
-    if (!els.date.value) return;
-    if (els.date.value < els.date.min || els.date.value > els.date.max) {
-      setStatus(`Pick a date between ${longDate(els.date.min)} and ${longDate(els.date.max)}.`, true);
-      return;
-    }
-    state.date = els.date.value;
-    refresh();
-  });
+  els.periods.forEach((btn) =>
+    btn.addEventListener("click", () => {
+      els.periods.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      state.days = Number(btn.dataset.days);
+      refresh();
+    })
+  );
 
   window.addEventListener("resize", debounce(() => lastRender && drawChart(...lastRender), 150));
   refresh();
@@ -241,23 +232,22 @@ async function refresh() {
   setStatus("Generating forecast…");
 
   try {
-    // Forecast every day from today up to the chosen date, so the chart line is continuous.
+    // Forecast today (so the chart line joins up) plus the next N days.
     const forecastDates = [];
-    for (let d = today(); isoDate(d) <= state.date; d = addDays(d, 1)) {
-      forecastDates.push(isoDate(d));
-    }
+    for (let i = 0; i <= state.days; i++) forecastDates.push(isoDate(addDays(today(), i)));
+    const firstDay = forecastDates[1];
 
     const [past, forecast, factors] = await Promise.all([
       getRecentSales(state.dishId, PAST_DAYS_SHOWN),
       Promise.all(forecastDates.map((date) => getForecast(state.dishId, date))),
-      getFactors(state.dishId, state.date),
+      getFactors(state.dishId, firstDay),
     ]);
 
     if (requestId !== state.requestId) return;
 
     lastRender = [past, forecast];
     drawChart(past, forecast);
-    renderHeadline(forecast[forecast.length - 1], past);
+    renderHeadline(forecast.slice(1), past);
     renderFactors(factors);
     renderHistory(past.slice(-7));
     setStatus(USE_MOCK_DATA ? "Showing sample data. Not connected to the forecasting model yet." : "");
@@ -272,19 +262,34 @@ function setStatus(text, isError = false) {
   els.status.classList.toggle("error", isError);
 }
 
-function renderHeadline(target, past) {
-  const dishName = els.dish.options[els.dish.selectedIndex]?.text ?? "";
-  const lastWeekSameDay = past.find((r) => r.date === isoDate(addDays(parseIso(target.date), -7)));
-  let comparison = "";
-  if (lastWeekSameDay && lastWeekSameDay.quantity > 0) {
-    const change = Math.round(((target.predicted - lastWeekSameDay.quantity) / lastWeekSameDay.quantity) * 100);
-    comparison =
-      change === 0 ? ", about the same as last week"
-      : `, ${Math.abs(change)}% ${change > 0 ? "more" : "fewer"} than the same day last week`;
+// `days` = the forecast for tomorrow onwards (today is only drawn on the chart).
+function renderHeadline(days, past) {
+  const dishName = escapeHtml(els.dish.options[els.dish.selectedIndex]?.text ?? "");
+  const total = Math.round(days.reduce((sum, d) => sum + d.predicted, 0));
+
+  if (days.length === 1) {
+    const day = days[0];
+    const lastWeek = past.find((r) => r.date === isoDate(addDays(parseIso(day.date), -7)));
+    let comparison = "";
+    if (lastWeek && lastWeek.quantity > 0) {
+      const change = Math.round(((day.predicted - lastWeek.quantity) / lastWeek.quantity) * 100);
+      comparison =
+        change === 0 ? ", about the same as last week"
+        : `, ${Math.abs(change)}% ${change > 0 ? "more" : "fewer"} than the same day last week`;
+    }
+    els.headline.innerHTML =
+      `<span class="number">${total}</span>` +
+      `${dishName} portions expected tomorrow (${longDate(day.date)})${comparison}.`;
+    return;
   }
+
+  const breakdown = days
+    .map((d) => `<li>${longDate(d.date)}: <strong>${Math.round(d.predicted)}</strong></li>`)
+    .join("");
   els.headline.innerHTML =
-    `<span class="number">${Math.round(target.predicted)}</span>` +
-    `${escapeHtml(dishName)} portions expected on ${longDate(target.date)}${comparison}.`;
+    `<span class="number">${total}</span>` +
+    `${dishName} portions expected over the next ${days.length} days.` +
+    `<ul class="day-breakdown">${breakdown}</ul>`;
 }
 
 function renderFactors({ weather, events }) {
@@ -366,7 +371,8 @@ function drawChart(past, forecast) {
       <path class="band" d="${bandPath}"/>
       <path class="actual" d="${pathFor(actualPts)}"/>
       <path class="forecast" d="${pathFor(forecastPts)}"/>
-      <circle class="target-dot" cx="${x(target.i)}" cy="${y(target.value)}" r="6"/>
+      ${forecastPts.filter((p) => p.date > isoDate(today()))
+        .map((p) => `<circle class="target-dot" cx="${x(p.i)}" cy="${y(p.value)}" r="5"/>`).join("")}
       <line class="hover-line" y1="${pad.top}" y2="${pad.top + innerH}" visibility="hidden"/>
       <circle class="hover-dot" r="5" visibility="hidden"/>
       <rect class="hit-area" x="${pad.left}" y="${pad.top}" width="${innerW}" height="${innerH}" fill="transparent"/>

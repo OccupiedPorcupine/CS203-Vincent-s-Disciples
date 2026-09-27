@@ -47,10 +47,14 @@
           <select id="dish-select"></select>
         </div>
       </div>
-      <div class="control date-control">
-        <label for="forecast-date">Forecast date</label>
-        <input type="date" id="forecast-date">
-      </div>
+      <fieldset class="control period-control">
+        <legend>Forecast period</legend>
+        <div class="period-buttons">
+          <button type="button" class="period-button" data-days="1" aria-pressed="true">1 day</button>
+          <button type="button" class="period-button" data-days="2" aria-pressed="false">2 days</button>
+          <button type="button" class="period-button" data-days="4" aria-pressed="false">4 days</button>
+        </div>
+      </fieldset>
     </section>
 
     <div class="content-grid">
