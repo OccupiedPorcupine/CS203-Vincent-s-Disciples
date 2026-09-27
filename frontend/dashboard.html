@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Chicky Dashboard</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+
+<body>
+  <header class="topbar">
+    <details class="navigation">
+      <summary aria-label="Toggle navigation"><img src="images/dashboard/sidebar.svg" alt=""></summary>
+      <nav aria-label="Main navigation">
+        <a href="dashboard.html" aria-current="page">Dashboard</a>
+        <a href="forecast.html">Demand Forecast</a>
+      </nav>
+    </details>
+    <img class="avatar" src="images/dashboard/avatar.png" width="40" height="40" alt="User profile">
+  </header>
+
+  <main class="dashboard">
+    <div class="overview">
+      <section class="welcome" aria-labelledby="welcome-heading">
+        <h1 id="welcome-heading">Welcome, USER</h1>
+        <p>Review this week’s performance</p>
+      </section>
+      <!-- Empty graph areas intentionally match the Figma skeleton. -->
+      <section class="graph demand" aria-labelledby="demand-heading">
+        <h2 id="demand-heading">Performance Graph 1 (Demand)</h2>
+      </section>
+      <section class="graph revenue" aria-labelledby="revenue-heading">
+        <h2 id="revenue-heading">Performance Graph 2 (Revenue)</h2>
+      </section>
+    </div>
+
+    <section class="actions" aria-labelledby="actions-heading">
+      <h2 id="actions-heading">Actions Needed</h2>
+      <div class="divider" aria-hidden="true"><img src="images/dashboard/divider.svg" alt=""></div>
+      <div class="checklist">
+        <label class="check-field"><input type="checkbox" checked aria-describedby="action-one-description"><span>Label<span class="description" id="action-one-description">Description</span></span></label>
+        <label class="check-field"><input type="checkbox" checked aria-describedby="action-two-description"><span>Label<span class="description" id="action-two-description">Description</span></span></label>
+      </div>
+    </section>
+
+    <!-- Connect these controls to a chat service when adding application logic. -->
+    <section class="chat-box" aria-label="AI assistant">
+      <textarea aria-label="Message to AI assistant" placeholder="What would you like to know?"></textarea>
+      <div class="chat-toolbar">
+        <label class="icon-button attachment" title="Attach an image"><input type="file" accept="image/*" aria-label="Attach an image"><img src="images/dashboard/icon4.svg" alt=""></label>
+        <button class="icon-button" type="button" disabled title="Code input is not connected" aria-label="Code input"><img src="images/dashboard/icon1.svg" alt=""></button>
+        <button class="icon-button" type="button" disabled title="Voice input is not connected" aria-label="Voice input"><img src="images/dashboard/icon7.svg" alt=""></button>
+        <button class="icon-button send" type="button" disabled title="Chat service is not connected" aria-label="Send message"><img src="images/dashboard/icon3.svg" alt=""></button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
