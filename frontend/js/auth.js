@@ -68,19 +68,21 @@ async function apiRequest(path, options = {}) {
 }
 
 function showAccount(user) {
-  document.querySelector("#account-name").textContent = user.name || "Chicky user";
-  document.querySelector("#account-email").textContent = user.email;
+  // document.querySelector("#account-name").textContent = user.name || "Chicky user";
+  // document.querySelector("#account-email").textContent = user.email;
 
-  const picture = document.querySelector("#account-picture");
-  if (user.pictureUrl) {
-    picture.src = user.pictureUrl;
-    picture.alt = `${user.name || "User"} profile picture`;
-    picture.hidden = false;
-  } else {
-    picture.removeAttribute("src");
-    picture.hidden = true;
-  }
-  showPanel("account");
+  // const picture = document.querySelector("#account-picture");
+  // if (user.pictureUrl) {
+  //   picture.src = user.pictureUrl;
+  //   picture.alt = `${user.name || "User"} profile picture`;
+  //   picture.hidden = false;
+  // } else {
+  //   picture.removeAttribute("src");
+  //   picture.hidden = true;
+  // }
+  // showPanel("account");
+  window.location.href = "dashboardFake.html";
+
 }
 
 async function restoreSession() {
@@ -98,15 +100,18 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
   event.preventDefault();
   const form = event.currentTarget;
   const status = document.querySelector("#login-status");
+  const data = new FormData(form);
   setStatus(status, "Signing in…");
   setFormBusy(form, true);
-
   try {
-    const data = new FormData(form);
     const user = await apiRequest("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email: data.get("email"), password: data.get("password") })
+      body: JSON.stringify({
+        email: data.get("email"),
+        password: data.get("password")
+      })
     });
+
     form.reset();
     showAccount(user);
   } catch (error) {
