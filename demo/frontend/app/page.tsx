@@ -63,7 +63,7 @@ export default function ForecastPage() {
     ? liveForecast.item_forecasts.slice(0, 4).map((item) => [item.item, item.quantity, item.revenue] as const)
     : itemForecasts;
   const chartBars = [...recentSales, { label: "Tomorrow", amount: forecast, height: Math.min(96, Math.max(12, forecast / 27)) }];
-  const highlightedBar = hoveredBar ?? selectedBar;
+  const highlightedBar = selectedBar ?? hoveredBar;
 
   return (
     <main className="app-shell">
@@ -83,7 +83,7 @@ export default function ForecastPage() {
               <div><span>Orders</span><strong>{liveForecast?.predicted_orders ?? (isOpen ? Math.round(forecast / 8.42) : 0)}</strong></div>
               <div><span>7-day avg.</span><strong className={forecast >= 1992 ? "positive" : "negative"}>{forecast >= 1992 ? "+" : ""}{Math.round(((forecast - 1992) / 1992) * 100)}%</strong></div>
             </div>
-            <div className="sales-bars" aria-label="Recent sales and tomorrow forecast" onMouseLeave={() => setHoveredBar(null)}>
+            <div className={`sales-bars ${selectedBar !== null ? "pinned" : ""}`} aria-label="Recent sales and tomorrow forecast" onMouseLeave={() => setHoveredBar(null)}>
               {chartBars.map((bar, index) => {
                 const active = highlightedBar === index;
                 const dimmed = highlightedBar !== null && !active;

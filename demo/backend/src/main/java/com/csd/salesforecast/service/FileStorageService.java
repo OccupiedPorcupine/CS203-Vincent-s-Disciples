@@ -29,6 +29,16 @@ public class FileStorageService {
         return new StoredFile(target, sha256(target));
     }
 
+    public Path resolveStoredPath(String storedPath) {
+        Path recorded = Path.of(storedPath).toAbsolutePath().normalize();
+        if (Files.isRegularFile(recorded)) return recorded;
+
+        Path relocated = uploadRoot.resolve(recorded.getFileName()).normalize();
+        if (relocated.startsWith(uploadRoot) && Files.isRegularFile(relocated)) return relocated;
+
+        throw new IllegalStateException("Stored workbook is missing: " + recorded.getFileName());
+    }
+
     private String sha256(Path path) throws IOException {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

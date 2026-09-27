@@ -35,8 +35,9 @@ test("server-renders data sources on a separate page", async () => {
   const html = await response.text();
   assert.match(html, /<title>Chicken rice demo<\/title>/i);
   assert.match(html, /Data sources/);
-  assert.match(html, /hawker_sales\.xlsx/);
   assert.match(html, /Add a source/);
+  assert.match(html, /Apply to forecast/);
+  assert.doesNotMatch(html, /hawker_sales\.xlsx/);
   assert.doesNotMatch(html, /Expected gross sales/);
   assert.doesNotMatch(html, /Training runs/);
 });

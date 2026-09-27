@@ -8,7 +8,8 @@ public final class ApiDtos {
     private ApiDtos() {}
 
     public record SourceResponse(UUID id, String fileName, String status, boolean included, LocalDate dateStart,
-        LocalDate dateEnd, int rowCount, List<String> sheets, String validationMessage, OffsetDateTime createdAt) {}
+        LocalDate dateEnd, int rowCount, List<String> sheets, String validationMessage, OffsetDateTime createdAt,
+        boolean usedByActiveModel, String activeModelName, OffsetDateTime activeSince) {}
 
     public record ValidationRequest(String path) {}
     public record ValidationResponse(boolean valid, @JsonProperty("date_start") LocalDate dateStart,

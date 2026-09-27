@@ -5,11 +5,6 @@ import SiteHeader from "../SiteHeader";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
-const sampleSources = [
-  { name: "hawker_sales.xlsx", detail: "Daily Summary + Daily Item Sales", coverage: "1 Mar – 31 Aug 2026", records: "1,734", state: "In use", active: true },
-  { name: "restaurant.csv", detail: "Historical benchmark dataset", coverage: "4 Oct 2013 – 7 Nov 2015", records: "5,320", state: "Reference", active: false },
-];
-
 type SourceApi = {
   id:string;
   fileName:string;
@@ -20,6 +15,16 @@ type SourceApi = {
   rowCount:number;
   sheets:string[];
   validationMessage:string;
+  usedByActiveModel:boolean;
+  activeModelName:string | null;
+  activeSince:string | null;
+};
+
+type TrainingRunApi = {
+  id:string;
+  status:string;
+  selectedModel:string | null;
+  message:string;
 };
 
 export default function SourcesPage() {
@@ -27,24 +32,32 @@ export default function SourcesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [notice, setNotice] = useState("");
-  const [liveSources, setLiveSources] = useState<SourceApi[]>([]);
+  const [applyNotice, setApplyNotice] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  const [sources, setSources] = useState<SourceApi[]>([]);
+
+  async function loadSources() {
+    const response = await fetch(`${API_BASE}/api/data-sources`);
+    if (!response.ok) throw new Error("Could not load sources");
+    setSources(await response.json());
+    setLoaded(true);
+  }
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/data-sources`)
-      .then((response) => response.ok ? response.json() : [])
-      .then(setLiveSources)
-      .catch(() => undefined);
+    loadSources().catch((error) => { setLoaded(true); setNotice(error.message); });
   }, []);
 
-  const displayedSources = liveSources.length ? liveSources.map((source) => ({
-    name:source.fileName,
+  const displayedSources = sources.map((source) => ({
+    ...source,
     detail:source.sheets.join(" + "),
     coverage:`${source.dateStart} – ${source.dateEnd}`,
     records:source.rowCount.toLocaleString(),
-    state:source.included ? "In use" : source.status,
-    active:source.included,
-  })) : sampleSources;
+    state:source.usedByActiveModel ? `Used by ${source.activeModelName}` : source.status === "VALIDATED" ? "Validated" : "Rejected",
+  }));
+  const validatedCount = sources.filter((source) => source.included && source.status === "VALIDATED").length;
+  const activeCount = sources.filter((source) => source.usedByActiveModel).length;
 
   function chooseFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -68,8 +81,8 @@ export default function SourcesPage() {
       const response = await fetch(`${API_BASE}/api/data-sources`, { method:"POST", body:form });
       if (!response.ok) throw new Error((await response.json()).error ?? "Workbook validation failed");
       const source = await response.json();
-      setLiveSources((current) => [source, ...current.filter((item) => item.id !== source.id)]);
-      setNotice(source.validationMessage);
+      setSources((current) => [source, ...current.filter((item) => item.id !== source.id)]);
+      setNotice(source.included ? "Workbook validated. Apply it to update the forecast." : source.validationMessage);
       setFileName("");
       setSelectedFile(null);
     } catch (error) {
@@ -79,21 +92,56 @@ export default function SourcesPage() {
     }
   }
 
+  async function applyToForecast() {
+    setApplying(true);
+    setApplyNotice("Updating forecast model…");
+    try {
+      const response = await fetch(`${API_BASE}/api/training-runs`, { method:"POST" });
+      if (!response.ok) throw new Error((await response.json()).error ?? "Model update could not start");
+      const started: TrainingRunApi = await response.json();
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 700));
+        const runsResponse = await fetch(`${API_BASE}/api/training-runs`);
+        if (!runsResponse.ok) continue;
+        const runs: TrainingRunApi[] = await runsResponse.json();
+        const current = runs.find((run) => run.id === started.id);
+        if (current?.status === "COMPLETED") {
+          await loadSources();
+          setApplyNotice(`Forecast now uses ${current.selectedModel}.`);
+          return;
+        }
+        if (current?.status === "FAILED") throw new Error(current.message || "Model update failed");
+      }
+      setApplyNotice("Model update is still running. Refresh shortly.");
+    } catch (error) {
+      setApplyNotice(error instanceof Error ? error.message : "Model update is unavailable");
+    } finally {
+      setApplying(false);
+    }
+  }
+
   return (
     <main className="app-shell">
-      <SiteHeader active="sources" status={`${displayedSources.length} sources`} />
+      <SiteHeader active="sources" status={`${activeCount} active`} />
       <div className="workspace sources-page">
         <section className="intro">
           <div><p>CHICKEN RICE DEMO</p><h1>Data sources</h1></div>
-          <span>{displayedSources.length} connected</span>
+          <span>{validatedCount} validated</span>
         </section>
 
         <section className="sources-content">
           <div className="source-table">
             <div className="source-row source-head"><span>Type</span><span>Source</span><span>Coverage</span><span>Rows</span><span>Status</span></div>
             {displayedSources.map((source) => (
-              <div className="source-row" key={source.name}><span className="file-type">XLS</span><div><strong>{source.name}</strong><span>{source.detail}</span></div><span>{source.coverage}</span><span>{source.records}</span><span className={source.active ? "source-state active" : "source-state"}>{source.state}</span></div>
+              <div className="source-row" key={source.id}><span className="file-type">XLS</span><div><strong>{source.fileName}</strong><span>{source.detail}</span></div><span>{source.coverage}</span><span>{source.records}</span><span className={source.usedByActiveModel ? "source-state active" : "source-state"} title={source.activeSince ? `Active since ${new Date(source.activeSince).toLocaleString("en-SG")}` : undefined}>{source.state}</span></div>
             ))}
+            {loaded && displayedSources.length === 0 && <div className="empty-row">No data sources yet</div>}
+          </div>
+
+          <div className="apply-row">
+            <div><strong>Forecast data</strong><span>{activeCount ? `${activeCount} source${activeCount === 1 ? "" : "s"} linked to the active model` : "No source is linked to the active model"}</span></div>
+            <button className="primary-action" disabled={!validatedCount || applying} onClick={applyToForecast}>{applying ? "Applying…" : "Apply to forecast"}</button>
+            {applyNotice && <span className="inline-notice" role="status">{applyNotice}</span>}
           </div>
 
           <div className="upload-area">
@@ -110,7 +158,7 @@ export default function SourcesPage() {
           </div>
         </section>
 
-        <footer><span>Chicken rice demo</span><span>Data used by the active forecast</span></footer>
+        <footer><span>Chicken rice demo</span><span>PostgreSQL in Docker · H2 for local development</span></footer>
       </div>
     </main>
   );

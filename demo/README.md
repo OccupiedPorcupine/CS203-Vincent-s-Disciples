@@ -44,6 +44,15 @@ Local endpoints:
 
 The first forecast bootstraps a model from `hawker_datasets/hawker_sales.xlsx`. Uploaded files and trained model artifacts are written to the ignored `.local-data/` directory. PostgreSQL records sources, training runs, active models, and forecast history.
 
+## Database and source lineage
+
+- The Docker stack uses PostgreSQL 17 with schema changes managed by Flyway migrations in `backend/src/main/resources/db/migration/`.
+- Local development uses a file-backed H2 database under `.local-data/backend/` so the demo starts without installing PostgreSQL.
+- Workbooks and trained model files remain in file/object storage; the database stores their paths, hashes, validation metadata, and model relationships rather than large binary blobs.
+- `training_run_sources` records the exact data-source IDs and SHA-256 hashes used for every model run. The Sources page labels a workbook **Used by active model** only when that lineage points to the active model version.
+
+For a production system, keep PostgreSQL as the system of record and replace local file storage with managed object storage while retaining the same database references and hashes.
+
 For development without Docker, start the ML service and run Spring Boot with the `local` profile. That profile uses an ignored file-backed H2 database while preserving the same entities and APIs.
 
 ## Run checks
