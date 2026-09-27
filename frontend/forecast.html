@@ -62,11 +62,17 @@
       <section class="card chart-card" aria-labelledby="chart-heading">
         <h2 id="chart-heading" class="visually-hidden">Predicted demand</h2>
         <div class="headline" id="headline" aria-live="polite"></div>
-        <div class="legend" aria-hidden="true">
-          <span class="legend-item"><span class="swatch swatch-actual"></span>Past sales</span>
-          <span class="legend-item"><span class="swatch swatch-forecast"></span>Forecast</span>
+
+        <div class="chart-toolbar">
+          <div class="view-toggle" role="group" aria-label="Chart view">
+            <button type="button" class="view-button" data-view="recent" aria-pressed="true">Last 7 days</button>
+            <button type="button" class="view-button" data-view="weekday" aria-pressed="false" id="weekday-view-button">Same weekday</button>
+          </div>
+          <div class="legend" id="legend" aria-hidden="true"></div>
         </div>
-        <div class="chart" id="chart" role="img" aria-label="Line chart of past sales and forecast demand"></div>
+
+        <div class="chart" id="chart" role="img" aria-label="Chart of past sales and forecast demand"></div>
+        <p class="chart-note" id="chart-note"></p>
         <p class="status" id="status" role="status"></p>
       </section>
 
@@ -92,10 +98,16 @@
           </div>
         </section>
 
-        <!-- History -->
-        <section class="card side-card" aria-labelledby="history-heading">
-          <h2 id="history-heading">Historical sales (last 7 days)</h2>
-          <ul class="history" id="history-list"></ul>
+        <!-- Ask about forecast (chat) -->
+        <section class="card side-card chat-card" aria-labelledby="chat-heading">
+          <h2 id="chat-heading">Ask about forecast</h2>
+          <ol class="messages" id="messages" aria-live="polite"></ol>
+          <div class="suggestions" id="suggestions"></div>
+          <form class="chat-form" id="chat-form">
+            <label for="chat-input" class="visually-hidden">Ask a question about this forecast</label>
+            <input id="chat-input" type="text" placeholder="Why is it this number?" autocomplete="off" maxlength="300">
+            <button type="submit" class="send-button">Ask</button>
+          </form>
         </section>
       </div>
     </div>

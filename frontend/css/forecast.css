@@ -204,7 +204,8 @@ select:focus-visible, input:focus-visible, a:focus-visible, button:focus-visible
   margin-top: 26px;
 }
 
-.side-column { display: grid; gap: 20px; grid-template-rows: auto 1fr; }
+.side-column { display: flex; flex-direction: column; gap: 20px; }
+.side-column .chat-card { flex: 1; }
 
 /* Chart card */
 .chart-card { display: flex; flex-direction: column; min-height: 320px; }
@@ -220,27 +221,67 @@ select:focus-visible, input:focus-visible, a:focus-visible, button:focus-visible
   margin: 10px 0 0;
   padding: 0;
 }
-.day-breakdown li {
+.day-chip {
   padding: 4px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
   font-size: 0.72rem;
+  cursor: pointer;
 }
+.day-chip[aria-pressed="true"] { border-color: var(--teal); background: #eef8f6; }
 .day-breakdown strong { font-weight: 400; color: var(--teal); }
+
+.chart-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 14px 0 4px;
+}
+
+.view-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fafaf8;
+}
+.view-button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.view-button[aria-pressed="true"] {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 15%);
+}
 
 .legend {
   display: flex;
-  gap: 18px;
-  margin: 12px 0 2px;
+  gap: 16px;
   font-size: 0.7rem;
   color: var(--muted);
 }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .swatch { width: 18px; height: 0; border-top: 2.5px solid var(--ink); }
 .swatch-forecast { border-top: 2.5px dashed var(--teal); }
+.swatch-bar { width: 10px; height: 10px; border: 0; border-radius: 2px; background: var(--ink); }
+.swatch-bar-forecast { background: #d9efec; outline: 1.5px dashed var(--teal); outline-offset: -1.5px; }
+.swatch-avg { border-top: 1.5px dashed var(--muted); }
 
-.chart { position: relative; width: 100%; flex: 1; }
-.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+/* The chart fills whatever height the card has (it stretches to match the side column). */
+.chart { position: relative; width: 100%; flex: 1; min-height: 240px; }
+.chart svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: visible; }
 .chart .grid line { stroke: #eeeae3; }
 .chart .axis text { fill: var(--muted); font-size: 11px; font-family: inherit; }
 .chart .actual { fill: none; stroke: var(--ink); stroke-width: 2.2; }
@@ -249,10 +290,16 @@ select:focus-visible, input:focus-visible, a:focus-visible, button:focus-visible
 .chart .today-line { stroke: #b6bec4; stroke-dasharray: 2 4; }
 .chart .marker-label { fill: var(--muted); font-size: 11px; font-family: inherit; }
 .chart .target-dot { fill: var(--teal); stroke: #fff; stroke-width: 2.5; }
+.chart .value-label { fill: var(--ink); font-size: 10.5px; font-family: inherit; }
+.chart .value-label.forecast-label { fill: var(--teal); }
+.chart .bar { fill: var(--ink); }
+.chart .bar-forecast { fill: #d9efec; stroke: var(--teal); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.chart .avg-line { stroke: var(--muted); stroke-dasharray: 4 4; }
+.chart .avg-label { fill: var(--muted); font-size: 10.5px; font-family: inherit; }
 .chart .hover-line { stroke: var(--ink); stroke-width: 1; opacity: 0.3; }
 .chart .hover-dot { stroke: #fff; stroke-width: 2; }
 
-.tooltip {
+.tooltip-unused {
   position: absolute;
   padding: 6px 10px;
   background: var(--ink);
@@ -264,6 +311,7 @@ select:focus-visible, input:focus-visible, a:focus-visible, button:focus-visible
   transform: translateX(-50%);
 }
 
+.chart-note { margin: 4px 0 0; font-size: 0.72rem; line-height: 1.5; }
 .status { margin: 6px 0 0; min-height: 1.2em; font-size: 0.7rem; color: var(--muted); }
 .status.error { color: #b3261e; }
 
@@ -287,16 +335,74 @@ select:focus-visible, input:focus-visible, a:focus-visible, button:focus-visible
 .factor ul { list-style: none; margin: 0; padding: 0; font-size: 0.72rem; line-height: 1.7; color: var(--muted); }
 .factor li strong { color: var(--ink); font-weight: 400; }
 
-/* History card */
-.history { list-style: none; margin: 0; padding: 0; }
-.history li {
+/* Chat card */
+.chat-card { display: flex; flex-direction: column; min-height: 340px; }
+
+.messages {
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 2px 2px 8px;
+  max-height: 260px;
+  overflow-y: auto;
   display: flex;
-  justify-content: space-between;
-  padding: 5px 0;
-  border-bottom: 1px solid #efefef;
-  font-size: 0.72rem;
+  flex-direction: column;
+  gap: 8px;
 }
-.history li:last-child { border-bottom: 0; }
+
+.msg {
+  max-width: 92%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+.msg-bot { align-self: flex-start; background: #f2f5f5; border-top-left-radius: 2px; }
+.msg-user { align-self: flex-end; background: #d9efec; border-top-right-radius: 2px; }
+.msg-divider {
+  align-self: center;
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+.msg-typing { color: var(--muted); }
+
+.suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 8px; }
+.suggestion {
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+.suggestion:hover { border-color: var(--teal); }
+
+.chat-form { display: flex; gap: 6px; }
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.75rem;
+}
+.send-button {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #128881;
+  border-radius: 6px;
+  background: var(--teal);
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.send-button:hover { background: #168c85; }
 
 /* Mobile */
 @media (max-width: 760px) {
@@ -305,4 +411,6 @@ select:focus-visible, input:focus-visible, a:focus-visible, button:focus-visible
   .page { padding: 22px 14px 40px; }
   .controls { grid-template-columns: 1fr; gap: 14px; }
   .content-grid { grid-template-columns: 1fr; gap: 22px; }
+  .chat-card { min-height: 0; }
+  .messages { min-height: 90px; }
 }

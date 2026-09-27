@@ -3,15 +3,20 @@
 // Stage 1: everything runs on MOCK DATA so the page can be designed and demoed
 // without the backend. Each data function has its real API call written below
 // the mock branch. When the backend endpoints exist, set USE_MOCK_DATA = false.
+//
+// NOTE on forecast periods (1, 2 or 4 days, set in forecast.html): the real
+// backend (NeaWeatherForecastService) currently only accepts dates inside NEA's
+// 24-hour forecast. "2 days" and "4 days" need it switched to NEA's 4-day
+// outlook before they will work with real data.
 
 const USE_MOCK_DATA = true;
 
-// Forecast periods offered: 1, 2 or 4 days ahead (set in forecast.html).
-// NOTE: the real backend (NeaWeatherForecastService) currently only accepts
-// dates inside NEA's 24-hour forecast. "2 days" and "4 days" need it switched
-// to NEA's 4-day outlook before they will work with real data.
+// Enough history for the "last 7 days" view AND the last 4 same weekdays
+// (the model's same-weekday features look back up to 4 weeks).
+const HISTORY_DAYS = 35;
 
-const PAST_DAYS_SHOWN = 14;
+// Typical error of the model on held-out test data (ml/README.md: ~5 portions/day).
+const TYPICAL_ERROR = 5;
 
 const API_BASE_URL =
   document.querySelector('meta[name="api-base-url"]')?.content ?? "http://localhost:8080";
@@ -35,7 +40,7 @@ async function getDishes() {
 }
 
 // Returns [{ date: "YYYY-MM-DD", quantity }] for the last `days` days, oldest first
-// Needs a NEW backend endpoint, e.g. GET /api/dishes/{id}/sales?days=14
+// Needs a NEW backend endpoint, e.g. GET /api/dishes/{id}/sales?days=35
 async function getRecentSales(dishId, days) {
   if (USE_MOCK_DATA) {
     const rows = [];
@@ -52,7 +57,7 @@ async function getRecentSales(dishId, days) {
 // Uses the EXISTING backend endpoint: POST /api/forecast { dishId, forecastDate }
 async function getForecast(dishId, date) {
   if (USE_MOCK_DATA) {
-    await wait(120);
+    await wait(100);
     return { date, predicted: mockDemand(dishId, parseIso(date)) };
   }
   const result = await apiRequest("/api/forecast", {
@@ -62,25 +67,40 @@ async function getForecast(dishId, date) {
   return { date: result.forecast_date, predicted: result.predicted_demand };
 }
 
-// Returns { weather: [{label, value}], events: [{label, value}] }
+// Returns { sky, tempC, rainLikely, holiday, event }
 // The backend already fetches NEA weather + public holidays for each forecast;
 // it would need to include them in the /api/forecast response.
-async function getFactors(dishId, date) {
+function getFactors(date) {
   if (USE_MOCK_DATA) {
-    const day = parseIso(date).getDay();
+    const day = parseIso(date).getDate();
+    const rainy = day % 3 === 0;
     return {
-      weather: [
-        { label: "Sky", value: day % 2 ? "Partly cloudy" : "Showers" },
-        { label: "Temp", value: day % 2 ? "31°C" : "28°C" },
-        { label: "Rain", value: day % 2 ? "Low" : "Likely" },
-      ],
-      events: [
-        { label: "Nearby", value: "None listed" },
-        { label: "Public holiday", value: "No" },
-      ],
+      sky: rainy ? "Showers" : day % 2 ? "Partly cloudy" : "Fair",
+      tempC: rainy ? 28 : 31 + (day % 2),
+      rainLikely: rainy,
+      holiday: null,
+      event: null,
     };
   }
-  return { weather: [], events: [] };
+  return { sky: "Not available", tempC: null, rainLikely: false, holiday: null, event: null };
+}
+
+// Returns an answer string.
+// Real version needs a NEW backend endpoint, e.g.
+//   POST /api/forecast/ask { dishId, forecastDate, question } -> { answer }
+// The backend could answer with an LLM given the forecast inputs, or with
+// rules like the mock below. Ask the ML side whether CatBoost feature
+// importances (or SHAP values) can be returned to make answers more exact.
+async function askAboutForecast(question, ctx) {
+  if (USE_MOCK_DATA) {
+    await wait(450);
+    return mockAnswer(question, ctx);
+  }
+  const result = await apiRequest("/api/forecast/ask", {
+    method: "POST",
+    body: JSON.stringify({ dishId: ctx.dishId, forecastDate: ctx.date, question }),
+  });
+  return result.answer;
 }
 
 // Same request pattern as js/auth.js: cookies + CSRF header on non-GET calls.
@@ -125,6 +145,58 @@ function seededRandom(seed) {
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Rule-based sample answers built from the numbers on screen.
+function mockAnswer(question, ctx) {
+  const q = question.toLowerCase();
+  const has = (...words) => words.some((w) => q.includes(w));
+  const { dish, predicted, weekdayPlural, sameDays, sameAvg, recentAvg, factors } = ctx;
+  const when = longDate(ctx.date);
+  const range = sameDays.length
+    ? `${Math.min(...sameDays.map((d) => d.quantity))}–${Math.max(...sameDays.map((d) => d.quantity))}`
+    : "";
+
+  const vsPattern = () => {
+    const diff = predicted - sameAvg;
+    if (Math.abs(diff) <= 2) return `right in line with that`;
+    return `${Math.abs(Math.round(diff))} ${diff > 0 ? "above" : "below"} that average`;
+  };
+  const weatherLine = () =>
+    factors.rainLikely
+      ? `Showers are expected (${factors.tempC}°C), and rain tends to pull walk-in numbers down a little.`
+      : `The weather looks ${factors.sky.toLowerCase()} at around ${factors.tempC}°C, so there's no weather drag expected.`;
+
+  if (has("accura", "trust", "sure", "confiden", "wrong", "error", "reliable")) {
+    return `In the team's tests, the model was typically off by about ${TYPICAL_ERROR} portions a day. ` +
+      `So for ${when}, treat ${predicted} as roughly ${Math.max(0, predicted - TYPICAL_ERROR)}–${predicted + TYPICAL_ERROR}. ` +
+      `It's least reliable after unusual days (events, closures), since it learns from normal patterns.`;
+  }
+  if (has("prepare", "cook", "order", "stock", "buy", "how many should", "make")) {
+    return `The forecast is ${predicted} portions for ${when}. Since the model is usually within about ${TYPICAL_ERROR} portions, ` +
+      `preparing around ${predicted + TYPICAL_ERROR} covers most days without much waste. If you'd rather risk selling out than waste food, stick closer to ${predicted}.`;
+  }
+  if (has("weather", "rain", "hot", "sun", "cloud", "temperature")) {
+    return `${weatherLine()} Weather is one of the model's inputs (temperature, rain, cloud, sunshine and wind), ` +
+      `but for ${dish} it matters less than which day of the week it is.`;
+  }
+  if (has("holiday", "event", "festival", "concert")) {
+    return `${when} ${factors.holiday ? `is ${factors.holiday}, which the model accounts for` : "isn't a public holiday"}. ` +
+      `The model doesn't know about local events yet, so if something is happening nearby, it's worth adjusting the number yourself.`;
+  }
+  if (has("weekday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "last week", "past")) {
+    const qs = sameDays.map((d) => d.quantity);
+    const list = qs.length > 1 ? `${qs.slice(0, -1).join(", ")} and ${qs[qs.length - 1]}` : `${qs[0] ?? 0}`;
+    return `Over the last 4 ${weekdayPlural} you sold ${list} portions (average ${Math.round(sameAvg)}), ` +
+      `and the forecast for ${when} is ${predicted}. ` +
+      `The model uses the average of the last 2, 3 and 4 ${weekdayPlural} as inputs, which is why the "Same weekday" chart is a good way to sanity-check the forecast.`;
+  }
+  if (has("why", "explain", "reason", "how come", "higher", "lower", "more", "less", "fewer", "increase", "drop", "number")) {
+    return `The forecast of ${predicted} for ${when} leans mostly on past ${weekdayPlural}. ` +
+      `Over the last 4 ${weekdayPlural} you sold ${range} (average ${Math.round(sameAvg)}), so ${predicted} is ${vsPattern()}. ` +
+      `Your last 7 days averaged ${Math.round(recentAvg)}, which also feeds in. ${weatherLine()}`;
+  }
+  return `I can explain why the forecast for ${when} is ${predicted}, how weather or holidays affect it, how accurate it is, or how much to prepare. Try one of the suggestions below.`;
+}
+
 /* ------------------------------------------------------------------ */
 /* Date helpers                                                        */
 /* ------------------------------------------------------------------ */
@@ -152,30 +224,46 @@ function parseIso(s) {
 const shortDate = (s) => parseIso(s).toLocaleDateString("en-SG", { day: "numeric", month: "short" });
 const longDate = (s) =>
   parseIso(s).toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short" });
+const weekdayName = (s) => parseIso(s).toLocaleDateString("en-SG", { weekday: "long" });
 
 /* ------------------------------------------------------------------ */
-/* Page wiring                                                         */
+/* Page state + wiring                                                 */
 /* ------------------------------------------------------------------ */
 
 const els = {
   dish: document.getElementById("dish-select"),
   periods: document.querySelectorAll(".period-button"),
+  views: document.querySelectorAll(".view-button"),
+  weekdayViewButton: document.getElementById("weekday-view-button"),
+  legend: document.getElementById("legend"),
   chart: document.getElementById("chart"),
+  chartNote: document.getElementById("chart-note"),
   headline: document.getElementById("headline"),
   status: document.getElementById("status"),
   weather: document.getElementById("weather-list"),
   events: document.getElementById("event-list"),
-  history: document.getElementById("history-list"),
+  messages: document.getElementById("messages"),
+  suggestions: document.getElementById("suggestions"),
+  chatForm: document.getElementById("chat-form"),
+  chatInput: document.getElementById("chat-input"),
   sidebar: document.getElementById("sidebar"),
   scrim: document.getElementById("scrim"),
   toggle: document.getElementById("sidebar-toggle"),
 };
 
-const state = { dishId: null, days: 1, requestId: 0 };
-let lastRender = null;
+const state = {
+  dishId: null,
+  days: 1,
+  view: "recent",     // "recent" | "weekday"
+  focusDate: null,    // which forecast day the weekday chart, factors and chat are about
+  past: [],
+  forecast: [],       // today + next N days (today is only drawn on the chart)
+  requestId: 0,
+};
 
 async function init() {
   setupSidebar();
+  setupChat();
 
   try {
     const dishes = await getDishes();
@@ -205,7 +293,20 @@ async function init() {
     })
   );
 
-  window.addEventListener("resize", debounce(() => lastRender && drawChart(...lastRender), 150));
+  els.views.forEach((btn) =>
+    btn.addEventListener("click", () => {
+      els.views.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      state.view = btn.dataset.view;
+      renderChart();
+    })
+  );
+
+  // Redraw whenever the chart area changes size (window resize, chat growing, etc.)
+  let lastSize = "";
+  new ResizeObserver(() => {
+    const size = `${els.chart.clientWidth}x${els.chart.clientHeight}`;
+    if (size !== lastSize) { lastSize = size; renderChart(); }
+  }).observe(els.chart);
   refresh();
 }
 
@@ -232,24 +333,20 @@ async function refresh() {
   setStatus("Generating forecast…");
 
   try {
-    // Forecast today (so the chart line joins up) plus the next N days.
-    const forecastDates = [];
-    for (let i = 0; i <= state.days; i++) forecastDates.push(isoDate(addDays(today(), i)));
-    const firstDay = forecastDates[1];
+    const dates = [];
+    for (let i = 0; i <= state.days; i++) dates.push(isoDate(addDays(today(), i)));
 
-    const [past, forecast, factors] = await Promise.all([
-      getRecentSales(state.dishId, PAST_DAYS_SHOWN),
-      Promise.all(forecastDates.map((date) => getForecast(state.dishId, date))),
-      getFactors(state.dishId, firstDay),
+    const [past, forecast] = await Promise.all([
+      getRecentSales(state.dishId, HISTORY_DAYS),
+      Promise.all(dates.map((date) => getForecast(state.dishId, date))),
     ]);
-
     if (requestId !== state.requestId) return;
 
-    lastRender = [past, forecast];
-    drawChart(past, forecast);
-    renderHeadline(forecast.slice(1), past);
-    renderFactors(factors);
-    renderHistory(past.slice(-7));
+    state.past = past;
+    state.forecast = forecast;
+    state.focusDate = futureDays()[0].date;
+
+    renderAll();
     setStatus(USE_MOCK_DATA ? "Showing sample data. Not connected to the forecasting model yet." : "");
   } catch (err) {
     if (requestId !== state.requestId) return;
@@ -257,164 +354,342 @@ async function refresh() {
   }
 }
 
+const futureDays = () => state.forecast.slice(1);
+const focusDay = () => futureDays().find((d) => d.date === state.focusDate) ?? futureDays()[0];
+
+// Last 4 same-weekday sales before the focus day (oldest first).
+function sameWeekdaySales(date) {
+  const out = [];
+  for (let w = 4; w >= 1; w--) {
+    const d = isoDate(addDays(parseIso(date), -7 * w));
+    const row = state.past.find((r) => r.date === d);
+    if (row) out.push(row);
+  }
+  return out;
+}
+
+function renderAll() {
+  renderHeadline();
+  renderChart();
+  renderFactors();
+  resetChat();
+}
+
+function setFocus(date) {
+  state.focusDate = date;
+  renderHeadline();
+  renderChart();
+  renderFactors();
+  addDivider(`Now asking about ${longDate(date)}`);
+  renderSuggestions();
+}
+
 function setStatus(text, isError = false) {
   els.status.textContent = text;
   els.status.classList.toggle("error", isError);
 }
 
-// `days` = the forecast for tomorrow onwards (today is only drawn on the chart).
-function renderHeadline(days, past) {
-  const dishName = escapeHtml(els.dish.options[els.dish.selectedIndex]?.text ?? "");
+/* ------------------------------------------------------------------ */
+/* Headline, factors                                                   */
+/* ------------------------------------------------------------------ */
+
+function currentDishName() {
+  return els.dish.options[els.dish.selectedIndex]?.text ?? "";
+}
+
+function renderHeadline() {
+  const days = futureDays();
+  const dishName = escapeHtml(currentDishName());
   const total = Math.round(days.reduce((sum, d) => sum + d.predicted, 0));
 
   if (days.length === 1) {
-    const day = days[0];
-    const lastWeek = past.find((r) => r.date === isoDate(addDays(parseIso(day.date), -7)));
-    let comparison = "";
-    if (lastWeek && lastWeek.quantity > 0) {
-      const change = Math.round(((day.predicted - lastWeek.quantity) / lastWeek.quantity) * 100);
-      comparison =
-        change === 0 ? ", about the same as last week"
-        : `, ${Math.abs(change)}% ${change > 0 ? "more" : "fewer"} than the same day last week`;
-    }
     els.headline.innerHTML =
       `<span class="number">${total}</span>` +
-      `${dishName} portions expected tomorrow (${longDate(day.date)})${comparison}.`;
+      `${dishName} portions expected tomorrow (${longDate(days[0].date)}).`;
     return;
   }
 
-  const breakdown = days
-    .map((d) => `<li>${longDate(d.date)}: <strong>${Math.round(d.predicted)}</strong></li>`)
+  const chips = days
+    .map(
+      (d) =>
+        `<li><button type="button" class="day-chip" data-date="${d.date}" aria-pressed="${d.date === state.focusDate}">` +
+        `${longDate(d.date)}: <strong>${Math.round(d.predicted)}</strong></button></li>`
+    )
     .join("");
   els.headline.innerHTML =
     `<span class="number">${total}</span>` +
-    `${dishName} portions expected over the next ${days.length} days.` +
-    `<ul class="day-breakdown">${breakdown}</ul>`;
+    `${dishName} portions expected over the next ${days.length} days. Pick a day to look at it closely.` +
+    `<ul class="day-breakdown">${chips}</ul>`;
+  els.headline.querySelectorAll(".day-chip").forEach((chip) =>
+    chip.addEventListener("click", () => setFocus(chip.dataset.date))
+  );
 }
 
-function renderFactors({ weather, events }) {
-  const toItems = (rows) =>
-    rows.length
-      ? rows.map((r) => `<li>${escapeHtml(r.label)}: <strong>${escapeHtml(r.value)}</strong></li>`).join("")
-      : "<li>Not available</li>";
-  els.weather.innerHTML = toItems(weather);
-  els.events.innerHTML = toItems(events);
-}
-
-function renderHistory(rows) {
-  els.history.innerHTML = rows
-    .slice()
-    .reverse() // newest first
-    .map((r) => `<li><span>${longDate(r.date)}</span><span>${r.quantity} sold</span></li>`)
-    .join("");
+function renderFactors() {
+  const f = getFactors(state.focusDate);
+  const item = (label, value) => `<li>${label}: <strong>${escapeHtml(value)}</strong></li>`;
+  els.weather.innerHTML =
+    item("Sky", f.sky) +
+    (f.tempC != null ? item("Temp", `${f.tempC}°C`) : "") +
+    item("Rain", f.rainLikely ? "Likely" : "Low");
+  els.events.innerHTML =
+    item("Nearby", f.event ?? "None listed") + item("Public holiday", f.holiday ?? "No");
 }
 
 /* ------------------------------------------------------------------ */
-/* Chart (plain SVG, no library)                                       */
+/* Charts (plain SVG, no library)                                      */
 /* ------------------------------------------------------------------ */
 
-function drawChart(past, forecast) {
-  const width = Math.max(300, els.chart.clientWidth);
-  const height = width < 500 ? 220 : 250;
-  const pad = { top: 18, right: 16, bottom: 28, left: 32 };
+function renderChart() {
+  if (!state.forecast.length) return;
+  const plural = `${weekdayName(state.focusDate)}s`;
+  els.weekdayViewButton.textContent = `Past ${plural}`;
+
+  if (state.view === "weekday") {
+    els.legend.innerHTML =
+      `<span class="legend-item"><span class="swatch swatch-bar"></span>Sold</span>` +
+      `<span class="legend-item"><span class="swatch swatch-bar swatch-bar-forecast"></span>Forecast</span>` +
+      `<span class="legend-item"><span class="swatch swatch-avg"></span>4-week average (${Math.round(avgOf(sameWeekdaySales(focusDay().date)))})</span>`;
+    drawWeekdayChart();
+  } else {
+    els.legend.innerHTML =
+      `<span class="legend-item"><span class="swatch swatch-actual"></span>Sold</span>` +
+      `<span class="legend-item"><span class="swatch swatch-forecast"></span>Forecast</span>`;
+    drawRecentChart();
+  }
+}
+
+function chartSize() {
+  const width = Math.max(280, els.chart.clientWidth);
+  const height = Math.min(Math.max(240, els.chart.clientHeight), 520);
+  return { width, height, narrow: width < 500 };
+}
+
+// View 1: last 7 days of sales, then the forecast line.
+function drawRecentChart() {
+  const { width, height, narrow } = chartSize();
+  const pad = { top: 22, right: 18, bottom: 28, left: 50 };
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
+  const todayIso = isoDate(today());
 
   const points = [
-    ...past.map((r) => ({ date: r.date, value: r.quantity, kind: "actual" })),
-    ...forecast.map((r) => ({ date: r.date, value: Math.round(r.predicted), kind: "forecast" })),
+    ...state.past.slice(-7).map((r) => ({ date: r.date, value: r.quantity, kind: "actual" })),
+    ...state.forecast.map((r) => ({ date: r.date, value: Math.round(r.predicted), kind: "forecast" })),
   ].map((p, i) => ({ ...p, i }));
   const n = points.length;
-  const yMax = niceCeil(Math.max(...points.map((p) => p.value)) * 1.2);
+  const yMax = niceCeil(Math.max(...points.map((p) => p.value)) * 1.25);
 
-  const x = (i) => pad.left + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+  const x = (i) => pad.left + (i / (n - 1)) * innerW;
   const y = (v) => pad.top + innerH - (v / yMax) * innerH;
   const pathFor = (pts) =>
     pts.map((p, j) => `${j ? "L" : "M"}${x(p.i).toFixed(1)},${y(p.value).toFixed(1)}`).join("");
 
   const actualPts = points.filter((p) => p.kind === "actual");
-  const lastActual = actualPts[actualPts.length - 1];
-  const forecastPts = [lastActual, ...points.filter((p) => p.kind === "forecast")].filter(Boolean);
-  const target = forecastPts[forecastPts.length - 1];
+  const forecastPts = [actualPts[actualPts.length - 1], ...points.filter((p) => p.kind === "forecast")];
 
-  // Uncertainty band that widens further into the future (illustrative only).
   const band = forecastPts.map((p, j) => ({ ...p, spread: j === 0 ? 0 : p.value * (0.08 + 0.04 * j) }));
   const bandPath =
     band.map((p, j) => `${j ? "L" : "M"}${x(p.i).toFixed(1)},${y(p.value + p.spread).toFixed(1)}`).join("") +
     band.slice().reverse().map((p) => `L${x(p.i).toFixed(1)},${y(Math.max(0, p.value - p.spread)).toFixed(1)}`).join("") +
     "Z";
 
-  let grid = "", yLabels = "", xLabels = "";
-  const ticks = 4;
-  for (let t = 0; t <= ticks; t++) {
-    const v = (yMax / ticks) * t;
-    grid += `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y(v)}" y2="${y(v)}"/>`;
-    yLabels += `<text x="${pad.left - 8}" y="${y(v) + 4}" text-anchor="end">${Math.round(v)}</text>`;
+  let grid = "", yLabels = "", xLabels = "", values = "", dots = "";
+  for (let t = 0; t <= 4; t++) {
+    const v = (yMax / 4) * t;
+    grid += `<line x1="28" x2="${width - pad.right}" y1="${y(v)}" y2="${y(v)}"/>`;
+    yLabels += `<text x="22" y="${y(v) + 4}" text-anchor="end">${Math.round(v)}</text>`;
   }
-  const every = Math.max(1, Math.ceil(n / (width < 500 ? 4 : 6)));
+  const every = narrow ? 2 : 1;
   points.forEach((p) => {
-    if (p.i % every === 0 && x(target.i) - x(p.i) > 55) {
-      xLabels += `<text x="${x(p.i)}" y="${height - 8}" text-anchor="middle">${shortDate(p.date)}</text>`;
+    const isFuture = p.kind === "forecast" && p.date > todayIso;
+    if (p.i % every === 0 || isFuture) {
+      const label = p.date === todayIso ? "Today" : shortDate(p.date);
+      const anchor = p.i === n - 1 ? "end" : p.i === 0 ? "start" : "middle";
+      xLabels += `<text x="${x(p.i)}" y="${height - 8}" text-anchor="${anchor}"${isFuture ? ' style="fill: var(--teal)"' : ""}>${label}</text>`;
+    }
+    if (p.date !== todayIso) {
+      values += `<text class="value-label${p.kind === "forecast" ? " forecast-label" : ""}" x="${x(p.i)}" y="${y(p.value) - 10}" text-anchor="middle">${p.value}</text>`;
+    }
+    if (isFuture) {
+      dots += `<circle class="target-dot" cx="${x(p.i)}" cy="${y(p.value)}" r="${p.date === state.focusDate ? 6.5 : 4.5}"/>`;
     }
   });
-  xLabels += `<text x="${x(target.i)}" y="${height - 8}" text-anchor="end" style="fill: var(--teal)">${shortDate(target.date)}</text>`;
 
-  const todayPt = points.find((p) => p.date === isoDate(today()));
-  const todayX = todayPt ? x(todayPt.i) : lastActual ? x(lastActual.i) : pad.left;
-
+  const todayPt = points.find((p) => p.date === todayIso);
   els.chart.innerHTML = `
     <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
       <g class="grid">${grid}</g>
       <g class="axis">${yLabels}${xLabels}</g>
-      <line class="today-line" x1="${todayX}" x2="${todayX}" y1="${pad.top}" y2="${pad.top + innerH}"/>
-      <text class="marker-label" x="${todayX - 6}" y="${pad.top + 10}" text-anchor="end">Today</text>
+      <line class="today-line" x1="${x(todayPt.i)}" x2="${x(todayPt.i)}" y1="${pad.top}" y2="${pad.top + innerH}"/>
       <path class="band" d="${bandPath}"/>
       <path class="actual" d="${pathFor(actualPts)}"/>
       <path class="forecast" d="${pathFor(forecastPts)}"/>
-      ${forecastPts.filter((p) => p.date > isoDate(today()))
-        .map((p) => `<circle class="target-dot" cx="${x(p.i)}" cy="${y(p.value)}" r="5"/>`).join("")}
-      <line class="hover-line" y1="${pad.top}" y2="${pad.top + innerH}" visibility="hidden"/>
-      <circle class="hover-dot" r="5" visibility="hidden"/>
-      <rect class="hit-area" x="${pad.left}" y="${pad.top}" width="${innerW}" height="${innerH}" fill="transparent"/>
-    </svg>
-    <div class="tooltip" hidden></div>`;
+      ${dots}
+      ${values}
+    </svg>`;
 
-  // Hover / tap tooltip
-  const svg = els.chart.querySelector("svg");
-  const line = svg.querySelector(".hover-line");
-  const dot = svg.querySelector(".hover-dot");
-  const tip = els.chart.querySelector(".tooltip");
-  const hit = svg.querySelector(".hit-area");
-
-  const show = (clientX) => {
-    const rect = svg.getBoundingClientRect();
-    const scale = width / rect.width;
-    const i = Math.round((((clientX - rect.left) * scale - pad.left) / innerW) * (n - 1));
-    const p = points[Math.min(n - 1, Math.max(0, i))];
-    const cx = x(p.i), cy = y(p.value);
-    line.setAttribute("x1", cx); line.setAttribute("x2", cx); line.setAttribute("visibility", "visible");
-    dot.setAttribute("cx", cx); dot.setAttribute("cy", cy); dot.setAttribute("visibility", "visible");
-    dot.setAttribute("fill", p.kind === "actual" ? "var(--ink)" : "var(--teal)");
-    tip.hidden = false;
-    tip.textContent = `${longDate(p.date)} · ${p.value} ${p.kind === "actual" ? "sold" : "predicted"}`;
-    const left = Math.min(Math.max(cx / scale, 70), rect.width - 70);
-    tip.style.left = `${left}px`;
-    tip.style.top = `${Math.max(0, cy / scale - 40)}px`;
-  };
-  const hide = () => {
-    line.setAttribute("visibility", "hidden");
-    dot.setAttribute("visibility", "hidden");
-    tip.hidden = true;
-  };
-  hit.addEventListener("pointermove", (e) => show(e.clientX));
-  hit.addEventListener("pointerdown", (e) => show(e.clientX));
-  hit.addEventListener("pointerleave", hide);
+  els.chartNote.textContent =
+    "Sales over the last week, followed by the forecast. The shaded area shows the likely range.";
 }
 
+// View 2: the last 4 same weekdays next to the forecast for the focus day.
+function drawWeekdayChart() {
+  const { width, height, narrow } = chartSize();
+  const pad = { top: 24, right: 16, bottom: 30, left: 36 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+
+  const target = focusDay();
+  const history = sameWeekdaySales(target.date);
+  const avg = avgOf(history);
+  const bars = [
+    ...history.map((r) => ({ date: r.date, value: r.quantity, kind: "actual" })),
+    { date: target.date, value: Math.round(target.predicted), kind: "forecast" },
+  ];
+
+  const yMax = niceCeil(Math.max(avg, ...bars.map((b) => b.value)) * 1.25);
+  const y = (v) => pad.top + innerH - (v / yMax) * innerH;
+  const slot = innerW / bars.length;
+  const barW = Math.min(56, slot * 0.55);
+  const cx = (i) => pad.left + slot * i + slot / 2;
+
+  const avgEnd = pad.left + slot * history.length;
+  let grid = "", yLabels = "";
+  let body = `<line class="avg-line" x1="${pad.left}" x2="${avgEnd}" y1="${y(avg)}" y2="${y(avg)}"/>`;
+  for (let t = 0; t <= 4; t++) {
+    const v = (yMax / 4) * t;
+    grid += `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y(v)}" y2="${y(v)}"/>`;
+    yLabels += `<text x="${pad.left - 8}" y="${y(v) + 4}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+  bars.forEach((b, i) => {
+    const isForecast = b.kind === "forecast";
+    body +=
+      `<rect class="${isForecast ? "bar-forecast" : "bar"}" x="${cx(i) - barW / 2}" y="${y(b.value)}" width="${barW}" height="${y(0) - y(b.value)}" rx="3"/>` +
+      `<text class="value-label${isForecast ? " forecast-label" : ""}" x="${cx(i)}" y="${y(b.value) - 7}" text-anchor="middle">${b.value}</text>` +
+      `<text x="${cx(i)}" y="${height - 10}" text-anchor="middle"${isForecast ? ' style="fill: var(--teal)"' : ""}>${isForecast && !narrow ? `${shortDate(b.date)} (forecast)` : shortDate(b.date)}</text>`;
+  });
+
+  els.chart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+      <g class="grid">${grid}</g>
+      <g class="axis">${yLabels}${body}</g>
+    </svg>`;
+
+  const diff = Math.round(target.predicted - avg);
+  const plural = `${weekdayName(target.date)}s`;
+  els.chartNote.textContent =
+    `The model leans heavily on past ${plural}. ` +
+    (Math.abs(diff) <= 2
+      ? `This forecast is in line with the last 4 ${plural}.`
+      : `This forecast is ${Math.abs(diff)} ${diff > 0 ? "above" : "below"} their average.`);
+}
+
+function avgOf(rows) {
+  return rows.reduce((s, r) => s + r.quantity, 0) / Math.max(1, rows.length);
+}
+
+// Rounds the chart's top value up so the 4 gridlines land on round numbers.
 function niceCeil(v) {
-  const step = v > 200 ? 50 : v > 80 ? 20 : 10;
-  return Math.max(step, Math.ceil(v / step) * step);
+  const steps = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 500];
+  const step = steps.find((st) => st * 4 >= v) ?? Math.ceil(v / 4 / 100) * 100;
+  return step * 4;
 }
+
+/* ------------------------------------------------------------------ */
+/* Chat                                                                */
+/* ------------------------------------------------------------------ */
+
+const SUGGESTIONS = [
+  "Why this number?",
+  "How do past WEEKDAYs compare?",
+  "How accurate is this?",
+  "How much should I prepare?",
+];
+
+function setupChat() {
+  els.chatForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const question = els.chatInput.value.trim();
+    if (!question) return;
+    els.chatInput.value = "";
+    ask(question);
+  });
+}
+
+function chatContext() {
+  const day = focusDay();
+  const sameDays = sameWeekdaySales(day.date);
+  const recent = state.past.slice(-7);
+  return {
+    dishId: state.dishId,
+    dish: currentDishName(),
+    date: day.date,
+    predicted: Math.round(day.predicted),
+    weekdayPlural: `${weekdayName(day.date)}s`,
+    sameDays,
+    sameAvg: sameDays.reduce((s, r) => s + r.quantity, 0) / Math.max(1, sameDays.length),
+    recentAvg: recent.reduce((s, r) => s + r.quantity, 0) / Math.max(1, recent.length),
+    factors: getFactors(day.date),
+  };
+}
+
+function resetChat() {
+  els.messages.innerHTML = "";
+  const day = focusDay();
+  addMessage(
+    "bot",
+    `Ask me about the ${currentDishName()} forecast for ${longDate(day.date)}, like why it's ${Math.round(day.predicted)} or how much to prepare.`
+  );
+  renderSuggestions();
+}
+
+function renderSuggestions() {
+  const weekday = weekdayName(focusDay().date);
+  els.suggestions.innerHTML = SUGGESTIONS.map(
+    (s) => `<button type="button" class="suggestion">${escapeHtml(s.replace("WEEKDAY", weekday))}</button>`
+  ).join("");
+  els.suggestions.querySelectorAll(".suggestion").forEach((btn) =>
+    btn.addEventListener("click", () => ask(btn.textContent))
+  );
+}
+
+async function ask(question) {
+  addMessage("user", question);
+  const typing = addMessage("bot", "Thinking…");
+  typing.classList.add("msg-typing");
+  try {
+    const answer = await askAboutForecast(question, chatContext());
+    typing.classList.remove("msg-typing");
+    typing.textContent = answer;
+  } catch (err) {
+    typing.classList.remove("msg-typing");
+    typing.textContent = `Couldn't get an answer. ${err.message}`;
+  }
+  els.messages.scrollTop = els.messages.scrollHeight;
+}
+
+function addMessage(who, text) {
+  const li = document.createElement("li");
+  li.className = `msg msg-${who}`;
+  li.textContent = text;
+  els.messages.appendChild(li);
+  els.messages.scrollTop = els.messages.scrollHeight;
+  return li;
+}
+
+function addDivider(text) {
+  const li = document.createElement("li");
+  li.className = "msg-divider";
+  li.textContent = text;
+  els.messages.appendChild(li);
+  els.messages.scrollTop = els.messages.scrollHeight;
+}
+
+/* ------------------------------------------------------------------ */
+/* Utilities                                                           */
+/* ------------------------------------------------------------------ */
+
 function debounce(fn, ms) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
