@@ -11,6 +11,8 @@ import java.util.*;
 
 @Service
 public class DataSourceService {
+    static final String XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
     private final DataSourceRepository repository;
     private final FileStorageService storage;
     private final MlClient mlClient;
@@ -26,7 +28,10 @@ public class DataSourceService {
     public SourceResponse upload(MultipartFile file) throws Exception {
         var stored = storage.store(file);
         var existing = repository.findBySha256(stored.sha256());
-        if (existing.isPresent()) return toResponse(existing.get(), activeModel(), activeSourceIds());
+        if (existing.isPresent()) {
+            storage.discard(stored);
+            return toResponse(existing.get(), activeModel(), activeSourceIds());
+        }
 
         ValidationResponse validation = mlClient.validate(stored.path());
         DataSourceEntity source = new DataSourceEntity();
@@ -34,6 +39,11 @@ public class DataSourceService {
         source.originalFileName = file.getOriginalFilename() == null ? "upload.xlsx" : file.getOriginalFilename();
         source.storedPath = stored.path().toString();
         source.sha256 = stored.sha256();
+        source.sourceType = "xlsx";
+        source.mimeType = XLSX_MIME_TYPE;
+        source.ingestedBy = "demo-backend";
+        var published = storage.publish(stored, source.originalFileName, XLSX_MIME_TYPE);
+        if (published != null) { source.storageBucket = published.bucket(); source.storageKey = published.key(); }
         source.status = validation.valid() ? "VALIDATED" : "REJECTED";
         source.included = validation.valid();
         source.dateStart = validation.dateStart();

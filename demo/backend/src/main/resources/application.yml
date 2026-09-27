@@ -5,6 +5,12 @@ spring:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/sales_forecast}
     username: ${DATABASE_USERNAME:sales_forecast}
     password: ${DATABASE_PASSWORD:sales_forecast}
+  flyway:
+    # Migrations run as the schema owner over a direct/session connection (Supabase port 5432);
+    # the app itself may use a less privileged role through the transaction pooler.
+    url: ${FLYWAY_URL:${DATABASE_URL:jdbc:postgresql://localhost:5432/sales_forecast}}
+    user: ${FLYWAY_USERNAME:${DATABASE_USERNAME:sales_forecast}}
+    password: ${FLYWAY_PASSWORD:${DATABASE_PASSWORD:sales_forecast}}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -24,3 +30,12 @@ management:
 app:
   ml-base-url: ${ML_BASE_URL:http://localhost:8000}
   storage-path: ${STORAGE_PATH:../.local-data}
+  storage:
+    # local keeps uploads on disk only; s3 also publishes them to Supabase Storage (or any S3 bucket).
+    backend: ${STORAGE_BACKEND:local}
+    s3:
+      endpoint: ${STORAGE_S3_ENDPOINT:}
+      region: ${STORAGE_S3_REGION:}
+      bucket: ${STORAGE_S3_BUCKET:raw-sources}
+      access-key-id: ${STORAGE_S3_ACCESS_KEY_ID:}
+      secret-access-key: ${STORAGE_S3_SECRET_ACCESS_KEY:}

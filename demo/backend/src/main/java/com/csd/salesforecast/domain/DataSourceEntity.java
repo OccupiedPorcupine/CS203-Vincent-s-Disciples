@@ -1,6 +1,7 @@
 package com.csd.salesforecast.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 import java.time.*;
 import java.util.UUID;
 
@@ -9,7 +10,7 @@ import java.util.UUID;
 public class DataSourceEntity {
     @Id public UUID id;
     @Column(name="original_file_name", nullable=false) public String originalFileName;
-    @Column(name="stored_path", nullable=false, length=1024) public String storedPath;
+    @Column(name="stored_path", length=1024) public String storedPath;
     @Column(nullable=false, unique=true, length=64) public String sha256;
     @Column(nullable=false, length=32) public String status;
     @Column(nullable=false) public boolean included;
@@ -19,6 +20,11 @@ public class DataSourceEntity {
     @Column(name="sheet_names", length=1000) public String sheetNames;
     @Column(name="validation_message", length=2000) public String validationMessage;
     @Column(name="created_at", nullable=false) public OffsetDateTime createdAt;
+    @ColumnDefault("'xlsx'") @Column(name="source_type", length=32) public String sourceType;
+    @Column(name="mime_type") public String mimeType;
+    @ColumnDefault("'demo-backend'") @Column(name="ingested_by", length=100) public String ingestedBy;
+    @Column(name="storage_bucket") public String storageBucket;
+    @Column(name="storage_key", length=1024) public String storageKey;
 
     public DataSourceEntity() {}
 }

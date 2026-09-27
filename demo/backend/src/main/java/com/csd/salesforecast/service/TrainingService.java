@@ -5,6 +5,8 @@ import com.csd.salesforecast.domain.TrainingRunEntity;
 import com.csd.salesforecast.domain.TrainingRunSourceEntity;
 import com.csd.salesforecast.repository.*;
 import org.springframework.stereotype.Service;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.*;
 
@@ -22,16 +24,20 @@ public class TrainingService {
     }
 
     public TrainingRunResponse start() {
-        var selected = sources.findByIncludedTrueAndStatusOrderByCreatedAtDesc("VALIDATED");
+        // The ML service trains on Excel workbooks only; other source types feed price validation separately.
+        var selected = sources.findByIncludedTrueAndStatusAndSourceTypeOrderByCreatedAtDesc("VALIDATED", "xlsx");
         if (selected.isEmpty()) throw new IllegalStateException("No validated data source is included");
-        var resolvedPaths = selected.stream().map(source -> {
-            var resolved = storage.resolveStoredPath(source.storedPath);
+        var resolvedPaths = new ArrayList<String>();
+        for (var source : selected) {
+            Path resolved;
+            try { resolved = storage.localCopy(source); }
+            catch (IOException exception) { throw new IllegalStateException("Could not fetch " + source.originalFileName + ": " + exception.getMessage(), exception); }
             if (!resolved.toString().equals(source.storedPath)) {
                 source.storedPath = resolved.toString();
                 sources.save(source);
             }
-            return resolved.toString();
-        }).toList();
+            resolvedPaths.add(resolved.toString());
+        }
         TrainingRunEntity run = new TrainingRunEntity();
         run.id = UUID.randomUUID(); run.status = "QUEUED"; run.sourceCount = selected.size();
         run.message = "Waiting to start"; run.startedAt = OffsetDateTime.now();

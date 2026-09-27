@@ -13,7 +13,7 @@ import static org.mockito.Mockito.*;
 
 class TrainingServiceTest {
     @Test
-    void snapshotsSourceIdentityBeforeStartingTraining() {
+    void snapshotsSourceIdentityBeforeStartingTraining() throws Exception {
         var runs = mock(TrainingRunRepository.class);
         var sources = mock(DataSourceRepository.class);
         var lineage = mock(TrainingRunSourceRepository.class);
@@ -21,8 +21,8 @@ class TrainingServiceTest {
         var storage = mock(FileStorageService.class);
         var source = new DataSourceEntity();
         source.id = UUID.randomUUID(); source.sha256 = "b".repeat(64); source.storedPath = "/data/sales.xlsx";
-        when(sources.findByIncludedTrueAndStatusOrderByCreatedAtDesc("VALIDATED")).thenReturn(List.of(source));
-        when(storage.resolveStoredPath(source.storedPath)).thenReturn(Path.of(source.storedPath));
+        when(sources.findByIncludedTrueAndStatusAndSourceTypeOrderByCreatedAtDesc("VALIDATED", "xlsx")).thenReturn(List.of(source));
+        when(storage.localCopy(source)).thenReturn(Path.of(source.storedPath));
 
         var response = new TrainingService(runs, sources, lineage, worker, storage).start();
 

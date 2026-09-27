@@ -24,7 +24,9 @@ demo/
 ├── backend/           # Spring Boot API
 ├── ml/                # FastAPI forecasting service
 ├── hawker_datasets/   # Demo workbook
+├── docs/              # Supabase setup and ingestion contract
 ├── compose.yaml       # Complete local stack
+├── compose.supabase.yaml  # Override: run against Supabase instead of local Postgres
 └── .env.example       # Configuration reference
 ```
 
@@ -52,6 +54,19 @@ The first forecast bootstraps a model from `hawker_datasets/hawker_sales.xlsx`. 
 - `training_run_sources` records the exact data-source IDs and SHA-256 hashes used for every model run. The Sources page labels a workbook **Used by active model** only when that lineage points to the active model version.
 
 For a production system, keep PostgreSQL as the system of record and replace local file storage with managed object storage while retaining the same database references and hashes.
+
+## Running against Supabase
+
+Supabase replaces the Docker Postgres container and, optionally, the local upload folder. Configuration is environment-only; see the Supabase block in `.env.example`. Full setup steps, the access model, and the contract for other ingestion apps are in [docs/supabase.md](docs/supabase.md).
+
+- **Database.** Flyway runs as the schema owner (`FLYWAY_*`, session pooler or direct connection on port 5432). The app can run as the limited `forecast_backend` role through the transaction pooler (`DATABASE_*`, port 6543 with `prepareThreshold=0`). Without `FLYWAY_*`, Flyway reuses the app credentials.
+- **Storage.** `STORAGE_BACKEND=s3` publishes each upload to a private bucket under `sources/<sha256>/<file name>` and records `storage_bucket`/`storage_key`. The backend keeps a working copy in `STORAGE_PATH/uploads` for the ML service and re-downloads it (verifying the SHA-256) if it goes missing.
+- **Access control.** `V4__access_control.sql` enables row-level security on every table, strips Supabase's `anon`/`authenticated` grants, and creates two `NOLOGIN` roles: `forecast_backend` (full access to app tables) and `source_ingestor` (may read `data_sources` and insert rows only as `PENDING_REVIEW`, not included, with a storage key). `afterMigrate.sql` applies the same protection to `flyway_schema_history`. New tables need RLS, grants, and a `forecast_backend` policy in their migration.
+- **Other ingestion apps** (PDFs, receipts) upload the raw file to the same bucket, then insert a `data_sources` row with their own `ingested_by`, the matching `source_type`, and status `PENDING_REVIEW`. Training only uses validated `xlsx` sources.
+
+```bash
+docker compose -f compose.yaml -f compose.supabase.yaml up --build backend ml-service frontend
+```
 
 For development without Docker, start the ML service and run Spring Boot with the `local` profile. That profile uses an ignored file-backed H2 database while preserving the same entities and APIs.
 
