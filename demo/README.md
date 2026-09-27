@@ -57,7 +57,9 @@ For a production system, keep PostgreSQL as the system of record and replace loc
 
 ## Running against Supabase
 
-Supabase replaces the Docker Postgres container and, optionally, the local upload folder. Configuration is environment-only; see the Supabase block in `.env.example`. Full setup steps, the access model, and the contract for other ingestion apps are in [docs/supabase.md](docs/supabase.md).
+Supabase replaces the Docker Postgres container and, optionally, the local upload folder. Configuration is environment-only, through a gitignored `demo/.env`.
+
+**Start with [docs/supabase.md](docs/supabase.md).** It has a step-by-step dashboard walkthrough, the `.env` template, how to run with or without Docker, how to verify the connection, the access model, the contract for other ingestion apps, troubleshooting, and open decisions. The summary below is for readers who already know the setup.
 
 - **Database.** Flyway runs as the schema owner (`FLYWAY_*`, session pooler or direct connection on port 5432). The app can run as the limited `forecast_backend` role through the transaction pooler (`DATABASE_*`, port 6543 with `prepareThreshold=0`). Without `FLYWAY_*`, Flyway reuses the app credentials.
 - **Storage.** `STORAGE_BACKEND=s3` publishes each upload to a private bucket under `sources/<sha256>/<file name>` and records `storage_bucket`/`storage_key`. The backend keeps a working copy in `STORAGE_PATH/uploads` for the ML service and re-downloads it (verifying the SHA-256) if it goes missing.
@@ -67,6 +69,8 @@ Supabase replaces the Docker Postgres container and, optionally, the local uploa
 ```bash
 docker compose -f compose.yaml -f compose.supabase.yaml up --build backend ml-service frontend
 ```
+
+To run the backend against Supabase without Docker, see *Running the app → Option B* in the guide.
 
 For development without Docker, start the ML service and run Spring Boot with the `local` profile. That profile uses an ignored file-backed H2 database while preserving the same entities and APIs.
 

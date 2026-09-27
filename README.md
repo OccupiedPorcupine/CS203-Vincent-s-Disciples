@@ -10,4 +10,11 @@ The repository keeps experimentation, research, and the standalone product demo 
 - `research/` — collected research datasets.
 - `database/` — reserved for the final system's database work.
 
-See `demo/README.md` for demo setup and run instructions.
+## Documentation
+
+| Topic | Where |
+|---|---|
+| Running the demo locally or with Docker | [demo/README.md](demo/README.md) |
+| Connecting to Supabase (database and file storage), access roles, ingestion contract, open decisions | [demo/docs/supabase.md](demo/docs/supabase.md) |
+| Database schema history | [demo/backend/src/main/resources/db/migration/](demo/backend/src/main/resources/db/migration/) |
+| Model experiments | [ml/README.md](ml/README.md) |
