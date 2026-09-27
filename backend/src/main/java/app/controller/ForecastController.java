@@ -6,6 +6,8 @@ import app.dto.MlPredictionRequest;
 import app.dto.MlPredictionResponse;
 import app.service.ForecastDataService;
 import app.service.MlForecastClient;
+import app.service.NeaWeatherForecastService;
+import app.service.PublicHolidayService;
 import app.user.AuthenticatedUser;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,48 +17,37 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/forecast")
 public class ForecastController {
 
-    private final MlForecastClient mlForecastClient;
-    private final ForecastDataService forecastDataService;
+        private final MlForecastClient mlForecastClient;
+        private final ForecastDataService forecastDataService;
+        private final NeaWeatherForecastService neaWeatherForecastService;
+        private final PublicHolidayService publicHolidayService;
 
-    public ForecastController(MlForecastClient mlForecastClient, ForecastDataService forecastDataService) {
-        this.mlForecastClient = mlForecastClient;
-        this.forecastDataService = forecastDataService;
-    }
+        public ForecastController(MlForecastClient mlForecastClient, ForecastDataService forecastDataService, NeaWeatherForecastService neaWeatherForecastService, PublicHolidayService publicHolidayService) {
+            this.mlForecastClient = mlForecastClient;
+            this.forecastDataService = forecastDataService;
+            this.neaWeatherForecastService = neaWeatherForecastService;
+            this.publicHolidayService = publicHolidayService;
+        }
 
-    @PostMapping
-    public MlPredictionResponse predict(
-            @AuthenticationPrincipal AuthenticatedUser user,
-            @RequestBody ForecastRequest request
-    ) {
+        @PostMapping
+        public MlPredictionResponse predict(@AuthenticationPrincipal AuthenticatedUser user, @RequestBody ForecastRequest request) {
+        Dish dish = forecastDataService.getOwnedDish(request.dishId(), user.id());
 
-        Dish dish = forecastDataService.getOwnedDish(
-                request.dishId(),
-                user.id()
+        var salesHistory = forecastDataService.getSalesHistory(dish.getId(), request.forecastDate());
+
+        var weather = neaWeatherForecastService.getWeather(request.forecastDate());
+
+        boolean isHoliday = publicHolidayService.isPublicHoliday(request.forecastDate());
+
+        MlPredictionRequest mlRequest = new MlPredictionRequest(
+                dish.getName(),
+                request.forecastDate().toString(),
+                salesHistory,
+                weather,
+                isHoliday
         );
-
-        var salesHistory = forecastDataService.getSalesHistory(
-                dish.getId(),
-                request.forecastDate()
-        );
-
-        var weather =
-                new MlPredictionRequest.WeatherInput(
-                        request.weather().wind(),
-                        request.weather().cloudCover(),
-                        request.weather().precipitation(),
-                        request.weather().sunshine(),
-                        request.weather().airTemperature()
-                );
-
-        MlPredictionRequest mlRequest =
-                new MlPredictionRequest(
-                        dish.getName(),
-                        request.forecastDate().toString(),
-                        salesHistory,
-                        weather,
-                        request.isHoliday()
-                );
 
         return mlForecastClient.predict(mlRequest);
-    }
+        }
+
 }

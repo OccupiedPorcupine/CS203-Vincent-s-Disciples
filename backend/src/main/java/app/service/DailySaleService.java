@@ -21,7 +21,7 @@ public class DailySaleService {
         this.dailySaleRepository = dailySaleRepository;
     }
 
-    public List<DailySale> addSales(Long dishId, Long ownerId, AddDailySalesRequest request) {
+    public int addSales(Long dishId, Long ownerId, AddDailySalesRequest request) {
         Dish dish = dishRepository
                 .findByIdAndOwnerId(dishId, ownerId)
                 .orElseThrow(
@@ -42,7 +42,8 @@ public class DailySaleService {
             salesToSave.add(new DailySale(dish, input.date(), input.quantitySold()));
         }
 
-        return dailySaleRepository.saveAll(salesToSave);
+        dailySaleRepository.saveAll(salesToSave);
+        return salesToSave.size();
         
     }
 }
