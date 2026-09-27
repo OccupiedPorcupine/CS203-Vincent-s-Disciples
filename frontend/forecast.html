@@ -1,156 +1,218 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <meta name="api-base-url" content="http://localhost:8080">
+  <meta name="api-base-url" content="http://localhost:8080">
 
-    <title>Demand Forecast</title>
+  <title>Demand Forecast · Chicky</title>
 
-    <link rel="stylesheet" href="css/forecast.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./css/forecast.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
 
-<header class="topbar">
-    <div>
-        <h1>Demand Forecast</h1>
-        <p>Predict demand, plan better & reduce food waste.</p>
+  <header class="topbar">
+    <div class="topbar-title">
+      <h1>Demand Forecast</h1>
+      <p>Predict demand, plan better and reduce food waste.</p>
     </div>
 
-    <div class="profile-circle"></div>
-</header>
+    <a class="avatar" href="./index.html" aria-label="Your account">
+      C
+    </a>
+  </header>
 
-<main class="page">
+  <main class="page">
 
-    <section class="filters card">
-        <div class="field">
-            <label for="dish-select">Select Dish / Item</label>
+    <!-- Forecast controls -->
+    <section class="card controls">
 
-            <select id="dish-select">
-                <option value="1">Chicken Rice</option>
-            </select>
+      <div class="control">
+        <label for="dish-select">Select dish / item</label>
+
+        <div class="select-wrap">
+          <select id="dish-select">
+            <option value="1">Chicken Rice</option>
+          </select>
         </div>
+      </div>
 
-        <div class="field">
-            <label for="forecast-date">Forecast Date</label>
-            <input id="forecast-date" type="date">
+      <div class="control">
+        <label for="forecast-date">Forecast date</label>
+
+        <div class="forecast-date-row">
+          <input id="forecast-date" type="date">
+
+          <button id="forecast-button" class="generate-button" type="button">
+            Generate
+          </button>
         </div>
+      </div>
 
-        <button id="forecast-button">Generate Forecast</button>
     </section>
 
-    <section class="dashboard-grid">
+    <div class="content-grid">
 
-        <div class="forecast-card card">
+      <!-- Main forecast card -->
+      <section class="card chart-card">
 
-            <p class="section-label">EXPECTED DEMAND</p>
+        <div class="headline">
+          <span>Expected demand</span>
 
-            <div class="forecast-number">
-                <span id="predicted-demand">--</span>
-                <span class="forecast-unit">portions</span>
+          <span class="number">
+            <span id="predicted-demand">--</span>
+            <span class="forecast-unit"> portions</span>
+          </span>
+
+          <span id="forecast-date-label">
+            Select a forecast date
+          </span>
+        </div>
+
+        <div class="chart-toolbar">
+
+          <div class="view-toggle" role="group" aria-label="Chart view">
+
+            <button
+              type="button"
+              class="view-button toggle-button active"
+              data-view="seven-days"
+              aria-pressed="true"
+            >
+              Last 7 days
+            </button>
+
+            <button
+              type="button"
+              class="view-button toggle-button"
+              data-view="same-weekday"
+              aria-pressed="false"
+            >
+              Same weekday
+            </button>
+
+          </div>
+
+        </div>
+
+        <div class="chart">
+          <canvas id="history-chart"></canvas>
+        </div>
+
+      </section>
+
+      <!-- Right side -->
+      <div class="side-column">
+
+        <!-- Context -->
+        <section class="card side-card">
+
+          <h2>Factors affecting demand</h2>
+
+          <div class="factors">
+
+            <div class="factor">
+              <h3>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                >
+                  <circle cx="12" cy="12" r="4"/>
+                  <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+                </svg>
+
+                Weather
+              </h3>
+
+              <p id="weather-context">
+                Included in forecast model
+              </p>
             </div>
 
-            <p id="forecast-date-label" class="forecast-date-label">
-                Select a forecast date
+            <div class="factor">
+              <h3>Public holiday</h3>
+
+              <p id="holiday-context">
+                Included in forecast model
+              </p>
+            </div>
+
+          </div>
+
+          <div class="extra-context">
+
+            <div>
+              <strong>Local Events</strong>
+              <p id="event-context">
+                Checking for relevant events...
+              </p>
+            </div>
+
+            <div>
+              <strong>Local Disruptions</strong>
+              <p id="disruption-context">
+                No major disruption detected
+              </p>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- Chat -->
+        <section class="card side-card chat-card">
+
+          <h2>Ask about forecast</h2>
+
+          <div id="chat-messages" class="messages">
+
+            <p class="chat-placeholder">
+              Ask why demand is higher or add business context.
             </p>
 
-            <div class="history-section">
+          </div>
 
-                <div class="history-header">
-                    <h2>Historical Sales</h2>
+          <div class="chat-form">
 
-                    <div class="toggle">
-                        <button class="toggle-button active" data-view="seven-days">
-                            Last 7 Days
-                        </button>
+            <input
+              id="chat-input"
+              type="text"
+              placeholder="Why is demand this number?"
+              autocomplete="off"
+              maxlength="300"
+            >
 
-                        <button class="toggle-button" data-view="same-weekday">
-                            Same Weekday
-                        </button>
-                    </div>
-                </div>
+            <button
+              id="chat-send"
+              type="button"
+              class="send-button"
+            >
+              Ask
+            </button>
 
-                <div class="chart-container">
-                    <canvas id="history-chart"></canvas>
-                </div>
+          </div>
 
-            </div>
+        </section>
 
-        </div>
+      </div>
 
-        <aside class="right-column">
+    </div>
 
-            <div class="context-card card">
-                <h2>Context Considered</h2>
+  </main>
 
-                <div class="context-item">
-                    <span class="context-icon">☀</span>
-
-                    <div>
-                        <strong>Weather</strong>
-                        <p id="weather-context">Included in forecast model</p>
-                    </div>
-                </div>
-
-                <div class="context-item">
-                    <span class="context-icon">◷</span>
-
-                    <div>
-                        <strong>Local Events</strong>
-                        <p id="event-context">Checking for relevant events...</p>
-                    </div>
-                </div>
-
-                <div class="context-item">
-                    <span class="context-icon">◆</span>
-
-                    <div>
-                        <strong>Public Holiday</strong>
-                        <p id="holiday-context">Included in forecast model</p>
-                    </div>
-                </div>
-
-                <div class="context-item">
-                    <span class="context-icon">↔</span>
-
-                    <div>
-                        <strong>Local Disruptions</strong>
-                        <p id="disruption-context">No major disruption detected</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="chat-card card">
-                <h2>Ask About This Forecast</h2>
-
-                <div id="chat-messages" class="chat-messages">
-                    <p class="chat-placeholder">
-                        Ask why demand is higher or add business context.
-                    </p>
-                </div>
-
-                <div class="chat-input-row">
-                    <input
-                        id="chat-input"
-                        type="text"
-                        placeholder="e.g. We have a promotion tomorrow"
-                    >
-
-                    <button id="chat-send">Send</button>
-                </div>
-            </div>
-
-        </aside>
-
-    </section>
-
-</main>
-
-<script src="js/api.js"></script>
-<script src="js/forecast.js"></script>
+  <script src="./js/api.js"></script>
+  <script src="./js/forecast.js"></script>
 
 </body>
 </html>
