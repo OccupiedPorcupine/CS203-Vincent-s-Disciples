@@ -68,20 +68,8 @@ async function apiRequest(path, options = {}) {
 }
 
 function showAccount(user) {
-  // document.querySelector("#account-name").textContent = user.name || "Chicky user";
-  // document.querySelector("#account-email").textContent = user.email;
 
-  // const picture = document.querySelector("#account-picture");
-  // if (user.pictureUrl) {
-  //   picture.src = user.pictureUrl;
-  //   picture.alt = `${user.name || "User"} profile picture`;
-  //   picture.hidden = false;
-  // } else {
-  //   picture.removeAttribute("src");
-  //   picture.hidden = true;
-  // }
-  // showPanel("account");
-  window.location.href = "dashboardFake.html";
+  window.location.href = "dashboard.html";
 
 }
 
