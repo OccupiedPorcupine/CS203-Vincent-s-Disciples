@@ -1,7 +1,6 @@
 :root {
   --ink: #425664;
   --teal: #1ba098;
-  --graph: #d9d9d9;
   --border: #d9d9d9;
 }
 
@@ -46,7 +45,23 @@ h1, h2, p { margin: 0; font-weight: 400; }
 h1 { font-size: 32px; line-height: 46px; }
 .welcome p { margin-left: 1px; line-height: 24px; }
 h2 { font-size: 16px; line-height: 24px; }
-.graph { background: var(--graph); }
+/* Graph cards use the same card and headline style as the forecast page (forecast.css). */
+.graph {
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* lets the chart canvas shrink with the grid column on narrow screens */
+  min-height: 0;
+  background: #fff;
+  border: 1px solid #f0ece4;
+  border-radius: 6px;
+  box-shadow: 2px 3px 3px rgb(0 0 0 / 22%);
+}
+.graph .headline { font-size: 0.85rem; line-height: 1.4; }
+.graph .headline h2 { font-size: inherit; line-height: inherit; }
+.graph .headline .number { display: block; margin-top: 6px; font-size: 2.4rem; line-height: 1.1; }
+.graph .headline .unit { font-size: 1rem; }
+.graph .headline .note { display: block; }
+.graph .chart { position: relative; flex: 1; min-height: 0; margin-top: 14px; }
 .demand { grid-column: 1; grid-row: 2; padding: 21px 32px; }
 .revenue { grid-column: 2; grid-row: 1 / 3; padding: 17px 25px; }
 .actions { margin: 29px 0 0 32px; }
