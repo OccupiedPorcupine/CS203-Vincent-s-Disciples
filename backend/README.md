@@ -80,6 +80,7 @@ Passwords must contain 12–256 characters and are stored using Spring Security'
 ## Database and tests
 
 - The schema is managed by Flyway migrations in `src/main/resources/db/migration/`, and Hibernate only validates it (`ddl-auto=validate`). **Any entity change needs a new migration.** See [database/README.md](../database/README.md#changing-the-schema).
+- Login sessions are stored in the database (`spring_session` tables), so users stay logged in across backend restarts. Changing `AuthenticatedUser` invalidates stored sessions; see [database/README.md → Login sessions](../database/README.md#login-sessions).
 - `./mvnw test` runs on H2 and never touches Supabase. `SchemaValidationTest` fails if an entity and the migrations disagree.
 - Tests tagged `integration` need external services and are skipped by default. `MlForecastClientIntegrationTest` needs the ML API on `localhost:8000`. Run them with `./mvnw test -DexcludedGroups= -Dgroups=integration`.
 
