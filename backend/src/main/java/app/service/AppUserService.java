@@ -4,6 +4,7 @@ import app.user.*;
 import app.exception.AccountLinkingRequiredException;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AppUserService {
@@ -14,6 +15,8 @@ public class AppUserService {
         this.appUserRepository = appUserRepository;
     }
 
+    // One transaction for the lookups and the save, so they see a consistent view of the user.
+    @Transactional
     public AppUser findOrCreateUser(GoogleIdToken.Payload payload) {
         String googleId = payload.getSubject();
         String email = normalizeEmail(payload.getEmail());
@@ -31,8 +34,11 @@ public class AppUserService {
             String name,
             String pictureUrl
     ) {
+        // Compare IDs, not object references: separate lookups can return different Java
+        // objects for the same row, which made every returning Google user look like a
+        // different account owning their own email.
         appUserRepository.findByEmailIgnoreCase(email)
-                .filter(emailOwner -> emailOwner != user)
+                .filter(emailOwner -> !emailOwner.getId().equals(user.getId()))
                 .ifPresent(emailOwner -> {
                     throw new AccountLinkingRequiredException();
                 });
