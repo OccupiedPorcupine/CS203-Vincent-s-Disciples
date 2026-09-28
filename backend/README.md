@@ -6,7 +6,15 @@
 
 ## Run locally
 
-Set the required client ID and start the app:
+By default the backend uses an in-memory H2 database that is wiped on every restart. To keep data in the team's Supabase Postgres database instead, follow [database/README.md](../database/README.md).
+
+The easiest way to configure the backend is a `backend/.env` file, which is loaded automatically and is gitignored:
+
+```wsl
+cp backend/.env.example backend/.env
+```
+
+Then set `GOOGLE_CLIENT_ID` in it. Alternatively, export the client ID in your shell:
 
 ```powershell
 $env:GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
@@ -51,7 +59,7 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `POST /api/auth/google` — public authentication exchange; requires the CSRF header
 - `POST /api/auth/logout` — invalidates the application session
 - `GET /api/profile` — returns the authenticated application user
-- `/h2-console` — local development database console
+- `/h2-console` — local development database console (H2 only; disabled when using Supabase)
 
 For cookie-based browser calls, use `credentials: "include"`. Fetch `/api/csrf` first, then send its `token` value in the header named by `headerName` on POST/PUT/PATCH/DELETE requests.
 
@@ -69,4 +77,10 @@ You can also query the user database directly (SQL style) by uncommenting certai
 
 Passwords must contain 12–256 characters and are stored using Spring Security's delegating password encoder with PBKDF2, never as plaintext. Email addresses are normalized to lowercase and must be unique. Google and password accounts are deliberately not linked merely because their emails match; authenticated account linking should be implemented as a separate flow.
 
-This is a development skeleton. Before production, replace H2 and `ddl-auto=update` with a production database and migrations, set secure cookie options, remove H2 console access, rate-limit authentication attempts, and add an email-verification and password-reset flow.
+## Database and tests
+
+- The schema is managed by Flyway migrations in `src/main/resources/db/migration/`, and Hibernate only validates it (`ddl-auto=validate`). **Any entity change needs a new migration.** See [database/README.md](../database/README.md#changing-the-schema).
+- `./mvnw test` runs on H2 and never touches Supabase. `SchemaValidationTest` fails if an entity and the migrations disagree.
+- Tests tagged `integration` need external services and are skipped by default. `MlForecastClientIntegrationTest` needs the ML API on `localhost:8000`. Run them with `./mvnw test -DexcludedGroups= -Dgroups=integration`.
+
+This is a development skeleton. Before production, set secure cookie options, remove the H2 console dependency, rate-limit authentication attempts, and add an email-verification and password-reset flow.
