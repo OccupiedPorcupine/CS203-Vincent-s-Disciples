@@ -6,6 +6,7 @@ The backend stores its data in Postgres, hosted on Supabase. For local developme
 |---|---|---|
 | Setup | None | Values in `backend/.env` |
 | Data survives a restart | No | Yes |
+| Users stay logged in across a restart | No | Yes |
 | Shared with the team | No | Yes: everyone on the same project sees the same data |
 | H2 console at `/h2-console` | On | Off |
 
@@ -18,8 +19,9 @@ Contents:
 3. [How the schema is managed](#how-the-schema-is-managed)
 4. [Changing the schema](#changing-the-schema)
 5. [Security](#security)
-6. [Team rules for the shared database](#team-rules-for-the-shared-database)
-7. [Troubleshooting](#troubleshooting)
+6. [Login sessions](#login-sessions)
+7. [Team rules for the shared database](#team-rules-for-the-shared-database)
+8. [Troubleshooting](#troubleshooting)
 
 ## Connecting to Supabase
 
@@ -91,9 +93,9 @@ cd backend
    ```
 
    If it says `jdbc:h2:mem:appdb`, the Supabase settings were not picked up. See [Troubleshooting](#troubleshooting).
-2. **First run only.** You should see `Migrating schema "public" to version "1 - initial schema"` and `"2 - access control"`. Later runs say `Schema "public" is up to date`.
-3. **Tables.** In the dashboard, open **Table Editor**. You should see `app_users`, `dishes`, `daily_sales`, `public_holidays`, and `flyway_schema_history`, each marked as RLS enabled.
-4. **Data survives a restart.** Sign up through the frontend, restart the backend, and log in again with the same account.
+2. **First run only.** You should see `Migrating schema "public"` to versions `"1 - initial schema"`, `"2 - access control"`, and `"3 - login sessions"`. Later runs say `Schema "public" is up to date`.
+3. **Tables.** In the dashboard, open **Table Editor**. You should see `app_users`, `dishes`, `daily_sales`, `public_holidays`, `spring_session`, `spring_session_attributes`, and `flyway_schema_history`, each marked as RLS enabled.
+4. **Data and logins survive a restart.** Sign in through the frontend, restart the backend, and reload the page: you should still be signed in.
 
 ## How the schema is managed
 
@@ -105,9 +107,13 @@ backend/src/main/resources/db/migration/
 │   └── V1__initial_schema.sql
 ├── postgresql/    # runs on Postgres/Supabase only
 │   ├── V2__access_control.sql
+│   ├── V3__login_sessions.sql   # session tables, plus RLS
 │   └── afterMigrate.sql   # runs after every migrate; secures flyway_schema_history
-└── h2/            # H2-only SQL, normally empty
+└── h2/            # H2-only SQL, for when H2 needs different SQL from Postgres
+    └── V3__login_sessions.sql   # same tables with H2 column types
 ```
+
+A version number can appear in both `postgresql/` and `h2/` when the same change needs different SQL on each database, as V3 does. Only one of the two folders runs on any given database.
 
 On Supabase, the history table starts with a `<< Flyway Baseline >>` row at version 0. New projects are not empty: the "Enable automatic RLS" option installs a helper function, `public.rls_auto_enable()`, and Flyway refuses to migrate a non-empty schema unless it records a starting point first. Baselining at version 0 still runs every migration from V1. The helper is harmless: it turns on RLS for new tables, which the migrations do anyway.
 
@@ -118,14 +124,14 @@ On Supabase, the history table starts with a `<< Flyway Baseline >>` row at vers
 Any change to an `@Entity` class (a new field, a renamed column, a new entity) needs a new migration file.
 
 1. Change the entity.
-2. Add a file in `common/` with the next free version number, for example `V3__add_dish_price.sql`:
+2. Add a file in `common/` with the next free version number, for example `V4__add_dish_price.sql`:
 
    ```sql
    ALTER TABLE dishes ADD COLUMN price NUMERIC(10, 2);
    ```
 
    Version numbers are shared across all folders, so check `postgresql/` too before picking one.
-3. If the migration creates a table, add a matching file in `postgresql/` that locks it down. Use the next version number after step 2, for example `V4__secure_new_table.sql`:
+3. If the migration creates a table, add a matching file in `postgresql/` that locks it down. Use the next version number after step 2, for example `V5__secure_new_table.sql`:
 
    ```sql
    ALTER TABLE new_table ENABLE ROW LEVEL SECURITY;
@@ -147,6 +153,25 @@ Rules:
 - **The H2 console** is disabled on the Supabase profile, so the database console at `/h2-console` never runs next to real user data.
 - **API responses** must not return entities directly, because `AppUser` holds the password hash. Return DTOs such as `DishResponse`.
 
+## Login sessions
+
+When someone signs in, with a password or with Google, Spring Session stores their login in the database instead of in the backend's memory:
+
+| Table | Holds |
+|---|---|
+| `spring_session` | One row per logged-in browser: the session ID, expiry time, and `principal_name` (the user's ID from `app_users`) |
+| `spring_session_attributes` | The serialized login for each session: an `AuthenticatedUser` with ID, email, name, picture URL, and role |
+
+As a result, users stay logged in when the backend restarts, and several backends can share the same logins. Sessions expire after 30 minutes of inactivity, and Spring deletes expired rows every minute.
+
+Things to know:
+
+- **Treat these tables like passwords.** Anyone holding a session ID can act as that user. V3 enables RLS and revokes Data API access on both tables.
+- **Log everyone out** by running `DELETE FROM spring_session;` in the SQL Editor. Attribute rows are removed with their sessions. To log out one user, run `DELETE FROM spring_session WHERE principal_name = '<user id>';`.
+- **Changing `AuthenticatedUser` invalidates existing sessions.** Sessions store it as serialized Java, so adding, removing, or renaming its fields means old sessions can no longer be read. After deploying such a change, run `DELETE FROM spring_session;` so everyone signs in again.
+- Each authenticated request reads its session from the database. Over the Singapore pooler this adds a few milliseconds per request.
+- On H2 the session tables live in memory like everything else, so logins are still lost on restart there.
+
 ## Team rules for the shared database
 
 Everyone whose `.env` points at the project shares one database, so:
@@ -154,7 +179,7 @@ Everyone whose `.env` points at the project shares one database, so:
 1. **Only run merged `main` code against Supabase.** A migration on an unmerged branch changes the database for everyone, and other people's apps may then refuse to start. Use H2 for feature work.
 2. **Connection limits.** The free tier allows few connections, and each running backend uses up to 5. About three or four people can run against Supabase at the same time.
 3. **Free projects pause** after about a week without activity. If the app suddenly cannot connect, open the dashboard and click **Restore project**.
-4. Login sessions are still held in the backend's memory, so users are logged out whenever it restarts. Their accounts and data remain.
+4. **Logins are shared too.** A session created through one person's backend is valid on everyone's, because they all read the same `spring_session` table.
 
 ## Troubleshooting
 
@@ -171,3 +196,4 @@ Everyone whose `.env` points at the project shares one database, so:
 | `Public holiday sync failed; using stored holidays` | data.gov.sg was unreachable, or the app was stopped while the startup sync was still running (the API starts answering before the sync finishes). The app keeps running with the holidays already stored |
 | `Found non-empty schema(s) "public" but no schema history table` | Flyway ran without the Supabase profile's baseline settings. Check that `spring.profiles.active=supabase` is set. Do not run `baseline` by hand: it would skip V1 |
 | `remaining connection slots are reserved` or `too many clients` | Too many backends running at once. Stop one |
+| Errors mentioning `deserialize` or `SerializationFailedException` after a deploy | `AuthenticatedUser` changed and old sessions cannot be read. Run `DELETE FROM spring_session;` in the SQL Editor |
