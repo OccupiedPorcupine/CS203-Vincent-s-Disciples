@@ -40,6 +40,26 @@ body {
 
 .topbar-title { flex: 1; min-width: 0; }
 
+/* Navigation menu, copied from dashboard.css so both pages share one menu. */
+.navigation { position: relative; z-index: 1; }
+.navigation summary { display: grid; place-items: center; width: 40px; height: 40px; list-style: none; cursor: pointer; }
+.navigation summary::-webkit-details-marker { display: none; }
+.navigation summary img { opacity: 0.5; }
+.navigation nav {
+  position: absolute;
+  top: 48px; /* the forecast header is shorter than the dashboard's */
+  left: 0;
+  width: 220px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fffefc;
+  box-shadow: 0 8px 24px #42566420;
+}
+.navigation a { display: block; padding: 12px; color: var(--ink); text-decoration: none; }
+.navigation a:hover, .navigation a[aria-current] { background: #1ba09818; }
+.navigation summary:focus-visible, .navigation a:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+
 .topbar h1 {
   margin: 0;
   font-size: 1.6rem;
