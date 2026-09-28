@@ -71,6 +71,12 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
+        <!-- Login sessions are stored in the database (tables from Flyway V3), so users stay
+             logged in across restarts and several backends can share them. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-session-jdbc</artifactId>
+        </dependency>
         <!-- Supabase Postgres -->
         <dependency>
             <groupId>org.postgresql</groupId>
