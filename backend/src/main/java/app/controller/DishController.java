@@ -1,7 +1,7 @@
 package app.controller;
 
-import app.dish.Dish;
 import app.dto.CreateDishRequest;
+import app.dto.DishResponse;
 import app.service.DishService;
 import app.user.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,7 +32,7 @@ public class DishController {
             @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
     })
     @PostMapping
-    public Dish createDish(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody CreateDishRequest request) {
-        return dishService.createDish(request.name(), user.id());
+    public DishResponse createDish(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody CreateDishRequest request) {
+        return DishResponse.from(dishService.createDish(request.name(), user.id()));
     }
 }

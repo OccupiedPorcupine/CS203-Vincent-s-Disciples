@@ -4,6 +4,12 @@ ml/artifacts/*
 **/.venv/
 __pycache__/
 .pytest_cache/
-**/catboost_info/backend/target/
+**/catboost_info/
+backend/target/
 target/
 catboost_info/
+
+# Local secrets (database passwords, OAuth client IDs)
+.env
+.env.*
+!.env.example

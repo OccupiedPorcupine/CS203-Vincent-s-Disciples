@@ -2,6 +2,7 @@ package app.service;
 
 import app.dto.MlPredictionRequest;
 import app.dto.MlPredictionResponse;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -10,6 +11,9 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// Needs the ML API running on localhost:8000, so it is skipped by default.
+// Run it with: ./mvnw test -DexcludedGroups= -Dgroups=integration
+@Tag("integration")
 class MlForecastClientIntegrationTest {
 
     @Test
