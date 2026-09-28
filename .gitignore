@@ -8,6 +8,8 @@ __pycache__/
 backend/target/
 target/
 catboost_info/
+ml/lib64
+backend/.env
 
 # Local secrets (database passwords, OAuth client IDs)
 .env
