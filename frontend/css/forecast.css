@@ -42,12 +42,13 @@ body {
 
 /* Navigation menu, copied from dashboard.css so both pages share one menu. */
 .navigation { position: relative; z-index: 1; }
-.navigation summary { display: grid; place-items: center; width: 40px; height: 40px; list-style: none; cursor: pointer; }
+/* Smaller than the dashboard's icon to suit this page's shorter header; matches the 34px avatar. */
+.navigation summary { display: grid; place-items: center; width: 34px; height: 34px; list-style: none; cursor: pointer; }
 .navigation summary::-webkit-details-marker { display: none; }
-.navigation summary img { opacity: 0.5; }
+.navigation summary img { width: 22px; height: 22px; opacity: 0.5; }
 .navigation nav {
   position: absolute;
-  top: 48px; /* the forecast header is shorter than the dashboard's */
+  top: 44px; /* the forecast header is shorter than the dashboard's */
   left: 0;
   width: 220px;
   padding: 12px;
