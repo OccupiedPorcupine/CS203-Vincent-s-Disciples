@@ -14,10 +14,17 @@ import app.user.AppUser;
 import app.service.LocalAuthService;
 import app.service.SessionAuthenticationService;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
+@Tag(name = "Authentication", description = "User authentication operations")
 @RestController
 @RequestMapping("/api/auth")
 public class LocalAuthController {
@@ -33,6 +40,12 @@ public class LocalAuthController {
         this.sessionAuthenticationService = sessionAuthenticationService;
     }
 
+    @Operation(summary = "Sign up", description = "Creates a new local user account and starts an authenticated session.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Account created successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid signup data", content = @Content),
+            @ApiResponse(responseCode = "409", description = "Account already exists", content = @Content)
+    })
     @PostMapping("/signup")
     public ResponseEntity<AuthResponse> signup(
             @Valid @RequestBody SignupRequest request,
@@ -44,6 +57,12 @@ public class LocalAuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(AuthResponse.from(user));
     }
 
+    @Operation(summary = "Log in", description = "Authenticates a local user with their email and password and starts an authenticated session.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Authentication successful"),
+            @ApiResponse(responseCode = "400", description = "Invalid login request", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Invalid email or password", content = @Content)
+    })    
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request,

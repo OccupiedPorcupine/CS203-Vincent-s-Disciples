@@ -1,6 +1,7 @@
 package app.service;
 
 import app.dto.MlPredictionRequest;
+import app.exception.InvalidForecastDateException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -48,7 +49,7 @@ public class NeaWeatherForecastService {
         LocalDate end = OffsetDateTime.parse(validPeriod.end()).toLocalDate();
 
         if (forecastDate.isBefore(start) || forecastDate.isAfter(end)) {
-            throw new IllegalArgumentException("Forecast date is outside the NEA 24-hour forecast period");
+            throw new InvalidForecastDateException("Forecast date is outside the NEA 24-hour forecast period");
         }
     }
 
