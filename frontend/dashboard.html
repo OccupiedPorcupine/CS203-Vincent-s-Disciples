@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chicky Dashboard</title>
+  <!-- Read by js/api.js; without it the login check below the graphs never ran. -->
+  <meta name="api-base-url" content="http://localhost:8080">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
@@ -27,12 +29,26 @@
         <h1 id="welcome-heading">Welcome, USER</h1>
         <p>Review this week’s performance</p>
       </section>
-      <!-- Empty graph areas intentionally match the Figma skeleton. -->
+      <!-- Graphs show sample data (js/dashboard.js) until the dashboard reads sales from the backend. -->
       <section class="graph demand" aria-labelledby="demand-heading">
-        <h2 id="demand-heading">Performance Graph 1 (Demand)</h2>
+        <div class="headline">
+          <h2 id="demand-heading">Demand this week</h2>
+          <span class="number"><span id="demand-total">--</span><span class="unit"> portions</span></span>
+          <span class="note">Sample data &middot; Mon to Sun</span>
+        </div>
+        <div class="chart">
+          <canvas id="demand-chart" role="img" aria-label="Line chart of portions sold each day this week"></canvas>
+        </div>
       </section>
       <section class="graph revenue" aria-labelledby="revenue-heading">
-        <h2 id="revenue-heading">Performance Graph 2 (Revenue)</h2>
+        <div class="headline">
+          <h2 id="revenue-heading">Revenue this week</h2>
+          <span class="number"><span id="revenue-total">--</span></span>
+          <span class="note">Sample data &middot; Mon to Sun</span>
+        </div>
+        <div class="chart">
+          <canvas id="revenue-chart" role="img" aria-label="Line chart of revenue each day this week"></canvas>
+        </div>
       </section>
     </div>
 
@@ -57,6 +73,7 @@
     </section>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="./js/api.js"></script>
   <script src="./js/dashboard.js"></script>
 </body>

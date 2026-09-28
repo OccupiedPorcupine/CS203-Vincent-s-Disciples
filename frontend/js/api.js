@@ -37,7 +37,10 @@ async function apiRequest(path, options = {}) {
 
     if (!response.ok) {
         const text = await response.text();
-        throw new Error(text || `Request failed: ${response.status}`);
+        // Expose the HTTP status (as auth.js does) so pages can react to 401, e.g. dashboard.js.
+        const error = new Error(text || `Request failed: ${response.status}`);
+        error.status = response.status;
+        throw error;
     }
 
     return response.json();
