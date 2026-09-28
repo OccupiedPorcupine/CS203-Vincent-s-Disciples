@@ -7,3 +7,5 @@ __pycache__/
 **/catboost_info/backend/target/
 target/
 catboost_info/
+ml/lib64
+backend/.env
