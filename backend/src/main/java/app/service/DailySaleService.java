@@ -3,12 +3,18 @@ package app.service;
 import app.dish.Dish;
 import app.dish.DishRepository;
 import app.dto.AddDailySalesRequest;
+import app.dto.UpdateDailySaleResponse;
 import app.sale.DailySale;
 import app.sale.DailySaleRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class DailySaleService {
@@ -28,11 +34,16 @@ public class DailySaleService {
                         () -> new IllegalArgumentException("Dish not found"));
 
         List<DailySale> salesToSave = new ArrayList<>();
+        Set<LocalDate> datesInRequest = new HashSet<>();
 
         for (AddDailySalesRequest.SaleInput input : request.sales()) {
 
             if (input.quantitySold() < 0) {
                 throw new IllegalArgumentException("Quantity sold cannot be negative");
+            }
+
+            if (!datesInRequest.add(input.date())) {
+                throw new IllegalArgumentException(input.date() + " appears more than once");
             }
 
             if (dailySaleRepository.existsByDishIdAndSaleDate(dishId, input.date())) {
@@ -54,5 +65,27 @@ public class DailySaleService {
                         () -> new IllegalArgumentException("Dish not found"));
 
         return dailySaleRepository.findByDishIdOrderBySaleDateAsc(dishId);
+    }
+
+    // Records one day's sales, replacing any quantity already recorded for that day.
+    @Transactional
+    public UpdateDailySaleResponse setSale(Long dishId, Long ownerId, LocalDate date, int quantitySold) {
+        Dish dish = dishRepository
+                .findByIdAndOwnerId(dishId, ownerId)
+                .orElseThrow(
+                        () -> new IllegalArgumentException("Dish not found"));
+
+        if (quantitySold < 0) {
+            throw new IllegalArgumentException("Quantity sold cannot be negative");
+        }
+
+        Optional<DailySale> existing = dailySaleRepository.findByDishIdAndSaleDate(dishId, date);
+        Integer previousQuantity = existing.map(DailySale::getQuantitySold).orElse(null);
+
+        DailySale sale = existing.orElseGet(() -> new DailySale(dish, date, quantitySold));
+        sale.setQuantitySold(quantitySold);
+        dailySaleRepository.save(sale);
+
+        return new UpdateDailySaleResponse(date, quantitySold, previousQuantity);
     }
 }
