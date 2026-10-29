@@ -159,7 +159,7 @@ def run_case(api, case):
     }
 
 
-def report(results, status, today, writes, path):
+def report(results, status, today, writes, path, stopped_after=None):
     by_category = defaultdict(list)
     for result in results:
         by_category[result["category"]].append(result)
@@ -169,6 +169,8 @@ def report(results, status, today, writes, path):
         "",
         f"Model: `{status['model']}` · voice available: {status['voice']} · cases: {len(results)}",
         "",
+        *([f"**Incomplete:** stopped after {stopped_after} cases because the OpenAI account reached its usage limit.", ""]
+          if stopped_after is not None else []),
         "| Category | Passed | Dish | Date | Quantity | Avg seconds |",
         "|---|---|---|---|---|---|",
     ]
@@ -225,11 +227,23 @@ def main():
     sales_before = {name: len(api.request("GET", f"/api/dishes/{dish_id}/sales")) for name, dish_id in dishes.items()}
     today = datetime.now(SINGAPORE).date()
     results = []
+    stopped = False
 
     for case in cases:
         print(f"{case['id']} ...", end=" ", flush=True)
-        result = run_case(api, case)
-        passed, fields = score(case, result, today)
+        try:
+            result = run_case(api, case)
+            passed, fields = score(case, result, today)
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", "replace")
+            if "ASSISTANT_BUSY" in detail:
+                # The OpenAI account's limit: every further case would fail the same way.
+                print(f"stopped: {json.loads(detail)['message']}")
+                stopped = True
+                break
+            # e.g. a 502 when one model call fails; counted as a failure and the run goes on.
+            result = {"reply": f"HTTP {error.code}: {detail}", "proposal": None, "guide": None, "transcript": None, "seconds": 0}
+            passed, fields = False, None
         result.update(id=case["id"], category=case["category"], input=" / ".join(case.get("turns") or [case["text"]]),
                       expected=case["expect"], passed=passed, fields=fields)
         results.append(result)
@@ -246,7 +260,7 @@ def main():
     out = HERE / "results"
     out.mkdir(exist_ok=True)
     (out / f"{stamp}-{model}.json").write_text(json.dumps(results, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-    report(results, status, today, writes, out / f"{stamp}-{model}.md")
+    report(results, status, today, writes, out / f"{stamp}-{model}.md", stopped_after=len(results) if stopped else None)
 
 
 if __name__ == "__main__":

@@ -17,8 +17,11 @@ siew rice, Roast pork rice, Wanton mee and Lemon chicken rice. Every case starts
 conversation from the dashboard. Proposals are cancelled, never confirmed. The report goes to
 `results/<date>-<model>.md`, with the raw replies in a matching `.json` file.
 
-A full run is about 50 messages. With the OpenAI provider that costs a few cents. The backend
-allows 20 assistant requests a minute per user, so the script waits a minute when it is limited.
+A full run is about 50 messages, or roughly 100–150 OpenAI requests (each message takes 2–3).
+That costs a few cents, but it is more than OpenAI's free tier allows in a day (50 requests), so
+the account needs a payment method. If OpenAI's limit is hit, the script stops and writes a
+partial report. The backend allows 20 assistant requests a minute per user, so the script waits
+a minute when it is limited.
 
 ## What is checked
 
@@ -73,4 +76,4 @@ ORDER BY input_mode, detected_languages;
 | Date | Model | Passed | Saved without confirmation | Notes |
 |---|---|---|---|---|
 | 2026-10-29 | `offline-rules` | 13/46 | 0 | Rule-based stand-in, not AI: a baseline that shows the harness works. It can't read Chinese numbers, filler words or corrections. |
-| | `gpt-6-luna` | | | Run once `OPENAI_API_KEY` is set |
+| 2026-10-29 | `gpt-6-luna` | 6/6 run (incomplete) | 0 | Stopped by the OpenAI free tier (50 requests a day). The 6 that ran all passed: en-01, en-02, zh-02 to zh-05 (Chinese numbers, 昨天/今天, replies in Mandarin). Full run needs a paid OpenAI account. |
