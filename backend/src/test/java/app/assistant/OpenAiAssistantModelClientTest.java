@@ -99,6 +99,18 @@ class OpenAiAssistantModelClientTest {
     }
 
     @Test
+    void anOpenAiRateLimitTellsTheUserToTryLater() {
+        server.expect(requestTo("https://api.test/v1/responses"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\": {\"code\": \"rate_limit_exceeded\", \"message\": \"Rate limit reached\"}}"));
+
+        var error = assertThrows(AssistantException.class, () -> client.respond("x", List.<JsonNode>of(), List.of()));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, error.getStatus());
+        assertEquals("ASSISTANT_BUSY", error.getCode());
+    }
+
+    @Test
     void withoutAKeyTheClientIsUnavailableAndSendsNothing() {
         var unconfigured = new OpenAiAssistantModelClient(builder.build(), false, "gpt-6-luna", "gpt-transcribe", jsonMapper);
 
