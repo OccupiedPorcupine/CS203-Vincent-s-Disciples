@@ -1,6 +1,9 @@
 package app.assistant;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.util.LinkedMultiValueMap;
@@ -21,6 +24,8 @@ import java.util.List;
 // Nothing is stored at OpenAI (store=false); the encrypted reasoning items it returns are kept
 // in the conversation and sent back, as the API requires for reasoning models.
 public class OpenAiAssistantModelClient implements AssistantModelClient {
+
+    private static final Logger log = LoggerFactory.getLogger(OpenAiAssistantModelClient.class);
 
     // OpenAI rejects keywords containing these characters.
     private static final String KEYWORD_FORBIDDEN = "[<>\\r\\n]";
@@ -173,7 +178,18 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
         try {
             return request.get();
         } catch (RestClientResponseException exception) {
-            throw AssistantException.upstream("The AI service returned an error (" + exception.getStatusCode().value() + "). Please try again.");
+            // OpenAI's error body says why (e.g. which limit was hit); it never contains the key.
+            log.warn("OpenAI returned {}: {}", exception.getStatusCode().value(), exception.getResponseBodyAsString());
+            int status = exception.getStatusCode().value();
+            if (status == 429) {
+                // Rate limit or used-up quota on the OpenAI account.
+                throw new AssistantException(HttpStatus.SERVICE_UNAVAILABLE, "ASSISTANT_BUSY",
+                        "The assistant has reached its usage limit for now. Please try again later.");
+            }
+            if (status == 401 || status == 403) {
+                throw AssistantException.unavailable("The assistant's OpenAI key was rejected. Check OPENAI_API_KEY on the server.");
+            }
+            throw AssistantException.upstream("The AI service returned an error (" + status + "). Please try again.");
         } catch (RestClientException exception) {
             throw AssistantException.upstream("The AI service could not be reached. Please try again.");
         }
