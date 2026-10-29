@@ -98,7 +98,7 @@
     const chatSend = chatBox.querySelector(".send");
     const chatMic = chatBox.querySelector('[aria-label="Voice input"]');
 
-    chatInput.placeholder = "Tell the assistant your sales, e.g. “chicken rice 42”";
+    chatInput.placeholder = "Say your sales, e.g. “chicken rice 42”";
     chatInput.addEventListener("keydown", event => {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
