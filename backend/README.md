@@ -69,6 +69,20 @@ not registered twice for the same user. Override the location with `TRAINING_DAT
 Uploads are currently marked `AVAILABLE_FOR_TRAINING`; connecting them to a training job and an
 active model version is a separate pipeline step.
 
+### Demo data
+
+An empty account shows nothing on the dashboard. With the backend running, fill a demo account
+with 120 days of fake chicken rice stall sales (safe to run again; it only adds missing days):
+
+```bash
+python3 scripts/seed_demo_data.py            # signs in as demo@chicky.test / chicky-demo-password
+python3 scripts/seed_demo_data.py --help     # other account, period, or backend URL
+```
+
+The script writes to whichever database the backend uses, so check `backend/.env` before running
+it against Supabase. `scripts/sample-data/demo_sales.csv` holds the same kind of data
+(`date,dish,quantity_sold`) for trying the Data ingestion upload.
+
 For cookie-based browser calls, use `credentials: "include"`. Fetch `/api/csrf` first, then send its `token` value in the header named by `headerName` on POST/PUT/PATCH/DELETE requests.
 
 Example signup body:
