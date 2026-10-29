@@ -25,9 +25,14 @@ function formatDay(isoDate, options) {
 
 const sum = values => values.reduce((total, value) => total + value, 0);
 
+// Charts by canvas ID, so they can be redrawn after new sales are saved.
+const charts = {};
+
 // Same chart style as the forecast page's history chart.
 function drawChart(canvasId, type, label, labels, values) {
-  return new Chart(document.getElementById(canvasId).getContext("2d"), {
+  charts[canvasId]?.destroy();
+
+  charts[canvasId] = new Chart(document.getElementById(canvasId).getContext("2d"), {
     type,
 
     data: {
@@ -142,7 +147,14 @@ async function loadDashboard() {
   );
 }
 
-loadDashboard().catch(error => {
-  console.error(error);
-  showEmpty("Could not load sales. Is the backend running?");
-});
+function refreshDashboard() {
+  loadDashboard().catch(error => {
+    console.error(error);
+    showEmpty("Could not load sales. Is the backend running?");
+  });
+}
+
+refreshDashboard();
+
+// Sent by js/assistant.js when the user confirms sales.
+window.addEventListener("chicky:sales-saved", refreshDashboard);

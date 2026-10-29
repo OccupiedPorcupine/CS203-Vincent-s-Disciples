@@ -9,6 +9,11 @@ async function getCsrf() {
         throw new Error(`Failed to get CSRF token: ${response.status}`);
     }
 
+    // 204 No Content, e.g. cancelling an assistant proposal.
+    if (response.status === 204) {
+        return null;
+    }
+
     return response.json();
 }
 
@@ -44,6 +49,11 @@ async function apiRequest(path, options = {}) {
         error.status = response.status;
         error.code = body?.code;
         throw error;
+    }
+
+    // 204 No Content, e.g. cancelling an assistant proposal.
+    if (response.status === 204) {
+        return null;
     }
 
     return response.json();
