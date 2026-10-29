@@ -8,13 +8,19 @@
   const SILENCE_MS = 2000;
   const SPEECH_LEVEL = 0.02;
   const CONVERSATION_KEY = "chicky-assistant-conversation";
+  const MUTED_KEY = "chicky-assistant-muted";
   // At most this many visible elements are described to the assistant with each message.
   const MAX_PAGE_ELEMENTS = 60;
 
   const MIC_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z"/></svg>';
+  const SOUND_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3Zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.47 4.47 0 0 0 2.5-4ZM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06a9 9 0 0 0 0-17.54Z"/></svg>';
+  const MUTED_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M16.5 12A4.5 4.5 0 0 0 14 8v2.18l2.45 2.45c.03-.2.05-.41.05-.63Zm2.5 0a6.97 6.97 0 0 1-.54 2.7l1.51 1.51A8.96 8.96 0 0 0 21 12a9 9 0 0 0-7-8.77v2.06A7 7 0 0 1 19 12ZM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25A6.92 6.92 0 0 1 14 18.7v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3ZM12 4 9.91 6.09 12 8.18V4Z"/></svg>';
   const SEND_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M11 20V7.83l-5.59 5.58L4 12l8-8 8 8-1.41 1.41L13 7.83V20h-2Z"/></svg>';
 
   let status = { available: false, voice: false };
+  let muted = readStored(MUTED_KEY, localStorage) === "true";
+  let currentAudio = null;
+  let speechRequest = 0;
   let conversationId = readStored(CONVERSATION_KEY);
   let recorder = null;
   let voiceLanguages = null;
@@ -38,6 +44,7 @@
   panel.innerHTML = `
     <header class="assistant-header">
       <h2 id="assistant-title">Chicky assistant</h2>
+      <button class="assistant-sound" type="button" hidden></button>
       <button class="assistant-close" type="button" aria-label="Close assistant">&times;</button>
     </header>
     <div class="assistant-log" role="log" aria-live="polite"></div>
@@ -54,16 +61,23 @@
   const input = form.querySelector("textarea");
   const micButton = form.querySelector(".assistant-mic");
   const sendButton = form.querySelector(".assistant-send");
+  const soundButton = panel.querySelector(".assistant-sound");
+
+  // Signed out (the page redirects) or the backend is down: no assistant.
+  const statusLoaded = apiRequest("/api/assistant/status")
+    .then(result => {
+      status = result;
+      return true;
+    })
+    .catch(() => false);
+
+  // Used by js/guide.js to read tour steps aloud.
+  window.chickyAssistant = { speak, stopSpeaking };
 
   init();
 
   async function init() {
-    try {
-      status = await apiRequest("/api/assistant/status");
-    } catch (error) {
-      // Signed out (the page redirects) or the backend is down: no assistant.
-      return;
-    }
+    if (!await statusLoaded) return;
 
     document.body.append(bubble, panel);
     addMessage("assistant", status.available
@@ -87,6 +101,9 @@
       }
     });
     micButton.addEventListener("click", toggleRecording);
+    soundButton.hidden = !status.voice;
+    soundButton.addEventListener("click", () => setMuted(!muted));
+    setMuted(muted);
 
     connectDashboardChatBox();
   }
@@ -169,8 +186,11 @@
       addMessage("assistant", response.reply);
       if (response.proposal) addConfirmCard(response.proposal);
       if (response.guide?.length && window.chickyGuide) {
+        // The tour reads its own steps aloud.
         setOpen(false);
         window.chickyGuide.start(response.guide);
+      } else {
+        speak(response.reply);
       }
     } catch (error) {
       addMessage("error", errorMessage(error));
@@ -183,6 +203,49 @@
     busy = isBusy;
     statusLine.textContent = message;
     updateControls();
+  }
+
+  // ---- Spoken replies ----
+
+  function setMuted(isMuted) {
+    muted = isMuted;
+    writeStored(MUTED_KEY, String(muted), localStorage);
+    soundButton.innerHTML = muted ? MUTED_ICON : SOUND_ICON;
+    soundButton.setAttribute("aria-pressed", String(muted));
+    soundButton.setAttribute("aria-label", "Mute spoken replies");
+    soundButton.title = muted ? "Spoken replies are off" : "Spoken replies are on";
+    if (muted) stopSpeaking();
+  }
+
+  // Reads text aloud. Optional: the text is always shown, so failures (no audio support,
+  // autoplay blocked after moving page) are ignored.
+  async function speak(text) {
+    stopSpeaking();
+    const request = speechRequest;
+    if (!await statusLoaded || muted || !status.voice || !text) return;
+
+    try {
+      const audio = await apiRequest("/api/assistant/speech", {
+        method: "POST",
+        body: JSON.stringify({ text: text.slice(0, 500) }),
+        responseType: "blob"
+      });
+      if (request !== speechRequest || muted) return;
+
+      const url = URL.createObjectURL(audio);
+      currentAudio = new Audio(url);
+      currentAudio.addEventListener("ended", () => URL.revokeObjectURL(url));
+      await currentAudio.play();
+    } catch (error) {
+      // Text only.
+    }
+  }
+
+  // Stops playback and any reply still being fetched.
+  function stopSpeaking() {
+    speechRequest++;
+    currentAudio?.pause();
+    currentAudio = null;
   }
 
   // What's on screen, so the assistant can point at things the app guide doesn't describe yet.
@@ -495,19 +558,20 @@
   }
 
   // Storage can be unavailable (private windows, blocked cookies); the assistant works without it.
-  function readStored(key) {
+  // The conversation is per tab (sessionStorage); the mute setting is per browser (localStorage).
+  function readStored(key, storage = sessionStorage) {
     try {
-      return sessionStorage.getItem(key);
+      return storage.getItem(key);
     } catch (error) {
       return null;
     }
   }
 
-  function writeStored(key, value) {
+  function writeStored(key, value, storage = sessionStorage) {
     try {
-      sessionStorage.setItem(key, value);
+      storage.setItem(key, value);
     } catch (error) {
-      // Not remembered across pages; a new conversation starts instead.
+      // Not remembered; defaults apply next time.
     }
   }
 })();

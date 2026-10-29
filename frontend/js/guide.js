@@ -69,6 +69,7 @@ window.chickyGuide = (() => {
 
   function end() {
     clearState();
+    window.chickyAssistant?.stopSpeaking();
     cancelAnimationFrame(frame);
     window.removeEventListener("resize", schedulePosition);
     window.removeEventListener("scroll", schedulePosition, true);
@@ -97,6 +98,7 @@ window.chickyGuide = (() => {
 
     position();
     layer.querySelector(".guide-next").focus({ preventScroll: true });
+    window.chickyAssistant?.speak(message);
   }
 
   function build() {
