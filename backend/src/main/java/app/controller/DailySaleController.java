@@ -2,6 +2,7 @@ package app.controller;
 
 import app.dto.AddDailySalesRequest;
 import app.dto.AddDailySalesResponse;
+import app.dto.DailySaleResponse;
 import app.service.DailySaleService;
 import app.user.AuthenticatedUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,6 +17,8 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import jakarta.validation.Valid;
 
+import java.util.List;
+
 @Tag(name = "Sales", description = "Daily sales data operations")
 @RestController
 @RequestMapping("/api/dishes/{dishId}/sales")
@@ -25,6 +28,17 @@ public class DailySaleController {
 
     public DailySaleController(DailySaleService dailySaleService) {
         this.dailySaleService = dailySaleService;
+    }
+
+    @Operation(summary = "List daily sales", description = "Lists every daily sales record for a dish belonging to the authenticated user, oldest first.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Sales records listed successfully"),
+            @ApiResponse(responseCode = "400", description = "Dish not found", content = @Content),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @GetMapping
+    public List<DailySaleResponse> getSales(@PathVariable Long dishId, @AuthenticationPrincipal AuthenticatedUser user) {
+        return dailySaleService.getSales(dishId, user.id()).stream().map(DailySaleResponse::from).toList();
     }
 
     @Operation(summary = "Add daily sales", description = "Adds daily sales records for a dish belonging to the authenticated user.")

@@ -29,17 +29,20 @@ async function apiRequest(path, options = {}) {
         requestOptions.headers[csrf.headerName] = csrf.token;
     }
 
-    if (options.body) {
+    if (options.body && !(options.body instanceof FormData)) {
         requestOptions.headers["Content-Type"] = "application/json";
     }
 
     const response = await fetch(`${API_BASE_URL}${path}`, requestOptions);
 
     if (!response.ok) {
-        const text = await response.text();
-        // Expose the HTTP status (as auth.js does) so pages can react to 401, e.g. dashboard.js.
-        const error = new Error(text || `Request failed: ${response.status}`);
+        const contentType = response.headers.get("content-type") || "";
+        const body = contentType.includes("application/json")
+            ? await response.json()
+            : await response.text();
+        const error = new Error(body?.message || body || `Request failed: ${response.status}`);
         error.status = response.status;
+        error.code = body?.code;
         throw error;
     }
 

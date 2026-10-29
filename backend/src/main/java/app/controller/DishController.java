@@ -14,6 +14,8 @@ import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Tag(name = "Dishes", description = "Dish management operations")
 @RestController
 @RequestMapping("/api/dishes")
@@ -23,6 +25,16 @@ public class DishController {
 
     public DishController(DishService dishService) {
         this.dishService = dishService;
+    }
+
+    @Operation(summary = "List dishes", description = "Lists the authenticated user's dishes, sorted by name.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dishes listed successfully"),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @GetMapping
+    public List<DishResponse> getDishes(@AuthenticationPrincipal AuthenticatedUser user) {
+        return dishService.getDishes(user.id()).stream().map(DishResponse::from).toList();
     }
 
     @Operation(summary = "Create dish", description = "Creates a new dish for the authenticated user.")

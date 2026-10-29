@@ -44,6 +44,15 @@ public class DailySaleService {
 
         dailySaleRepository.saveAll(salesToSave);
         return salesToSave.size();
-        
+
+    }
+
+    public List<DailySale> getSales(Long dishId, Long ownerId) {
+        dishRepository
+                .findByIdAndOwnerId(dishId, ownerId)
+                .orElseThrow(
+                        () -> new IllegalArgumentException("Dish not found"));
+
+        return dailySaleRepository.findByDishIdOrderBySaleDateAsc(dishId);
     }
 }

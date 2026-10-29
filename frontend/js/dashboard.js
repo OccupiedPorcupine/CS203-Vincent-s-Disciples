@@ -1,39 +1,37 @@
 async function requireLogin() {
   try {
-    await apiRequest("/api/profile");
+    return await apiRequest("/api/profile");
   } catch (error) {
     if (error.status === 401) {
       window.location.href = "index.html";
-      return;
+      return null;
     }
 
     throw error;
   }
 }
 
-requireLogin();
+// Sale dates are plain "YYYY-MM-DD" strings; doing the arithmetic in UTC keeps them from
+// shifting a day in the browser's time zone.
+function addDays(isoDate, days) {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 
-// Sample data until the dashboard reads sales from the backend. Demand matches the
-// seven-day history on the forecast page (forecast.js), and revenue assumes S$5.50 a plate.
-const PRICE_PER_PORTION = 5.5;
-
-const weekLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const portionsSold = [31, 35, 32, 41, 38, 47, 44];
-const revenue = portionsSold.map(portions => portions * PRICE_PER_PORTION);
+function formatDay(isoDate, options) {
+  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString("en-SG", { ...options, timeZone: "UTC" });
+}
 
 const sum = values => values.reduce((total, value) => total + value, 0);
 
-document.getElementById("demand-total").textContent = sum(portionsSold);
-document.getElementById("revenue-total").textContent =
-  `S$${sum(revenue).toLocaleString("en-SG", { minimumFractionDigits: 2 })}`;
-
 // Same chart style as the forecast page's history chart.
-function lineChart(canvasId, label, values, formatValue) {
+function drawChart(canvasId, type, label, labels, values) {
   return new Chart(document.getElementById(canvasId).getContext("2d"), {
-    type: "line",
+    type,
 
     data: {
-      labels: weekLabels,
+      labels,
 
       datasets: [{
         label,
@@ -47,36 +45,104 @@ function lineChart(canvasId, label, values, formatValue) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      indexAxis: type === "bar" ? "y" : "x",
 
       plugins: {
         legend: {
           display: false
-        },
-
-        tooltip: {
-          callbacks: {
-            label: context => `${label}: ${formatValue(context.parsed.y)}`
-          }
         }
       },
 
       scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: value => formatValue(value)
-          }
-        },
-
         x: {
+          beginAtZero: true,
           grid: {
             display: false
           }
+        },
+
+        y: {
+          beginAtZero: true
         }
       }
     }
   });
 }
 
-lineChart("demand-chart", "Portions sold", portionsSold, value => value);
-lineChart("revenue-chart", "Revenue", revenue, value => `S$${value}`);
+function showEmpty(message) {
+  document.getElementById("demand-note").textContent = message;
+  document.getElementById("dish-note").textContent = message;
+}
+
+async function loadDashboard() {
+  const profile = await requireLogin();
+
+  if (!profile) {
+    return;
+  }
+
+  if (profile.name) {
+    document.getElementById("welcome-heading").textContent = `Welcome, ${profile.name}`;
+  }
+
+  const dishes = await apiRequest("/api/dishes");
+
+  if (dishes.length === 0) {
+    showEmpty("No dishes yet. Add one to see your sales here.");
+    return;
+  }
+
+  const salesByDish = await Promise.all(
+    dishes.map(dish => apiRequest(`/api/dishes/${dish.id}/sales`))
+  );
+
+  const latestDate = salesByDish
+    .flat()
+    .map(sale => sale.date)
+    .sort()
+    .at(-1);
+
+  if (!latestDate) {
+    showEmpty("No sales recorded yet.");
+    return;
+  }
+
+  // The 7 days ending on the most recent recorded sale, so older datasets still show something.
+  const days = Array.from({ length: 7 }, (_, index) => addDays(latestDate, index - 6));
+  const firstDay = days[0];
+
+  const dailyTotals = days.map(day =>
+    sum(salesByDish.flat().filter(sale => sale.date === day).map(sale => sale.quantitySold))
+  );
+
+  const dishTotals = salesByDish.map(sales =>
+    sum(sales.filter(sale => sale.date >= firstDay && sale.date <= latestDate).map(sale => sale.quantitySold))
+  );
+
+  const range = `${formatDay(firstDay, { day: "numeric", month: "short" })} to ${formatDay(latestDate, { day: "numeric", month: "short" })}`;
+
+  document.getElementById("demand-total").textContent = sum(dailyTotals);
+  document.getElementById("demand-note").textContent = `All dishes · ${range}`;
+  document.getElementById("dish-note").textContent = range;
+
+  drawChart(
+    "demand-chart",
+    "line",
+    "Portions sold",
+    days.map(day => formatDay(day, { weekday: "short" })),
+    dailyTotals
+  );
+
+  drawChart(
+    "dish-chart",
+    "bar",
+    "Portions sold",
+    dishes.map(dish => dish.name),
+    dishTotals
+  );
+}
+
+loadDashboard().catch(error => {
+  console.error(error);
+  showEmpty("Could not load sales. Is the backend running?");
+});

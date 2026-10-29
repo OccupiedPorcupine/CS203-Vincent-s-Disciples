@@ -9,6 +9,8 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
 
     List<Dish> findByOwnerId(Long ownerId);
 
+    List<Dish> findByOwnerIdOrderByNameAsc(Long ownerId);
+
     Optional<Dish> findByIdAndOwnerId(
             Long id,
             Long ownerId
