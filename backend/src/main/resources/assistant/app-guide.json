@@ -1,0 +1,92 @@
+{
+  "_comment": "What the assistant knows about Chicky's screens. Update this when you add or change UI (see .github/pull_request_template.md). Each element's guideId must match a data-guide-id attribute on that page; AppGuideConsistencyTest checks both directions. Keep summaries to one line: they are sent with every message.",
+  "version": 1,
+  "shared": [
+    {
+      "guideId": "assistant-button",
+      "description": "Round mic button in the bottom-right corner of every page. Opens the assistant, where the user can say or type their sales."
+    }
+  ],
+  "pages": [
+    {
+      "id": "dashboard",
+      "title": "Dashboard",
+      "url": "dashboard.html",
+      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, and a box to talk to the assistant.",
+      "elements": [
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand Forecast and Data ingestion pages." },
+        { "guideId": "nav-forecast", "description": "Link to the Demand Forecast page, inside the top-left menu." },
+        { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "demand-chart", "description": "Line chart and total of portions sold per day, all dishes combined, for the 7 days ending on the latest recorded sale." },
+        { "guideId": "dish-chart", "description": "Bar chart of portions sold per dish over the same 7 days." },
+        { "guideId": "actions-needed", "description": "Checklist of things to do (placeholder items for now)." },
+        { "guideId": "assistant-chat", "description": "Large text box for typing or speaking to the assistant, e.g. to record today's sales." }
+      ]
+    },
+    {
+      "id": "forecast",
+      "title": "Demand Forecast",
+      "url": "forecast.html",
+      "summary": "Predicts how many portions of a dish will sell on a date, using past sales, weather and public holidays.",
+      "elements": [
+        { "guideId": "nav-dashboard", "description": "Link back to the Dashboard, top right." },
+        { "guideId": "nav-data", "description": "Link to the Data ingestion page, top right." },
+        { "guideId": "dish-select", "description": "Drop-down to choose which dish to forecast." },
+        { "guideId": "forecast-date", "description": "Date to forecast. Only dates covered by the current NEA 24-hour weather forecast work." },
+        { "guideId": "forecast-button", "description": "Button that runs the forecast for the chosen dish and date." },
+        { "guideId": "forecast-result", "description": "Predicted portions and the chart of past sales for the chosen dish." },
+        { "guideId": "history-view", "description": "Switch the chart between the last 7 days and the same weekday in past weeks." },
+        { "guideId": "demand-factors", "description": "Weather, holiday, event and disruption factors behind the forecast." }
+      ]
+    },
+    {
+      "id": "data",
+      "title": "Data ingestion",
+      "url": "data.html",
+      "summary": "Upload CSV or Excel files of past sales for the forecasting model, and see the files uploaded so far.",
+      "elements": [
+        { "guideId": "nav-dashboard", "description": "Link to the Dashboard, top of the page." },
+        { "guideId": "nav-forecast", "description": "Link to the Demand Forecast page, top of the page." },
+        { "guideId": "upload-dropzone", "description": "Area to drop a CSV or XLSX file onto, or click to choose one (maximum 25 MB)." },
+        { "guideId": "upload-button", "description": "Uploads the chosen file. Disabled until a file is chosen." },
+        { "guideId": "source-list", "description": "Table of uploaded files, when they were uploaded, their size and whether the model uses them." }
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "record-sales",
+      "summary": "Record today's (or another day's) sales by talking to or typing to the assistant.",
+      "steps": [
+        { "page": "*", "guideId": "assistant-button", "message": "Tap this mic and say what you sold, like \"today chicken rice 42, char siew 30\". You'll see a card to check before anything is saved." }
+      ]
+    },
+    {
+      "id": "view-demand",
+      "summary": "See how many portions were sold recently, in total and per dish.",
+      "steps": [
+        { "page": "dashboard", "guideId": "demand-chart", "message": "This shows the portions you sold each day for the latest 7 days, all dishes together." },
+        { "page": "dashboard", "guideId": "dish-chart", "message": "And this splits the same 7 days by dish." }
+      ]
+    },
+    {
+      "id": "run-forecast",
+      "summary": "Predict how many portions of a dish will sell on a coming day.",
+      "steps": [
+        { "page": "forecast", "guideId": "dish-select", "message": "First choose the dish you want to plan for." },
+        { "page": "forecast", "guideId": "forecast-date", "message": "Then pick the day. Today or tomorrow works best, because the weather forecast only covers the next 24 hours." },
+        { "page": "forecast", "guideId": "forecast-button", "message": "Press this to get the forecast." },
+        { "page": "forecast", "guideId": "forecast-result", "message": "The predicted portions appear here, with your past sales for comparison." }
+      ]
+    },
+    {
+      "id": "upload-training-data",
+      "summary": "Upload a file of past sales so the forecasting model can learn from it.",
+      "steps": [
+        { "page": "data", "guideId": "upload-dropzone", "message": "Drop your CSV or Excel file here, or click to choose it." },
+        { "page": "data", "guideId": "upload-button", "message": "Then press Upload source." },
+        { "page": "data", "guideId": "source-list", "message": "Your uploaded files are listed here." }
+      ]
+    }
+  ]
+}

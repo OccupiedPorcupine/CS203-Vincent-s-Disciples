@@ -1,0 +1,54 @@
+/* Guided tour spotlight (js/guide.js). Above the assistant widget. */
+.guide-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+  font-family: Inter, Arial, sans-serif;
+}
+
+.guide-shade {
+  position: fixed;
+  background: rgb(15 23 30 / 62%);
+  /* Blocks clicks on everything except the highlighted element. */
+  pointer-events: auto;
+}
+
+.guide-ring {
+  position: fixed;
+  border: 3px solid #1ba098;
+  border-radius: 10px;
+  box-shadow: 0 0 0 4px rgb(27 160 152 / 30%);
+  pointer-events: none;
+}
+.guide-ring[hidden] { display: none; }
+
+.guide-bubble {
+  position: fixed;
+  box-sizing: border-box;
+  padding: 14px 16px 12px;
+  border-radius: 12px;
+  color: #425664;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  pointer-events: auto;
+}
+
+.guide-progress { margin: 0 0 4px; font-size: 12px; color: #6b7c88; }
+.guide-progress:empty { display: none; }
+.guide-text { margin: 0; font-size: 15px; line-height: 1.45; }
+
+.guide-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.guide-actions button {
+  padding: 7px 14px;
+  border: 1px solid #d8dce1;
+  border-radius: 8px;
+  color: #425664;
+  background: #fff;
+  font: 500 14px Inter, Arial, sans-serif;
+  cursor: pointer;
+}
+.guide-actions .guide-exit { margin-right: auto; border-color: transparent; }
+.guide-actions .guide-next { border-color: #1ba098; color: #fff; background: #1ba098; }
+.guide-actions button[hidden] { display: none; }
+.guide-actions button:focus-visible { outline: 2px solid #1ba098; outline-offset: 2px; }

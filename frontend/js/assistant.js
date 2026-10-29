@@ -8,6 +8,8 @@
   const SILENCE_MS = 2000;
   const SPEECH_LEVEL = 0.02;
   const CONVERSATION_KEY = "chicky-assistant-conversation";
+  // At most this many visible elements are described to the assistant with each message.
+  const MAX_PAGE_ELEMENTS = 60;
 
   const MIC_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z"/></svg>';
   const SEND_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M11 20V7.83l-5.59 5.58L4 12l8-8 8 8-1.41 1.41L13 7.83V20h-2Z"/></svg>';
@@ -20,6 +22,7 @@
 
   const bubble = element("button", "assistant-bubble", {
     type: "button",
+    "data-guide-id": "assistant-button",
     "aria-label": "Open assistant",
     "aria-expanded": "false",
     "aria-controls": "assistant-panel"
@@ -159,12 +162,16 @@
     try {
       const response = await apiRequest("/api/assistant/messages", {
         method: "POST",
-        body: JSON.stringify({ conversationId, text, page: PAGE, inputMode, languages })
+        body: JSON.stringify({ conversationId, text, page: PAGE, inputMode, languages, pageContext: describePage() })
       });
       conversationId = response.conversationId;
       writeStored(CONVERSATION_KEY, conversationId);
       addMessage("assistant", response.reply);
       if (response.proposal) addConfirmCard(response.proposal);
+      if (response.guide?.length && window.chickyGuide) {
+        setOpen(false);
+        window.chickyGuide.start(response.guide);
+      }
     } catch (error) {
       addMessage("error", errorMessage(error));
     } finally {
@@ -176,6 +183,48 @@
     busy = isBusy;
     statusLine.textContent = message;
     updateControls();
+  }
+
+  // What's on screen, so the assistant can point at things the app guide doesn't describe yet.
+  // Elements with a data-guide-id keep it; others get a temporary data-live-guide-id.
+  function describePage() {
+    document.querySelectorAll("[data-live-guide-id]").forEach(node => node.removeAttribute("data-live-guide-id"));
+
+    const described = [];
+    const candidates = document.querySelectorAll(
+      "[data-guide-id], main :is(h1, h2, button, a[href], input, select, textarea), header :is(a[href], button, summary)");
+    let liveCount = 0;
+
+    for (const node of candidates) {
+      if (described.length >= MAX_PAGE_ELEMENTS) break;
+      if (node.closest(".assistant-panel, .guide-layer") || !node.getClientRects().length) continue;
+
+      let id = node.dataset.guideId;
+      if (!id) {
+        id = `live-${++liveCount}`;
+        node.dataset.liveGuideId = id;
+      }
+      described.push({ id, kind: kindOf(node), label: labelOf(node) });
+    }
+    return described;
+  }
+
+  function kindOf(node) {
+    const tag = node.tagName.toLowerCase();
+    if (/^h[1-6]$/.test(tag)) return "heading";
+    if (tag === "a") return "link";
+    if (tag === "summary") return "menu";
+    return node.dataset.guideId && !["button", "input", "select", "textarea"].includes(tag) ? "section" : tag;
+  }
+
+  function labelOf(node) {
+    const text = node.getAttribute("aria-label")
+      || node.labels?.[0]?.textContent
+      || node.querySelector?.("h2, h1")?.textContent
+      || node.textContent
+      || node.getAttribute("placeholder")
+      || "";
+    return text.replace(/\s+/g, " ").trim().slice(0, 80);
   }
 
   // ---- Voice input ----

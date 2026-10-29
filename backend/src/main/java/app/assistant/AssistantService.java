@@ -3,6 +3,8 @@ package app.assistant;
 import app.assistant.AssistantInteraction.Outcome;
 import app.assistant.AssistantModelClient.ModelResponse;
 import app.assistant.AssistantModelClient.ToolCall;
+import app.assistant.guide.GuideRetriever;
+import app.assistant.guide.GuideStep;
 import app.dish.Dish;
 import app.dish.DishAlias;
 import app.dish.DishRepository;
@@ -51,6 +53,7 @@ public class AssistantService {
     private final DishService dishService;
     private final DailySaleService dailySaleService;
     private final DishAliasService dishAliasService;
+    private final GuideRetriever guideRetriever;
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
@@ -58,7 +61,8 @@ public class AssistantService {
                             AssistantRateLimiter rateLimiter, AssistantInteractionRepository interactions,
                             AppUserRepository users, ProposalValidator proposalValidator, DishRepository dishRepository,
                             DishService dishService, DailySaleService dailySaleService,
-                            DishAliasService dishAliasService, JsonMapper jsonMapper, Clock clock) {
+                            DishAliasService dishAliasService, GuideRetriever guideRetriever,
+                            JsonMapper jsonMapper, Clock clock) {
         this.modelClient = modelClient;
         this.tools = tools;
         this.conversations = conversations;
@@ -70,6 +74,7 @@ public class AssistantService {
         this.dishService = dishService;
         this.dailySaleService = dailySaleService;
         this.dishAliasService = dishAliasService;
+        this.guideRetriever = guideRetriever;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
     }
@@ -118,8 +123,13 @@ public class AssistantService {
         userMessage.put("content", request.text().strip());
         items.add(userMessage);
 
-        String instructions = AssistantPrompt.build(today, request.page(), tools.listDishes(ownerId).toString());
-        AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today);
+        List<AssistantMessageRequest.PageElement> pageElements = request.pageContext() == null ? List.of() : request.pageContext();
+        Set<String> liveElementIds = new HashSet<>();
+        pageElements.forEach(element -> liveElementIds.add(element.id()));
+
+        String instructions = AssistantPrompt.build(today, request.page(), tools.listDishes(ownerId).toString(),
+                guideRetriever.context(request.text(), request.page()), jsonMapper.writeValueAsString(pageElements));
+        AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
         String reply = null;
 
         for (int call = 0; call < MAX_MODEL_CALLS && reply == null; call++) {
@@ -139,9 +149,10 @@ public class AssistantService {
         }
 
         List<ProposedEntry> proposal = context.proposal();
+        List<GuideStep> guide = context.guide();
         if (reply == null || reply.isBlank()) {
-            reply = proposal != null
-                    ? "Please check these and press Confirm to save them."
+            reply = proposal != null ? "Please check these and press Confirm to save them."
+                    : guide != null ? "Let me show you."
                     : "Sorry, I couldn't work that out. Please try again.";
         }
         conversations.save(ownerId, conversationId, items);
@@ -161,7 +172,7 @@ public class AssistantService {
 
         AssistantMessageResponse.Proposal proposalView = proposal == null ? null : new AssistantMessageResponse.Proposal(
                 interaction.getId(), proposal, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
-        return new AssistantMessageResponse(conversationId, reply, proposalView);
+        return new AssistantMessageResponse(conversationId, reply, proposalView, guide);
     }
 
     // Saves a proposal, as proposed or as the user edited it. Confirming again returns the same

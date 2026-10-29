@@ -14,6 +14,7 @@
 
   <link rel="stylesheet" href="./css/forecast.css">
   <link rel="stylesheet" href="./css/assistant.css">
+  <link rel="stylesheet" href="./css/guide.css">
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -36,8 +37,8 @@
     </div>
 
     <nav class="topbar-nav" aria-label="Primary navigation">
-      <a href="dashboard.html">Dashboard</a>
-      <a href="data.html">Data ingestion</a>
+      <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
+      <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
       <a class="avatar" href="./index.html" aria-label="Your account">C</a>
     </nav>
   </header>
@@ -52,7 +53,7 @@
 
         <div class="select-wrap">
           <!-- Filled with the signed-in user's dishes by js/forecast.js. -->
-          <select id="dish-select" disabled>
+          <select id="dish-select" disabled data-guide-id="dish-select">
             <option>Loading dishes…</option>
           </select>
         </div>
@@ -62,9 +63,9 @@
         <label for="forecast-date">Forecast date</label>
 
         <div class="forecast-date-row">
-          <input id="forecast-date" type="date">
+          <input id="forecast-date" type="date" data-guide-id="forecast-date">
 
-          <button id="forecast-button" class="generate-button" type="button">
+          <button id="forecast-button" class="generate-button" type="button" data-guide-id="forecast-button">
             Generate
           </button>
         </div>
@@ -75,7 +76,7 @@
     <div class="content-grid">
 
       <!-- Main forecast card -->
-      <section class="card chart-card">
+      <section class="card chart-card" data-guide-id="forecast-result">
 
         <div class="headline">
           <span>Expected demand</span>
@@ -92,7 +93,7 @@
 
         <div class="chart-toolbar">
 
-          <div class="view-toggle" role="group" aria-label="Chart view">
+          <div class="view-toggle" role="group" aria-label="Chart view" data-guide-id="history-view">
 
             <button
               type="button"
@@ -128,7 +129,7 @@
       <div class="side-column">
 
         <!-- Context -->
-        <section class="card side-card">
+        <section class="card side-card" data-guide-id="demand-factors">
 
           <h2>Factors affecting demand</h2>
 
@@ -228,6 +229,7 @@
 
   <script src="./js/api.js"></script>
   <script src="./js/forecast.js"></script>
+  <script src="./js/guide.js"></script>
   <script src="./js/assistant.js"></script>
 
 </body>

@@ -11,15 +11,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="./css/assistant.css">
+  <link rel="stylesheet" href="./css/guide.css">
 </head>
 <body>
   <header class="topbar">
-    <details class="navigation">
+    <details class="navigation" data-guide-id="main-menu">
       <summary aria-label="Toggle navigation"><img src="images/dashboard/sidebar.svg" alt=""></summary>
       <nav aria-label="Main navigation">
         <a href="dashboard.html" aria-current="page">Dashboard</a>
-        <a href="forecast.html">Demand Forecast</a>
-        <a href="data.html">Data ingestion</a>
+        <a href="forecast.html" data-guide-id="nav-forecast">Demand Forecast</a>
+        <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
       </nav>
     </details>
     <img class="avatar" src="images/dashboard/avatar.png" width="40" height="40" alt="User profile">
@@ -32,7 +33,7 @@
         <p>Review this week’s performance</p>
       </section>
       <!-- Filled from the signed-in user's daily sales by js/dashboard.js. -->
-      <section class="graph demand" aria-labelledby="demand-heading">
+      <section class="graph demand" aria-labelledby="demand-heading" data-guide-id="demand-chart">
         <div class="headline">
           <h2 id="demand-heading">Demand, latest 7 days</h2>
           <span class="number"><span id="demand-total">--</span><span class="unit"> portions</span></span>
@@ -42,7 +43,7 @@
           <canvas id="demand-chart" role="img" aria-label="Line chart of portions sold each day, all dishes combined"></canvas>
         </div>
       </section>
-      <section class="graph by-dish" aria-labelledby="dish-heading">
+      <section class="graph by-dish" aria-labelledby="dish-heading" data-guide-id="dish-chart">
         <div class="headline">
           <h2 id="dish-heading">Demand by dish</h2>
           <span class="note" id="dish-note">Same 7 days</span>
@@ -53,7 +54,7 @@
       </section>
     </div>
 
-    <section class="actions" aria-labelledby="actions-heading">
+    <section class="actions" aria-labelledby="actions-heading" data-guide-id="actions-needed">
       <h2 id="actions-heading">Actions Needed</h2>
       <div class="divider" aria-hidden="true"><img src="images/dashboard/divider.svg" alt=""></div>
       <div class="checklist">
@@ -63,7 +64,7 @@
     </section>
 
     <!-- Sends to the voice assistant (js/assistant.js), which opens its panel to reply. -->
-    <section class="chat-box" aria-label="AI assistant">
+    <section class="chat-box" aria-label="AI assistant" data-guide-id="assistant-chat">
       <textarea aria-label="Message to AI assistant" placeholder="What would you like to know?"></textarea>
       <div class="chat-toolbar">
         <label class="icon-button attachment" title="Attach an image"><input type="file" accept="image/*" aria-label="Attach an image"><img src="images/dashboard/icon4.svg" alt=""></label>
@@ -77,6 +78,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="./js/api.js"></script>
   <script src="./js/dashboard.js"></script>
+  <script src="./js/guide.js"></script>
   <script src="./js/assistant.js"></script>
 </body>
 </html>
