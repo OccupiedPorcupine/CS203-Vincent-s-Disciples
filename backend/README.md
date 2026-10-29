@@ -63,6 +63,10 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `GET /api/dishes/{dishId}/sales`, `POST /api/dishes/{dishId}/sales` — lists sales, or adds new days (rejects days that already have a record)
 - `PUT /api/dishes/{dishId}/sales/{date}` — sets one day's quantity, replacing any existing record; returns `previousQuantity`
 - `GET /api/dishes/{dishId}/aliases`, `POST /api/dishes/{dishId}/aliases` — other names for a dish (e.g. `鸡饭`); matching ignores case and spacing, and each name points to one dish per user (409 `ALIAS_IN_USE` otherwise)
+- `GET /api/assistant/status` — whether the voice assistant and voice input are available
+- `POST /api/assistant/transcribe` — multipart `audio` (under a minute) → `{text, languages}`; audio is not stored
+- `POST /api/assistant/messages` — `{conversationId?, text, page, inputMode, languages}` → `{conversationId, reply, proposal?}`; a proposal is only a suggestion
+- `POST /api/assistant/proposals/{id}/confirm` — saves a proposal (optionally edited: `{entries: [...]}`); `.../cancel` discards it
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)
@@ -72,6 +76,19 @@ The frontend data-ingestion page is available at `/data.html`. Uploaded files ar
 not registered twice for the same user. Override the location with `TRAINING_DATA_STORAGE_PATH`.
 Uploads are currently marked `AVAILABLE_FOR_TRAINING`; connecting them to a training job and an
 active model version is a separate pipeline step.
+
+### Voice assistant
+
+The assistant turns what a user says or types ("yesterday chicken rice 42, 叉烧饭 30") into proposed
+sales, which are only saved when the user confirms them. Set it up in `backend/.env`:
+
+- `OPENAI_API_KEY=...` uses OpenAI (`gpt-6-luna` for understanding, `gpt-transcribe` for speech).
+  Model names are in `application.properties`.
+- Without a key, add `ASSISTANT_PROVIDER=offline` to try it with a rule-based stand-in that
+  understands typed sales like `chicken rice 42, char siew 30` (no voice).
+
+Code is in `src/main/java/app/assistant/`. The prompt is `AssistantPrompt`, the model's tools are
+`AssistantTools`, and every message and its outcome is logged in `assistant_interactions`.
 
 ### Demo data
 
