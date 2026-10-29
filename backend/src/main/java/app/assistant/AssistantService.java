@@ -54,6 +54,7 @@ public class AssistantService {
     private final DailySaleService dailySaleService;
     private final DishAliasService dishAliasService;
     private final GuideRetriever guideRetriever;
+    private final SpeechCache speechCache;
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
@@ -62,7 +63,7 @@ public class AssistantService {
                             AppUserRepository users, ProposalValidator proposalValidator, DishRepository dishRepository,
                             DishService dishService, DailySaleService dailySaleService,
                             DishAliasService dishAliasService, GuideRetriever guideRetriever,
-                            JsonMapper jsonMapper, Clock clock) {
+                            SpeechCache speechCache, JsonMapper jsonMapper, Clock clock) {
         this.modelClient = modelClient;
         this.tools = tools;
         this.conversations = conversations;
@@ -75,6 +76,7 @@ public class AssistantService {
         this.dailySaleService = dailySaleService;
         this.dishAliasService = dishAliasService;
         this.guideRetriever = guideRetriever;
+        this.speechCache = speechCache;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
     }
@@ -105,6 +107,20 @@ public class AssistantService {
         } catch (IOException exception) {
             throw new AssistantException(HttpStatus.BAD_REQUEST, "NO_AUDIO", "The recording could not be read.");
         }
+    }
+
+    // MP3 of a reply or guide step. Guide steps repeat, so audio is cached, and cached audio
+    // doesn't count towards the user's rate limit.
+    public byte[] speak(Long ownerId, String text) {
+        String cleaned = text.strip();
+        byte[] cached = speechCache.get(cleaned);
+        if (cached != null) {
+            return cached;
+        }
+        rateLimiter.check(ownerId);
+        byte[] audio = modelClient.speak(cleaned);
+        speechCache.put(cleaned, audio);
+        return audio;
     }
 
     public AssistantMessageResponse handleMessage(Long ownerId, AssistantMessageRequest request) {

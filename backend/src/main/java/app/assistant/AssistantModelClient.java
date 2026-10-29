@@ -15,9 +15,13 @@ public interface AssistantModelClient {
     // False when the server is missing what it needs, e.g. an API key.
     boolean isAvailable();
 
+    // Speech in and out (transcribe and speak).
     boolean supportsVoice();
 
     Transcription transcribe(byte[] audio, String filename, List<String> keywords);
+
+    // Spoken audio (MP3) of the text.
+    byte[] speak(String text);
 
     ModelResponse respond(String instructions, List<JsonNode> input, List<ToolSpec> tools);
 

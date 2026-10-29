@@ -31,24 +31,33 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
     private static final String KEYWORD_FORBIDDEN = "[<>\\r\\n]";
     private static final int MAX_KEYWORDS = 100;
     private static final List<String> LANGUAGE_HINTS = List.of("en", "zh");
+    private static final String SPEECH_STYLE = "Speak clearly and warmly at a relaxed pace, like a helpful stall assistant. "
+            + "Read Chinese in Mandarin and English in a neutral accent.";
 
     private final RestClient restClient;
     private final JsonMapper jsonMapper;
     private final boolean configured;
     private final String chatModel;
     private final String transcribeModel;
+    private final String speechModel;
+    private final String speechVoice;
 
-    public OpenAiAssistantModelClient(String baseUrl, String apiKey, String chatModel, String transcribeModel, JsonMapper jsonMapper) {
-        this(buildRestClient(baseUrl, apiKey), apiKey != null && !apiKey.isBlank(), chatModel, transcribeModel, jsonMapper);
+    public OpenAiAssistantModelClient(String baseUrl, String apiKey, Models models, JsonMapper jsonMapper) {
+        this(buildRestClient(baseUrl, apiKey), apiKey != null && !apiKey.isBlank(), models, jsonMapper);
     }
 
-    OpenAiAssistantModelClient(RestClient restClient, boolean configured, String chatModel, String transcribeModel, JsonMapper jsonMapper) {
+    OpenAiAssistantModelClient(RestClient restClient, boolean configured, Models models, JsonMapper jsonMapper) {
         this.restClient = restClient;
         this.configured = configured;
-        this.chatModel = chatModel;
-        this.transcribeModel = transcribeModel;
+        this.chatModel = models.chat();
+        this.transcribeModel = models.transcribe();
+        this.speechModel = models.speech();
+        this.speechVoice = models.speechVoice();
         this.jsonMapper = jsonMapper;
     }
+
+    // Model names and the speaking voice, from app.assistant.* in application.properties.
+    public record Models(String chat, String transcribe, String speech, String speechVoice) {}
 
     private static RestClient buildRestClient(String baseUrl, String apiKey) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
@@ -107,6 +116,28 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
         List<String> languages = new ArrayList<>();
         body.path("languages").forEach(language -> languages.add(language.path("code").asString()));
         return new Transcription(body.path("text").asString(), languages);
+    }
+
+    @Override
+    public byte[] speak(String text) {
+        requireConfigured();
+        ObjectNode request = jsonMapper.createObjectNode();
+        request.put("model", speechModel);
+        request.put("voice", speechVoice);
+        request.put("input", text);
+        request.put("instructions", SPEECH_STYLE);
+        request.put("response_format", "mp3");
+
+        try {
+            return restClient.post()
+                    .uri("/audio/speech")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(jsonMapper.writeValueAsString(request))
+                    .retrieve()
+                    .body(byte[].class);
+        } catch (RestClientException exception) {
+            throw translate(exception);
+        }
     }
 
     @Override
@@ -177,21 +208,26 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
     private String call(java.util.function.Supplier<String> request) {
         try {
             return request.get();
-        } catch (RestClientResponseException exception) {
+        } catch (RestClientException exception) {
+            throw translate(exception);
+        }
+    }
+
+    private AssistantException translate(RestClientException error) {
+        if (error instanceof RestClientResponseException exception) {
             // OpenAI's error body says why (e.g. which limit was hit); it never contains the key.
             log.warn("OpenAI returned {}: {}", exception.getStatusCode().value(), exception.getResponseBodyAsString());
             int status = exception.getStatusCode().value();
             if (status == 429) {
                 // Rate limit or used-up quota on the OpenAI account.
-                throw new AssistantException(HttpStatus.SERVICE_UNAVAILABLE, "ASSISTANT_BUSY",
+                return new AssistantException(HttpStatus.SERVICE_UNAVAILABLE, "ASSISTANT_BUSY",
                         "The assistant has reached its usage limit for now. Please try again later.");
             }
             if (status == 401 || status == 403) {
-                throw AssistantException.unavailable("The assistant's OpenAI key was rejected. Check OPENAI_API_KEY on the server.");
+                return AssistantException.unavailable("The assistant's OpenAI key was rejected. Check OPENAI_API_KEY on the server.");
             }
-            throw AssistantException.upstream("The AI service returned an error (" + status + "). Please try again.");
-        } catch (RestClientException exception) {
-            throw AssistantException.upstream("The AI service could not be reached. Please try again.");
+            return AssistantException.upstream("The AI service returned an error (" + status + "). Please try again.");
         }
+        return AssistantException.upstream("The AI service could not be reached. Please try again.");
     }
 }

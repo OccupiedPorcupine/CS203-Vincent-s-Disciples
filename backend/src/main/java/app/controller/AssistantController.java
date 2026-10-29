@@ -46,6 +46,17 @@ public class AssistantController {
         return assistantService.transcribe(user.id(), audio);
     }
 
+    @Operation(summary = "Speak text", description = "Returns MP3 audio of an assistant reply or guide step, for reading it aloud.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "MP3 audio", content = @Content(mediaType = "audio/mpeg")),
+            @ApiResponse(responseCode = "400", description = "Text missing or over 500 characters", content = @Content),
+            @ApiResponse(responseCode = "503", description = "Spoken replies are not available on this server", content = @Content)
+    })
+    @PostMapping(value = "/speech", produces = "audio/mpeg")
+    public ResponseEntity<byte[]> speak(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody SpeechRequest request) {
+        return ResponseEntity.ok().contentType(MediaType.valueOf("audio/mpeg")).body(assistantService.speak(user.id(), request.text()));
+    }
+
     @Operation(summary = "Send a message", description = "Sends what the user said or typed. The reply may include a proposal: "
             + "sales to show on a confirm card. Nothing is saved until the proposal is confirmed.")
     @ApiResponses({

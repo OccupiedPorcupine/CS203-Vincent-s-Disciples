@@ -24,10 +24,13 @@ public class AssistantConfig {
             @Value("${app.assistant.openai.base-url}") String baseUrl,
             @Value("${app.assistant.chat-model}") String chatModel,
             @Value("${app.assistant.transcribe-model}") String transcribeModel,
+            @Value("${app.assistant.speech-model}") String speechModel,
+            @Value("${app.assistant.speech-voice}") String speechVoice,
             JsonMapper jsonMapper
     ) {
+        var models = new OpenAiAssistantModelClient.Models(chatModel, transcribeModel, speechModel, speechVoice);
         return switch (provider) {
-            case "openai" -> new OpenAiAssistantModelClient(baseUrl, apiKey, chatModel, transcribeModel, jsonMapper);
+            case "openai" -> new OpenAiAssistantModelClient(baseUrl, apiKey, models, jsonMapper);
             case "offline" -> new OfflineAssistantModelClient(jsonMapper);
             default -> throw new IllegalStateException("app.assistant.provider must be openai or offline, not " + provider);
         };

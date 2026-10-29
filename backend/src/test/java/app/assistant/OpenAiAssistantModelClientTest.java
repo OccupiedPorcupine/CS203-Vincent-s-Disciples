@@ -25,8 +25,9 @@ class OpenAiAssistantModelClientTest {
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private final RestClient.Builder builder = RestClient.builder().baseUrl("https://api.test/v1");
     private final MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-    private final OpenAiAssistantModelClient client =
-            new OpenAiAssistantModelClient(builder.build(), true, "gpt-6-luna", "gpt-transcribe", jsonMapper);
+    private final OpenAiAssistantModelClient.Models models =
+            new OpenAiAssistantModelClient.Models("gpt-6-luna", "gpt-transcribe", "gpt-4o-mini-tts", "marin");
+    private final OpenAiAssistantModelClient client = new OpenAiAssistantModelClient(builder.build(), true, models, jsonMapper);
 
     @Test
     void respondSendsAStatelessStrictToolRequestAndReadsToolCallsAndText() {
@@ -88,6 +89,23 @@ class OpenAiAssistantModelClientTest {
     }
 
     @Test
+    void speakAsksForMp3InTheConfiguredVoiceAndReturnsTheAudio() {
+        server.expect(requestTo("https://api.test/v1/audio/speech"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.model").value("gpt-4o-mini-tts"))
+                .andExpect(jsonPath("$.voice").value("marin"))
+                .andExpect(jsonPath("$.input").value("请确认后保存。"))
+                .andExpect(jsonPath("$.response_format").value("mp3"))
+                .andExpect(jsonPath("$.instructions").exists())
+                .andRespond(withSuccess(new byte[]{73, 68, 51}, MediaType.valueOf("audio/mpeg")));
+
+        byte[] audio = client.speak("请确认后保存。");
+
+        server.verify();
+        assertArrayEquals(new byte[]{73, 68, 51}, audio);
+    }
+
+    @Test
     void anErrorFromOpenAiBecomesABadGateway() {
         server.expect(requestTo("https://api.test/v1/responses"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
@@ -112,7 +130,7 @@ class OpenAiAssistantModelClientTest {
 
     @Test
     void withoutAKeyTheClientIsUnavailableAndSendsNothing() {
-        var unconfigured = new OpenAiAssistantModelClient(builder.build(), false, "gpt-6-luna", "gpt-transcribe", jsonMapper);
+        var unconfigured = new OpenAiAssistantModelClient(builder.build(), false, models, jsonMapper);
 
         assertFalse(unconfigured.isAvailable());
         var error = assertThrows(AssistantException.class, () -> unconfigured.respond("x", List.of(), List.of()));
