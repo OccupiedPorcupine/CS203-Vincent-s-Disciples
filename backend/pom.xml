@@ -22,6 +22,7 @@
         <java.version>21</java.version>
         <google-api-client.version>2.9.1</google-api-client.version>
         <google-http-client.version>2.2.0</google-http-client.version>
+        <poi.version>5.5.1</poi.version>
         <!-- Tests tagged "integration" need external services (e.g. the ML API) and are
              skipped by default. Run them with: ./mvnw test -DexcludedGroups= -Dgroups=integration -->
         <excludedGroups>integration</excludedGroups>
@@ -59,6 +60,13 @@
             <groupId>com.google.http-client</groupId>
             <artifactId>google-http-client-gson</artifactId>
             <version>${google-http-client.version}</version>
+        </dependency>
+
+        <!-- Reads uploaded .xlsx sales files (issue #41). -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
         </dependency>
 
         <!-- Schema migrations. On Spring Boot 4 the starter is required: flyway-core alone

@@ -49,11 +49,11 @@
       <span id="active-count" class="tag is-active">0 active</span>
     </section>
 
-    <section class="section" aria-labelledby="upload-heading">
+    <section id="upload-section" class="section" aria-labelledby="upload-heading">
       <div class="section-heading">
         <div>
           <h2 id="upload-heading">Upload training data</h2>
-          <p>CSV or Excel workbook · maximum 25 MB</p>
+          <p>CSV or Excel workbook · maximum 25 MB. For sales, one row per dish per day with a date, dish and quantity sold column.</p>
         </div>
       </div>
 
@@ -72,6 +72,38 @@
       <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
     </section>
 
+    <section id="import-section" class="section import-section" aria-labelledby="import-heading" data-guide-id="import-panel" hidden>
+      <div class="section-heading">
+        <div>
+          <h2 id="import-heading">Import sales</h2>
+          <p id="import-summary">Reading the file…</p>
+        </div>
+      </div>
+
+      <ul id="import-errors" class="import-errors" hidden></ul>
+
+      <div id="import-dishes" class="import-table" role="table" aria-label="Dishes in the file" hidden>
+        <div class="import-row source-header" role="row">
+          <span role="columnheader">In the file</span>
+          <span role="columnheader">Days</span>
+          <span role="columnheader">Record as</span>
+        </div>
+        <div id="import-dish-list"></div>
+      </div>
+
+      <fieldset id="import-existing" class="import-existing" hidden>
+        <legend id="import-existing-label">Some of these days already have sales</legend>
+        <label><input type="radio" name="existing-sales" value="SKIP" checked> Keep what’s already recorded</label>
+        <label><input type="radio" name="existing-sales" value="OVERWRITE"> Replace it with the file</label>
+      </fieldset>
+
+      <div class="upload-actions">
+        <button id="import-cancel" class="text-button" type="button">Cancel</button>
+        <button id="import-button" class="primary-button" type="button" data-guide-id="import-button" hidden>Import sales</button>
+      </div>
+      <p id="import-status" class="status-text" role="status" aria-live="polite"></p>
+    </section>
+
     <section class="section" aria-labelledby="source-heading" data-guide-id="source-list">
       <div class="section-heading">
         <div>
@@ -86,6 +118,7 @@
           <span role="columnheader">Uploaded</span>
           <span role="columnheader">Size</span>
           <span role="columnheader">Model use</span>
+          <span role="columnheader">Sales</span>
         </div>
         <div id="source-list"></div>
       </div>
