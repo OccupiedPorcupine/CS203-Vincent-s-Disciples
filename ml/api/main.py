@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 
 from ml.api.schemas import (
     HealthResponse,
+    ModelInfoResponse,
     PredictionRequest,
     PredictionResponse,
 )
@@ -12,6 +13,7 @@ from ml.src.features.feature_builder import build_features
 from ml.src.models.inference import (
     load_feature_schema,
     load_model,
+    load_model_metadata,
     predict_demand,
 )
 
@@ -21,6 +23,7 @@ async def lifespan(app: FastAPI):
     # Load these once when the API starts.
     app.state.model = load_model()
     app.state.schema = load_feature_schema()
+    app.state.metadata = load_model_metadata()
 
     yield
 
@@ -38,6 +41,18 @@ app = FastAPI(
 def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
+    )
+
+
+# The backend uses this to avoid model forecasts for dishes the
+# model never saw in training, which it can't forecast meaningfully.
+@app.get(
+    "/model-info",
+    response_model=ModelInfoResponse,
+)
+def model_info() -> ModelInfoResponse:
+    return ModelInfoResponse(
+        dishes=app.state.metadata.get("dishes"),
     )
 
 

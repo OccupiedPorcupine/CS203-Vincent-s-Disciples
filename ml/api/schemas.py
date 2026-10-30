@@ -30,5 +30,10 @@ class PredictionResponse(BaseModel):
     predicted_demand: float
 
 
+class ModelInfoResponse(BaseModel):
+    # None when the artifacts don't record which dishes the model was trained on.
+    dishes: list[str] | None
+
+
 class HealthResponse(BaseModel):
     status: str

@@ -33,6 +33,7 @@
   margin: 16px 0 8px;
 }
 .history-note { color: var(--muted); font-size: var(--text-sm); }
+.headline .note:empty { display: none; }
 /* The chart fills whatever height the card has (it stretches to match the side column). */
 .chart { position: relative; flex: 1; width: 100%; min-height: 260px; }
 

@@ -39,7 +39,11 @@ const capture = async (page, out) => {
     if (p === "/api/dishes") return json(route, dishes);
     const m = p.match(/^\/api\/dishes\/(\d+)\/sales$/);
     if (m) return json(route, sales(Number(m[1])));
-    if (p === "/api/forecast") return json(route, { predicted_demand: 47.2 });
+    if (p === "/api/forecast") return json(route, {
+      dish: "Chicken rice", forecastDate: "2026-11-01", predictedDemand: 47.2, low: 41, high: 53, roughRange: false,
+      method: "BASELINE", fallbackReason: "DISH_NOT_IN_MODEL", basis: "Average of your last 4 Sundays",
+      note: "The forecast model hasn't been trained on this dish yet, so this uses your past sales only."
+    });
     if (p === "/api/data-sources") return json(route, [
       { filename: "pos-export-2026-q3.csv", sha256: "9f2c1ab4e7d0c3aa", uploadedAt: "2026-10-28T09:12:00Z", sizeBytes: 482113, usedByModel: true },
       { filename: "accounting-sept.xlsx", sha256: "41be09c2d3f1aa77", uploadedAt: "2026-10-02T14:40:00Z", sizeBytes: 1830211, usedByModel: false }
