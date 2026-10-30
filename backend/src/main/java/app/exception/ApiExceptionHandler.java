@@ -3,6 +3,8 @@ package app.exception;
 import java.util.Map;
 import app.assistant.AssistantException;
 import app.dto.ErrorResponse;
+import app.dto.SalesImportErrorResponse;
+import app.salesimport.SalesImportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -58,6 +60,12 @@ public class ApiExceptionHandler {
         log.warn("Assistant request failed: {} {} ({})", exception.getStatus().value(), exception.getCode(), exception.getMessage());
         return ResponseEntity.status(exception.getStatus())
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(SalesImportException.class)
+    public ResponseEntity<SalesImportErrorResponse> salesImportFailed(SalesImportException exception) {
+        return ResponseEntity.badRequest().body(new SalesImportErrorResponse(
+                exception.getCode(), exception.getMessage(), exception.getErrorCount(), exception.getErrors()));
     }
 
     @ExceptionHandler(AliasInUseException.class)
