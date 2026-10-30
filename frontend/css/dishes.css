@@ -1,0 +1,25 @@
+/* Dishes layout. Shared tokens and components are in base.css. */
+/* One row per dish. */
+.price-table { margin-top: 32px; border-top: 1px solid var(--divider); }
+.price-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.6fr) 120px 120px minmax(120px, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  min-height: 60px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--divider);
+  font-size: var(--text-sm);
+}
+.price-row .input { width: 100%; }
+.price-field { display: grid; gap: 4px; }
+.price-caption { display: none; color: var(--muted); font-size: var(--text-xs); }
+.price-margin { color: var(--muted); }
+.price-header { min-height: 44px; color: var(--muted); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; }
+
+@media (max-width: 760px) {
+  .price-header { display: none; }
+  .price-caption { display: block; }
+  .price-row { grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .price-row > :first-child, .price-margin { grid-column: 1 / -1; }
+}

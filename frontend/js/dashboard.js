@@ -182,7 +182,7 @@ async function loadRevenue(from, to) {
     const names = unpriced.map(dish => dish.name);
     const list = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
     const link = document.createElement("a");
-    link.href = "data.html#price-section";
+    link.href = "dishes.html";
     link.textContent = "Set prices";
     missing.append(`Price not set: ${list}, so ${revenue.unpricedPortions} portions aren’t counted. `, link);
   }

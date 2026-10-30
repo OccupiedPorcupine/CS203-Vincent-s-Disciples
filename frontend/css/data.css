@@ -71,21 +71,6 @@
 .import-existing { margin-top: 20px; font-size: var(--text-sm); }
 .import-existing legend { margin-bottom: 8px; }
 .import-existing label { display: flex; align-items: center; gap: 8px; margin: 4px 0; cursor: pointer; }
-/* Dish prices: one row per dish. */
-.price-table { margin-top: 20px; border-top: 1px solid var(--divider); }
-.price-row {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.6fr) 120px 120px minmax(120px, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  min-height: 60px;
-  padding: 8px 4px;
-  border-bottom: 1px solid var(--divider);
-  font-size: var(--text-sm);
-}
-.price-row .input { width: 100%; }
-.price-margin { color: var(--muted); }
-
 .import-errors {
   max-height: 320px;
   overflow: auto;
@@ -104,8 +89,6 @@
   .source-row { grid-template-columns: 1fr auto; gap: 8px 16px; }
   .source-row > span:nth-child(2), .source-row > span:nth-child(3) { color: var(--muted); font-size: var(--text-xs); }
   .import-row { grid-template-columns: 1fr auto; gap: 8px 16px; }
-  .price-row { grid-template-columns: 1fr 1fr; gap: 8px 12px; }
-  .price-row > :first-child, .price-margin { grid-column: 1 / -1; }
   .import-choice { grid-column: 1 / -1; }
 }
 
