@@ -168,6 +168,7 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 
 /* A big figure with its caption, e.g. "838 portions". */
 .headline { font-size: var(--text-sm); }
+.headline .card-title { margin-bottom: 0; }
 .headline .number { display: block; margin-top: 4px; font-size: var(--text-number); line-height: 1.1; color: var(--ink); }
 .headline .unit { font-size: var(--text-md); }
 .headline .note { display: block; color: var(--muted); }
@@ -257,6 +258,19 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .status-text { min-height: 1.5em; margin-top: 8px; color: var(--muted); font-size: var(--text-sm); }
 .status-text.is-error { color: var(--error); }
 .status-text.is-success { color: var(--teal-strong); }
+
+/* The last row of every form: its status on the left, its buttons on the right with the primary
+   button last. On phones the status takes its own line above the buttons. */
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 16px;
+  margin-top: 16px;
+}
+.form-actions .status-text { flex: 1 1 240px; margin: 0; }
+.form-actions .status-text:empty { display: none; }
 
 /* Small labels, e.g. "Used by active model" */
 .tag {

@@ -92,7 +92,7 @@ async function loadSources() {
     renderSources(sources);
   } catch (error) {
     if (error.status === 401) window.location.href = "index.html";
-    else sourceSummary.textContent = "Sources could not be loaded.";
+    else sourceSummary.textContent = "Couldn’t load your sources. Refresh the page to try again.";
   }
 }
 
@@ -122,7 +122,7 @@ uploadForm.addEventListener("submit", async (event) => {
     showStatus("Source uploaded and available for training.", "success");
     renderSources(await apiRequest("/api/data-sources"));
   } catch (error) {
-    showStatus(error.message || "The source could not be uploaded.", "error");
+    showStatus(error.message || "Couldn’t upload the source. Try again in a moment.", "error");
     uploadButton.disabled = false;
   } finally {
     uploadButton.textContent = "Upload source";

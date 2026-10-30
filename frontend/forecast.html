@@ -59,32 +59,40 @@
     </section>
 
     <!-- Forecast controls -->
-    <section class="card controls">
+    <section class="card" aria-labelledby="controls-heading">
 
-      <div class="field">
-        <label for="dish-select">Dish</label>
-
-        <div class="select-wrap">
-          <!-- Filled with the signed-in user's dishes by js/forecast.js. -->
-          <select id="dish-select" class="input" disabled data-guide-id="dish-select">
-            <option>Loading dishes…</option>
-          </select>
-        </div>
+      <div class="headline">
+        <h2 id="controls-heading" class="card-title">Plan a forecast</h2>
+        <span class="note">Weather forecasts reach about a day ahead, so pick today or tomorrow.</span>
       </div>
 
-      <div class="field">
-        <label for="forecast-date">Forecast date</label>
+      <form id="forecast-form" class="controls">
 
-        <div class="forecast-date-row">
-          <input id="forecast-date" class="input" type="date" data-guide-id="forecast-date">
+        <div class="field">
+          <label for="dish-select">Dish</label>
 
-          <button id="forecast-button" class="primary-button" type="button" data-guide-id="forecast-button">
+          <div class="select-wrap">
+            <!-- Filled with the signed-in user's dishes by js/forecast.js. -->
+            <select id="dish-select" class="input" disabled data-guide-id="dish-select">
+              <option>Loading dishes…</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="forecast-date">Forecast date</label>
+          <input id="forecast-date" class="input" type="date" required data-guide-id="forecast-date">
+        </div>
+
+        <div class="form-actions">
+          <p id="forecast-status" class="status-text" role="status" aria-live="polite"></p>
+
+          <button id="forecast-button" class="primary-button" type="submit" disabled data-guide-id="forecast-button">
             Generate forecast
           </button>
         </div>
-      </div>
 
-      <p id="forecast-status" class="status-text" role="status" aria-live="polite"></p>
+      </form>
 
     </section>
 
@@ -201,7 +209,7 @@
             <div>
               <h3>Local events</h3>
               <p id="event-context">
-                Checking for relevant events...
+                Not connected yet
               </p>
             </div>
 
@@ -231,19 +239,24 @@
 
           <div class="chat-form">
 
+            <!-- Not connected yet, so disabled like the dashboard's unconnected buttons. -->
             <input
               id="chat-input"
               class="input"
               type="text"
               placeholder="Why is demand this number?"
+              aria-label="Question about this forecast"
               autocomplete="off"
               maxlength="300"
+              disabled
             >
 
             <button
               id="chat-send"
               type="button"
               class="secondary-button"
+              title="Not connected yet"
+              disabled
             >
               Ask
             </button>

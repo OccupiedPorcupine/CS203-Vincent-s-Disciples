@@ -1,6 +1,7 @@
 const predictedDemand = document.getElementById("predicted-demand");
 const forecastDateInput = document.getElementById("forecast-date");
 const forecastDateLabel = document.getElementById("forecast-date-label");
+const forecastForm = document.getElementById("forecast-form");
 const forecastButton = document.getElementById("forecast-button");
 const dishSelect = document.getElementById("dish-select");
 const historyNote = document.getElementById("history-note");
@@ -112,7 +113,7 @@ async function updateHistoryChart() {
             }
         } catch (error) {
             console.error(error);
-            historyNote.textContent = "Could not load sales history.";
+            historyNote.textContent = "Couldn’t load sales history.";
         }
     }
 
@@ -134,20 +135,20 @@ async function loadDishes() {
         }
 
         console.error(error);
-        dishSelect.replaceChildren(new Option("Could not load dishes"));
-        forecastButton.disabled = true;
+        dishSelect.replaceChildren(new Option("Couldn’t load dishes"));
+        showStatus("Couldn’t load your dishes. Refresh the page to try again.", "error");
         return;
     }
 
     if (dishes.length === 0) {
         dishSelect.replaceChildren(new Option("No dishes yet"));
-        forecastButton.disabled = true;
         historyNote.textContent = "Add a dish and its sales to see history here.";
         return;
     }
 
     dishSelect.replaceChildren(...dishes.map(dish => new Option(dish.name, dish.id)));
     dishSelect.disabled = false;
+    updateForecastButton();
 
     await updateHistoryChart();
 }
@@ -164,24 +165,29 @@ toggleButtons.forEach(button => {
     });
 });
 
+// Like the upload button on the data page, the forecast button stays disabled until the form
+// can run: a dish is loaded and a date is chosen.
+function updateForecastButton() {
+    forecastButton.disabled = dishSelect.disabled || !forecastDateInput.value;
+}
+
 dishSelect.addEventListener("change", updateHistoryChart);
+forecastDateInput.addEventListener("input", updateForecastButton);
 forecastDateInput.addEventListener("change", updateHistoryChart);
 
 loadDishes();
 
-forecastButton.addEventListener("click", async () => {
-    const dishId = Number(dishSelect.value);
+forecastForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
 
+    const dishId = Number(dishSelect.value);
     const forecastDate = forecastDateInput.value;
 
-    if (!forecastDate) {
-        setForecastStatus("Choose a forecast date first.", true);
-        return;
-    }
+    if (forecastButton.disabled) return;
 
     forecastButton.disabled = true;
     forecastButton.textContent = "Generating…";
-    setForecastStatus("");
+    showStatus("Working out expected demand…");
 
     try {
         const result = await requestForecast(dishId, forecastDate);
@@ -198,20 +204,26 @@ forecastButton.addEventListener("click", async () => {
         });
 
         forecastDateLabel.textContent = formattedDate;
+        showStatus(`Forecast ready for ${formattedDate}.`, "success");
 
     } catch (error) {
         console.error(error);
 
-        setForecastStatus("Couldn’t generate a forecast. Try again in a moment.", true);
+        showStatus(
+            error.status === 400
+                ? "That date is outside the weather forecast. Choose today or tomorrow."
+                : "Couldn’t generate a forecast. Try again in a moment.",
+            "error"
+        );
     } finally {
-        forecastButton.disabled = false;
         forecastButton.textContent = "Generate forecast";
+        updateForecastButton();
     }
 });
 
-function setForecastStatus(message, isError = false) {
+function showStatus(message, type = "") {
     forecastStatus.textContent = message;
-    forecastStatus.classList.toggle("is-error", isError);
+    forecastStatus.className = `status-text${type ? ` is-${type}` : ""}`;
 }
 
 async function requestForecast(dishId, forecastDate) {

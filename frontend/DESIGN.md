@@ -38,7 +38,7 @@ Every signed-in page has the same skeleton:
 header.topbar      menu (details.navigation) · Chicky wordmark · account (details.account-menu)
 main.page          max 1120px wide, centred
   .page-heading    h1 + p.lede (optional tag or action on the right)
-  content          cards and/or .section blocks
+  content          cards, 32px apart (24px on phones)
 assistant bubble   added by js/assistant.js, bottom right
 ```
 
@@ -167,7 +167,7 @@ data tables collapse further at 520px. Keep a 16px side gutter on phones and nev
 
 All of these are in `base.css` and shown in the style guide. Prefer them to new classes.
 
-### Page heading and sections
+### Page heading
 
 ```html
 <section class="page-heading">
@@ -177,20 +177,14 @@ All of these are in `base.css` and shown in the style guide. Prefer them to new 
   </div>
   <span class="tag is-active">1 active</span>   <!-- optional -->
 </section>
-
-<section class="section" aria-labelledby="upload-heading">
-  <div class="section-heading">
-    <h2 id="upload-heading">Upload training data</h2>
-    <p>CSV or Excel workbook · maximum 25 MB</p>
-  </div>
-  …
-</section>
 ```
 
-A `.section` is separated by a divider line, not a card. Use sections for full-width page areas
-and cards for side-by-side panels.
-
 ### Cards and headline figures
+
+**Content lives in cards.** Anything the user reads or works with on a page (a chart, a form, a
+table) goes in a `.card`, whether it spans the page or sits beside another card. Every card opens
+the same way: a `.headline` with an `h2.card-title` and, optionally, a `.note` caption and one
+`.number`.
 
 ```html
 <section class="card" aria-labelledby="demand-heading">
@@ -203,7 +197,11 @@ and cards for side-by-side panels.
 </section>
 ```
 
-One idea per card. A card has at most one `.number`.
+One idea per card. A card has at most one `.number`. Leave 16px between the headline and the
+card's content.
+
+A `.section` (heading over a divider line, no card) is only for a page's closing area that isn't a
+panel, such as the dashboard's "Actions needed" checklist. Don't put forms or tables in one.
 
 ### Buttons
 
@@ -217,30 +215,59 @@ One idea per card. A card has at most one `.number`.
 Disabled buttons fade to 45% opacity. While a button is working, change its label to an
 ellipsis form ("Generating…") and restore the **same** label afterwards.
 
-### Form fields
+### Forms
+
+Every form behaves the same way. Upload on Data ingestion and Generate forecast on Demand forecast
+are the two references.
 
 ```html
-<div class="field">
-  <label for="dish-select">Dish</label>
-  <div class="select-wrap">            <!-- only for <select> -->
-    <select id="dish-select" class="input">…</select>
+<section class="card" aria-labelledby="controls-heading">
+  <div class="headline">
+    <h2 id="controls-heading" class="card-title">Plan a forecast</h2>
+    <span class="note">Weather forecasts reach about a day ahead, so pick today or tomorrow.</span>
   </div>
-</div>
+  <form id="forecast-form">
+    <div class="field">
+      <label for="dish-select">Dish</label>
+      <div class="select-wrap">            <!-- only for <select> -->
+        <select id="dish-select" class="input">…</select>
+      </div>
+    </div>
+    …
+    <div class="form-actions">
+      <p id="forecast-status" class="status-text" role="status" aria-live="polite"></p>
+      <button class="primary-button" type="submit" disabled>Generate forecast</button>
+    </div>
+  </form>
+</section>
 ```
 
-Every input, select and date picker gets `.input`. Labels sit above the control, are short nouns
-("Dish", "Forecast date"), and don't end in a colon.
+1. **A real `<form>` inside a card**, handled on `submit` (not a button `click`), so Enter works.
+2. **Fields stack** a short noun label ("Dish", "Forecast date", no colon) above a 40px `.input`.
+   Every input, select and date picker gets `.input`. Buttons never sit inside a field row.
+3. **One `.form-actions` row ends the form**: the status line on the left, buttons on the right,
+   secondary actions (Remove) before the primary one.
+4. **The primary button is disabled until the form can run** (a file is chosen; dishes have loaded
+   and a date is picked). Don't leave it enabled only to reject the click with an error.
+5. **While it runs**, the button reads "Uploading…" / "Generating…" and the status line says what
+   is happening ("Working out expected demand…").
+6. **When it finishes**, the status line says what happened, in `.is-success` ("Forecast ready for
+   Saturday, 31 Oct.") or `.is-error` ("Couldn’t generate a forecast. Try again in a moment."),
+   and the button gets its label back.
+7. **Controls that aren't connected yet are disabled**, with a `title` saying so, rather than
+   clickable and silent.
 
 ### Feedback
 
-- **Inline status:** `<p class="status-text" role="status" aria-live="polite">` under the thing it
-  is about, with `.is-error` or `.is-success`. Progress messages ("Signing in…") have no modifier.
-  **Don't use `alert()`.**
+- **Inline status:** `<p class="status-text" role="status" aria-live="polite">`, in a form's
+  `.form-actions` row (see [Forms](#forms)) or under the thing it is about, with `.is-error` or
+  `.is-success`. Progress messages ("Signing in…") have no modifier. **Don't use `alert()`.**
 - **Tags:** `.tag` (neutral), `.tag.is-active` (in use, selected), `.tag.is-warning` (needs a look).
 - **Empty states:** `.empty-state`, one sentence saying what will appear here and how to get it
   ("Upload the first data source to make it available for training.").
 - **Loading:** put the loading message in the element that will hold the data ("Loading sales…",
-  `--` for a number). No spinners.
+  `--` for a number). No spinners. Only say "Loading…" or "Checking…" while something is actually
+  loading; a placeholder that isn't wired up says "Not connected yet".
 
 ### Charts
 
@@ -378,10 +405,11 @@ extra classes, so the look and the accessibility tree can't drift apart.
 3. Make it reachable: a top-level page goes in the menu on **every** page, in the same order; a
    subpage is linked from its parent and links back to it (see [Getting around](#getting-around)).
 4. Reach for an existing component before writing CSS. Page CSS is layout only, with tokens for
-   every colour, size, radius and shadow.
+   every colour, size, radius and shadow. Put content in cards that open with a `.headline`.
 5. One primary button per view; sentence-case labels. Animations use the motion tokens and
    respect reduced motion.
-6. Inline `.status-text` for feedback, never `alert()`.
+6. Forms follow [Forms](#forms): `<form>` + `submit`, a `.form-actions` row, the primary button
+   disabled until it can run, and inline `.status-text` for feedback, never `alert()`.
 7. Charts: load `js/chart-theme.js` and use its presets.
 8. Add `data-guide-id` to anything the assistant should be able to point at, and describe it in
    `backend/src/main/resources/assistant/app-guide.json` (`AppGuideConsistencyTest` checks both).
@@ -401,6 +429,7 @@ The script mocks the API, so no backend or login is needed.
 ## Known gaps
 
 - The sign-in page's left panel is still a "PLACEHOLDER" block waiting for artwork.
-- Dashboard "Actions needed" items and the forecast "Ask about this forecast" card are placeholders
-  that aren't connected yet. When they are, keep the components above.
+- Dashboard "Actions needed" items, the forecast "Ask about this forecast" card (disabled) and its
+  "Local events" factor are placeholders that aren't connected yet. When they are, keep the
+  components above.
 - The dashboard chat box's attach and code buttons don't do anything yet.

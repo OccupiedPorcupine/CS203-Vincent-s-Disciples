@@ -49,12 +49,10 @@
       <span id="active-count" class="tag is-active">0 active</span>
     </section>
 
-    <section class="section" aria-labelledby="upload-heading">
-      <div class="section-heading">
-        <div>
-          <h2 id="upload-heading">Upload training data</h2>
-          <p>CSV or Excel workbook · maximum 25 MB</p>
-        </div>
+    <section class="card" aria-labelledby="upload-heading">
+      <div class="headline">
+        <h2 id="upload-heading" class="card-title">Upload training data</h2>
+        <span class="note">CSV or Excel workbook · maximum 25 MB</span>
       </div>
 
       <form id="upload-form">
@@ -64,20 +62,18 @@
           <strong id="file-label">Choose a file or drop it here</strong>
           <span class="drop-hint">Sales history, order exports or accounting data</span>
         </label>
-        <div class="upload-actions">
+        <div class="form-actions">
+          <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
           <button id="remove-file" class="text-button" type="button" hidden>Remove</button>
           <button id="upload-button" class="primary-button" type="submit" disabled data-guide-id="upload-button">Upload source</button>
         </div>
       </form>
-      <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
     </section>
 
-    <section class="section" aria-labelledby="source-heading" data-guide-id="source-list">
-      <div class="section-heading">
-        <div>
-          <h2 id="source-heading">Model data sources</h2>
-          <p id="source-summary">Loading sources…</p>
-        </div>
+    <section class="card" aria-labelledby="source-heading" data-guide-id="source-list">
+      <div class="headline">
+        <h2 id="source-heading" class="card-title">Model data sources</h2>
+        <span id="source-summary" class="note">Loading sources…</span>
       </div>
 
       <div class="source-table" role="table" aria-label="Model data sources">

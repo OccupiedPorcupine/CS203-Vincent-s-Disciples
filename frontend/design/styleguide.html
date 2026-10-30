@@ -114,8 +114,8 @@
 
     <section class="section">
       <div class="section-heading">
-        <h2>Cards and fields</h2>
-        <p>Cards hold one idea each. Fields stack a label above a 40px control.</p>
+        <h2>Cards and forms</h2>
+        <p>Every card opens with a title and caption. Forms end in one actions row: status left, buttons right.</p>
       </div>
       <div class="grid-2">
         <section class="card">
@@ -126,18 +126,31 @@
           </div>
         </section>
         <section class="card">
-          <div class="field">
-            <label for="sg-dish">Dish</label>
-            <div class="select-wrap">
-              <select id="sg-dish" class="input"><option>Chicken rice</option></select>
+          <div class="headline">
+            <h3 class="card-title">Plan a forecast</h3>
+            <span class="note">Pick today or tomorrow.</span>
+          </div>
+          <form onsubmit="return false">
+            <div class="field" style="margin-top: 16px">
+              <label for="sg-dish">Dish</label>
+              <div class="select-wrap">
+                <select id="sg-dish" class="input"><option>Chicken rice</option></select>
+              </div>
             </div>
-          </div>
-          <div class="field" style="margin-top: 12px">
-            <label for="sg-date">Forecast date</label>
-            <input id="sg-date" class="input" type="text" placeholder="Choose a date">
-          </div>
-          <p class="status-text is-error">Choose a forecast date first.</p>
-          <p class="status-text is-success">Source uploaded and available for training.</p>
+            <div class="field" style="margin-top: 16px">
+              <label for="sg-date">Forecast date</label>
+              <input id="sg-date" class="input" type="text" placeholder="Choose a date">
+            </div>
+            <div class="form-actions">
+              <p class="status-text is-success" role="status">Forecast ready for Saturday, 31 Oct.</p>
+              <button class="primary-button" type="submit">Generate forecast</button>
+            </div>
+            <div class="form-actions">
+              <p class="status-text is-error" role="status">Couldn’t generate a forecast. Try again in a moment.</p>
+              <button class="text-button" type="button">Remove</button>
+              <button class="primary-button" type="submit" disabled>Upload source</button>
+            </div>
+          </form>
         </section>
       </div>
     </section>

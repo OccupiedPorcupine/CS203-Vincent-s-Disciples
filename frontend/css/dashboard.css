@@ -15,7 +15,6 @@
   min-width: 0; /* lets the chart canvas shrink with the grid column on narrow screens */
   min-height: 0;
 }
-.graph .card-title { margin-bottom: 0; }
 .graph .chart { position: relative; flex: 1; min-height: 0; margin-top: 16px; }
 
 .checklist { display: grid; gap: 16px; margin-top: 20px; }

@@ -1,16 +1,14 @@
 /* Demand forecast layout. Shared tokens and components are in base.css. */
 
 /* Controls */
+.page-heading + .card { margin-top: 32px; }
 .controls {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   gap: 16px 48px;
-  margin-top: 32px;
+  margin-top: 16px;
 }
-.controls .status-text { grid-column: 1 / -1; margin-top: -8px; }
-.controls .status-text:empty { display: none; }
-.forecast-date-row { display: flex; gap: 8px; }
-.forecast-date-row .input { flex: 1; }
+.controls .form-actions { grid-column: 1 / -1; margin-top: 0; }
 
 /* Main grid */
 .content-grid {
@@ -23,7 +21,6 @@
 
 /* Chart card */
 .chart-card { display: flex; flex-direction: column; min-height: 420px; }
-.chart-card .card-title { margin-bottom: 0; }
 .chart-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -53,6 +50,7 @@
 
 @media (max-width: 760px) {
   .controls { grid-template-columns: 1fr; }
+  .page-heading + .card { margin-top: 24px; }
   .content-grid { grid-template-columns: 1fr; gap: 24px; }
   .chart-card { min-height: 360px; }
 }
