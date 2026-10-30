@@ -20,8 +20,8 @@
 
 .assistant-bubble {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  right: calc(24px + env(safe-area-inset-right));
+  bottom: calc(24px + env(safe-area-inset-bottom));
   z-index: 1000;
   display: grid;
   place-items: center;
@@ -42,13 +42,13 @@
 
 .assistant-panel {
   position: fixed;
-  right: 24px;
-  bottom: 92px;
+  right: calc(24px + env(safe-area-inset-right));
+  bottom: calc(92px + env(safe-area-inset-bottom));
   z-index: 1000;
   display: flex;
   flex-direction: column;
   width: min(400px, calc(100vw - 32px));
-  max-height: min(580px, calc(100vh - 120px));
+  max-height: min(580px, calc(100dvh - 120px - env(safe-area-inset-bottom)));
   border: 1px solid var(--assistant-border);
   border-radius: 16px;
   background: #fff;
@@ -228,8 +228,39 @@
 .assistant-panel :is(button, input, textarea):focus-visible { outline: 2px solid var(--assistant-teal); outline-offset: 2px; }
 
 @media (max-width: 600px) {
-  .assistant-bubble { right: 16px; bottom: 16px; }
-  .assistant-panel { right: 16px; bottom: 84px; }
+  .assistant-bubble { right: calc(16px + env(safe-area-inset-right)); bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .assistant-panel { right: calc(16px + env(safe-area-inset-right)); bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+  /* Too narrow for four columns: each entry puts the dish on its own line, with the date, portions
+     and remove button below it. The inputs keep their own labels ("Date for Chicken rice"). */
+  .assistant-entries thead { display: none; }
+  .assistant-entries tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 88px auto;
+    grid-template-areas: "dish dish dish" "date portions remove";
+    gap: 6px 8px;
+    padding: 10px 0;
+    border-top: 1px solid var(--divider, #e6e8eb);
+  }
+  .assistant-entries td,
+  .assistant-entries td:first-child,
+  .assistant-entries td:nth-child(3),
+  .assistant-entries td:last-child { width: auto; padding: 0; border-top: 0; }
+  .assistant-entries td:nth-child(1) { grid-area: date; }
+  .assistant-entries td:nth-child(2) { grid-area: dish; font-weight: 600; }
+  .assistant-entries td:nth-child(2) :is(.assistant-heard, .assistant-tag) { font-weight: 400; }
+  .assistant-entries td:nth-child(3) { grid-area: portions; }
+  .assistant-entries td:nth-child(4) { grid-area: remove; }
+}
+
+/* Touch screens: 44px tap targets, and 16px text in fields so iOS doesn't zoom in (see base.css). */
+@media (pointer: coarse) {
+  .assistant-sound, .assistant-close, .assistant-remove { width: 44px; height: 44px; }
+  .assistant-entries td:last-child { width: 44px; }
+  .assistant-primary, .assistant-secondary { min-height: 44px; }
+  .assistant-mic, .assistant-send { width: 44px; height: 44px; }
+  .assistant-entries input { min-height: 44px; font-size: 16px; }
+  .assistant-input textarea { min-height: 44px; font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

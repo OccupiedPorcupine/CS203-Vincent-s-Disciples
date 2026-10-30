@@ -164,6 +164,8 @@ uploadForm.addEventListener("submit", async (event) => {
 const NEW_DISH = "new";
 const LEAVE_OUT = "leave-out";
 
+const money = new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD", currencyDisplay: "narrowSymbol" });
+
 function plural(count, word, words = `${word}s`) {
   return `${count.toLocaleString("en-SG")} ${count === 1 ? word : words}`;
 }
@@ -271,7 +273,8 @@ function dishRow(dish, dishes) {
   const strong = document.createElement("strong");
   strong.textContent = dish.name;
   const note = document.createElement("span");
-  note.textContent = dish.match?.by === "nickname" ? `Nickname for ${dish.match.dishName}` : `${dish.portions.toLocaleString("en-SG")} portions`;
+  const filePrice = dish.price === null ? "" : ` · ${money.format(Number(dish.price))} in the file`;
+  note.textContent = (dish.match?.by === "nickname" ? `Nickname for ${dish.match.dishName}` : `${dish.portions.toLocaleString("en-SG")} portions`) + filePrice;
   name.append(strong, note);
 
   const days = document.createElement("span");
@@ -329,9 +332,10 @@ async function runImport() {
     closeImport();
     const created = result.createdDishes.length
       ? ` Added ${plural(result.createdDishes.length, "new dish", "new dishes")}.` : "";
+    const priced = result.pricesSet ? ` Prices from the file set for ${plural(result.pricesSet, "dish", "dishes")}; see Dishes.` : "";
     const changed = result.rowsAdded || result.rowsOverwritten
       ? " The dashboard and forecasts use them now." : "";
-    showStatus(`Imported: ${describeImport(result)}.${created}${changed}`, "success");
+    showStatus(`Imported: ${describeImport(result)}.${created}${priced}${changed}`, "success");
     renderSources(await apiRequest("/api/data-sources"));
   } catch (error) {
     showStatus(error.message || "The sales could not be imported.", "error", importStatus);

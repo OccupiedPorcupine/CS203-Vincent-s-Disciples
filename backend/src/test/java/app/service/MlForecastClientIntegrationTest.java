@@ -19,7 +19,7 @@ class MlForecastClientIntegrationTest {
     @Test
     void callsFastApiAndReturnsPrediction() {
 
-        MlForecastClient client = new MlForecastClient();
+        MlForecastClient client = new MlForecastClient("http://localhost:8000");
 
         List<MlPredictionRequest.SalesRecord> history =
                 new ArrayList<>();

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
   <style>@view-transition { navigation: auto; }</style>
   <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
@@ -10,6 +10,12 @@
   <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
   <meta name="api-base-url" content="http://localhost:8080">
   <title>Data ingestion · Chicky</title>
+  <!-- Home-screen app (see DESIGN.md, "Phones"). -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./images/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./images/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Chicky">
+  <meta name="theme-color" content="#a9dcd6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
@@ -26,6 +32,7 @@
         <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
         <a href="forecast.html" data-guide-id="nav-forecast">Demand forecast</a>
         <a href="data.html" aria-current="page">Data ingestion</a>
+        <a href="dishes.html" data-guide-id="nav-dishes">Dishes</a>
       </nav>
     </details>
     <a class="brand" href="dashboard.html">Chicky</a>

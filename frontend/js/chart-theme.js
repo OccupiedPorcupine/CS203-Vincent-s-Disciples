@@ -10,6 +10,9 @@ const chickyChart = (() => {
   Chart.defaults.font.size = 12;
   Chart.defaults.color = token("--muted");
   Chart.defaults.borderColor = token("--divider");
+  // Level axis labels; on a phone Chart.js skips some instead of tilting them all.
+  Chart.defaults.scale.ticks.maxRotation = 0;
+  Chart.defaults.scale.ticks.autoSkipPadding = 8;
   Chart.defaults.plugins.legend.display = false;
   Chart.defaults.plugins.tooltip.backgroundColor = ink;
   Chart.defaults.plugins.tooltip.cornerRadius = 6;

@@ -3,6 +3,7 @@ package app.dto;
 import app.salesimport.SalesFileReader.RowError;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -28,7 +29,10 @@ public record SalesImportPreviewResponse(
             int rows,
             long portions,
             @Schema(description = "The dish it matches by name or nickname; null if it matches none") Match match,
-            int rowsWithExistingSales
+            int rowsWithExistingSales,
+            @Schema(description = "Price from the file (a menu sheet or a price column); used only if the dish has no price yet")
+            BigDecimal price,
+            BigDecimal unitCost
     ) {}
 
     public record Match(Long dishId, String dishName, @Schema(example = "name", allowableValues = {"name", "nickname"}) String by) {}

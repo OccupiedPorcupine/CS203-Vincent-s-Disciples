@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.OutputStream;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -153,6 +154,54 @@ class SalesFileReaderTest {
         assertEquals(0, file.errorCount(), () -> file.errors().toString());
         assertEquals(new SalesRow(2, LocalDate.of(2026, 3, 1), "Roasted Chicken Rice", 75), file.rows().get(0));
         assertEquals(new SalesRow(3, LocalDate.of(2026, 3, 2), "Char Siew Rice", 48), file.rows().get(1));
+    }
+
+    @Test
+    void takesEachDishsLatestPriceFromTheSalesRows() throws Exception {
+        SalesFile file = csv("Date,Item,Qty Sold,Unit Price (S$),Unit Cost (S$),COGS (S$)\n"
+                + "2/7/2026,Chicken rice,40,$4.80,1.70,68\n"
+                + "1/7/2026,Chicken rice,40,4.50,1.70,68\n"
+                + "1/7/2026,Barley,20,not sure,,\n");
+
+        assertEquals(new SalesFileReader.FilePrice(new BigDecimal("4.80"), new BigDecimal("1.70")), file.prices().get("Chicken rice"));
+        assertFalse(file.prices().containsKey("Barley"));
+        assertEquals(0, file.errorCount()); // an unreadable price is skipped, not an error
+    }
+
+    @Test
+    void aMenuSheetsPricesWinOverPricesOnTheSalesRows() throws Exception {
+        Path path = directory.resolve("menu.xlsx");
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet menu = workbook.createSheet("Menu");
+            menu.createRow(0).createCell(0).setCellValue("Ah Huat Chicken Rice");
+            Row header = menu.createRow(1);
+            String[] headers = {"Item", "Category", "Price (S$)", "Unit Cost (S$)"};
+            for (int i = 0; i < headers.length; i++) header.createCell(i).setCellValue(headers[i]);
+            Row item = menu.createRow(2);
+            item.createCell(0).setCellValue("Roasted Chicken Rice");
+            item.createCell(2).setCellValue(4.5);
+            item.createCell(3).setCellValue(1.7);
+
+            Sheet sales = workbook.createSheet("Daily Item Sales");
+            Row salesHeader = sales.createRow(0);
+            String[] salesHeaders = {"Date", "Item", "Qty Sold", "Unit Price (S$)"};
+            for (int i = 0; i < salesHeaders.length; i++) salesHeader.createCell(i).setCellValue(salesHeaders[i]);
+            Row sale = sales.createRow(1);
+            sale.createCell(0).setCellValue("2026-03-01");
+            sale.createCell(1).setCellValue("Roasted Chicken Rice");
+            sale.createCell(2).setCellValue(75);
+            sale.createCell(3).setCellValue(9.99);
+
+            try (OutputStream out = Files.newOutputStream(path)) {
+                workbook.write(out);
+            }
+        }
+
+        SalesFile file = SalesFileReader.read(path, "menu.xlsx", TODAY);
+
+        assertEquals("Daily Item Sales", file.sheet());
+        assertEquals(new SalesFileReader.FilePrice(new BigDecimal("4.50"), new BigDecimal("1.70")),
+                file.prices().get("Roasted Chicken Rice"));
     }
 
     @Test
