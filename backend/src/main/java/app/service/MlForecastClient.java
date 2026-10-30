@@ -2,6 +2,7 @@ package app.service;
 
 import app.dto.MlPredictionRequest;
 import app.dto.MlPredictionResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -10,9 +11,10 @@ public class MlForecastClient {
 
     private final RestClient restClient;
 
-    public MlForecastClient() {
+    public MlForecastClient(@Value("${app.ml.base-url}") String baseUrl) {
         this.restClient = RestClient.builder()
-                .baseUrl("http://localhost:8000")
+                // Strip a trailing slash so the base URL joins cleanly with "/predict".
+                .baseUrl(baseUrl.replaceAll("/+$", ""))
                 .build();
     }
 

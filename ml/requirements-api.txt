@@ -1,0 +1,7 @@
+# Packages the prediction API (ml/api) needs at runtime, used by ml/Dockerfile.
+# requirements.txt has the full training and comparison environment.
+numpy==2.3.3
+pandas==2.3.3
+catboost==1.2.10
+fastapi==0.162.0
+uvicorn==0.54.0

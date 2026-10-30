@@ -1,5 +1,9 @@
 const config = {
-  apiBaseUrl: document.querySelector('meta[name="api-base-url"]').content.replace(/\/$/, ""),
+  // Locally the backend runs at the api-base-url meta tag's address; when deployed it is
+  // served under /api on the same address as this page (see js/api.js).
+  apiBaseUrl: ["localhost", "127.0.0.1"].includes(location.hostname)
+    ? document.querySelector('meta[name="api-base-url"]').content.replace(/\/$/, "")
+    : "",
   googleClientId: ""
 };
 
