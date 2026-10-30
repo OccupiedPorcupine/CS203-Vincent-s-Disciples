@@ -46,5 +46,10 @@ async function apiRequest(path, options = {}) {
         throw error;
     }
 
+    // 204 No Content, e.g. cancelling an assistant proposal.
+    if (response.status === 204) {
+        return null;
+    }
+
     return response.json();
 }
