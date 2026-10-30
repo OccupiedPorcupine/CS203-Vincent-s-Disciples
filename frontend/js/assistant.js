@@ -15,7 +15,7 @@
   let status = { available: false, voice: false };
   let conversationId = readStored(CONVERSATION_KEY);
   let recorder = null;
-  let voiceLanguages = null;
+  let fromVoice = false; // the text box holds a transcript
   let busy = false;
 
   const bubble = element("button", "assistant-bubble", {
@@ -149,9 +149,8 @@
   }
 
   async function send(text) {
-    const inputMode = voiceLanguages ? "voice" : "text";
-    const languages = voiceLanguages;
-    voiceLanguages = null;
+    const inputMode = fromVoice ? "voice" : "text";
+    fromVoice = false;
 
     addMessage("user", text);
     setBusy(true, "Thinking…");
@@ -159,7 +158,7 @@
     try {
       const response = await apiRequest("/api/assistant/messages", {
         method: "POST",
-        body: JSON.stringify({ conversationId, text, page: PAGE, inputMode, languages })
+        body: JSON.stringify({ conversationId, text, page: PAGE, inputMode })
       });
       conversationId = response.conversationId;
       writeStored(CONVERSATION_KEY, conversationId);
@@ -280,7 +279,7 @@
         return;
       }
       input.value = result.text;
-      voiceLanguages = result.languages;
+      fromVoice = true;
       setBusy(false, "Check the text, then press Send.");
       input.focus();
       return;
