@@ -3,39 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chicky Dashboard</title>
+  <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
+  <style>@view-transition { navigation: auto; }</style>
+  <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
+       follows it), so the page never shows undimmed between steps. Chrome; other browsers ignore it. -->
+  <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
+  <title>Dashboard · Chicky</title>
   <!-- Read by js/api.js to reach the backend. -->
   <meta name="api-base-url" content="http://localhost:8080">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/dashboard.css">
   <link rel="stylesheet" href="./css/assistant.css">
   <link rel="stylesheet" href="./css/guide.css">
 </head>
 <body>
   <header class="topbar">
     <details class="navigation" data-guide-id="main-menu">
-      <summary aria-label="Toggle navigation"><img src="images/dashboard/sidebar.svg" alt=""></summary>
-      <nav aria-label="Main navigation">
+      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""></summary>
+      <nav class="menu-panel" aria-label="Main navigation">
         <a href="dashboard.html" aria-current="page">Dashboard</a>
-        <a href="forecast.html" data-guide-id="nav-forecast">Demand Forecast</a>
+        <a href="forecast.html" data-guide-id="nav-forecast">Demand forecast</a>
         <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
       </nav>
     </details>
-    <img class="avatar" src="images/dashboard/avatar.png" width="40" height="40" alt="User profile">
+    <a class="brand" href="dashboard.html">Chicky</a>
+    <details class="account-menu" data-guide-id="account-menu">
+      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""></summary>
+      <div class="menu-panel">
+        <p class="account-name">Signed in</p>
+        <p class="account-email"></p>
+        <button class="secondary-button" type="button" data-action="log-out">Log out</button>
+        <p class="status-text" role="status" aria-live="polite"></p>
+      </div>
+    </details>
   </header>
 
-  <main class="dashboard">
+  <main class="page">
     <div class="overview">
-      <section class="welcome" aria-labelledby="welcome-heading">
-        <h1 id="welcome-heading">Welcome, USER</h1>
-        <p>Review this week’s performance</p>
+      <section class="page-heading welcome" aria-labelledby="welcome-heading">
+        <div>
+          <h1 id="welcome-heading">Welcome</h1>
+          <p class="lede">Review this week’s performance</p>
+        </div>
       </section>
       <!-- Filled from the signed-in user's daily sales by js/dashboard.js. -->
-      <section class="graph demand" aria-labelledby="demand-heading" data-guide-id="demand-chart">
+      <section class="card graph demand" aria-labelledby="demand-heading" data-guide-id="demand-chart">
         <div class="headline">
-          <h2 id="demand-heading">Demand, latest 7 days</h2>
+          <h2 id="demand-heading" class="card-title">Demand, latest 7 days</h2>
           <span class="number"><span id="demand-total">--</span><span class="unit"> portions</span></span>
           <span class="note" id="demand-note">Loading sales&hellip;</span>
         </div>
@@ -43,9 +60,9 @@
           <canvas id="demand-chart" role="img" aria-label="Line chart of portions sold each day, all dishes combined"></canvas>
         </div>
       </section>
-      <section class="graph by-dish" aria-labelledby="dish-heading" data-guide-id="dish-chart">
+      <section class="card graph by-dish" aria-labelledby="dish-heading" data-guide-id="dish-chart">
         <div class="headline">
-          <h2 id="dish-heading">Demand by dish</h2>
+          <h2 id="dish-heading" class="card-title">Demand by dish</h2>
           <span class="note" id="dish-note">Same 7 days</span>
         </div>
         <div class="chart">
@@ -54,9 +71,8 @@
       </section>
     </div>
 
-    <section class="actions" aria-labelledby="actions-heading" data-guide-id="actions-needed">
-      <h2 id="actions-heading">Actions Needed</h2>
-      <div class="divider" aria-hidden="true"><img src="images/dashboard/divider.svg" alt=""></div>
+    <section class="section actions" aria-labelledby="actions-heading" data-guide-id="actions-needed">
+      <div class="section-heading"><h2 id="actions-heading">Actions needed</h2></div>
       <div class="checklist">
         <label class="check-field"><input type="checkbox" checked aria-describedby="action-one-description"><span>Label<span class="description" id="action-one-description">Description</span></span></label>
         <label class="check-field"><input type="checkbox" checked aria-describedby="action-two-description"><span>Label<span class="description" id="action-two-description">Description</span></span></label>
@@ -76,9 +92,12 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="./js/chart-theme.js"></script>
   <script src="./js/api.js"></script>
+  <script src="./js/app-shell.js"></script>
   <script src="./js/dashboard.js"></script>
   <script src="./js/guide.js"></script>
+  <span id="guide-ready" hidden></span>
   <script src="./js/assistant.js"></script>
 </body>
 </html>

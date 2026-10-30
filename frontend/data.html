@@ -3,33 +3,53 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
+  <style>@view-transition { navigation: auto; }</style>
+  <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
+       follows it), so the page never shows undimmed between steps. Chrome; other browsers ignore it. -->
+  <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
   <meta name="api-base-url" content="http://localhost:8080">
   <title>Data ingestion · Chicky</title>
-  <link rel="stylesheet" href="css/data.css">
-  <link rel="stylesheet" href="css/assistant.css">
-  <link rel="stylesheet" href="css/guide.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/data.css">
+  <link rel="stylesheet" href="./css/assistant.css">
+  <link rel="stylesheet" href="./css/guide.css">
 </head>
 <body>
   <header class="topbar">
+    <details class="navigation" data-guide-id="main-menu">
+      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""></summary>
+      <nav class="menu-panel" aria-label="Main navigation">
+        <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
+        <a href="forecast.html" data-guide-id="nav-forecast">Demand forecast</a>
+        <a href="data.html" aria-current="page">Data ingestion</a>
+      </nav>
+    </details>
     <a class="brand" href="dashboard.html">Chicky</a>
-    <nav aria-label="Primary navigation">
-      <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
-      <a href="forecast.html" data-guide-id="nav-forecast">Forecast</a>
-      <a class="active" href="data.html">Data ingestion</a>
-    </nav>
+    <details class="account-menu" data-guide-id="account-menu">
+      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""></summary>
+      <div class="menu-panel">
+        <p class="account-name">Signed in</p>
+        <p class="account-email"></p>
+        <button class="secondary-button" type="button" data-action="log-out">Log out</button>
+        <p class="status-text" role="status" aria-live="polite"></p>
+      </div>
+    </details>
   </header>
 
   <main class="page">
     <section class="page-heading">
       <div>
-        <p class="eyebrow">MODEL INPUTS</p>
         <h1>Data ingestion</h1>
-        <p>Upload sales or accounting data and review the sources available to the forecasting model.</p>
+        <p class="lede">Upload sales or accounting data and review the sources available to the forecasting model.</p>
       </div>
-      <span id="active-count" class="count-label">0 active</span>
+      <span id="active-count" class="tag is-active">0 active</span>
     </section>
 
-    <section class="upload-section" aria-labelledby="upload-heading">
+    <section class="section" aria-labelledby="upload-heading">
       <div class="section-heading">
         <div>
           <h2 id="upload-heading">Upload training data</h2>
@@ -40,19 +60,19 @@
       <form id="upload-form">
         <label id="drop-zone" class="drop-zone" for="source-file" data-guide-id="upload-dropzone">
           <input id="source-file" name="file" type="file" accept=".csv,.xlsx" required>
-          <span class="upload-mark" aria-hidden="true">↑</span>
+          <svg class="upload-mark" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6.5 9.5 12 4l5.5 5.5M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"/></svg>
           <strong id="file-label">Choose a file or drop it here</strong>
-          <span>Sales history, order exports or accounting data</span>
+          <span class="drop-hint">Sales history, order exports or accounting data</span>
         </label>
         <div class="upload-actions">
           <button id="remove-file" class="text-button" type="button" hidden>Remove</button>
           <button id="upload-button" class="primary-button" type="submit" disabled data-guide-id="upload-button">Upload source</button>
         </div>
       </form>
-      <p id="upload-status" class="status-message" role="status" aria-live="polite"></p>
+      <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
     </section>
 
-    <section class="source-section" aria-labelledby="source-heading" data-guide-id="source-list">
+    <section class="section" aria-labelledby="source-heading" data-guide-id="source-list">
       <div class="section-heading">
         <div>
           <h2 id="source-heading">Model data sources</h2>
@@ -73,8 +93,10 @@
   </main>
 
   <script src="js/api.js"></script>
+  <script src="js/app-shell.js"></script>
   <script src="js/data.js"></script>
   <script src="js/guide.js"></script>
+  <span id="guide-ready" hidden></span>
   <script src="js/assistant.js"></script>
 </body>
 </html>

@@ -34,7 +34,7 @@ function clearFile() {
 
 function showStatus(message, type = "") {
   uploadStatus.textContent = message;
-  uploadStatus.className = `status-message ${type}`.trim();
+  uploadStatus.className = `status-text${type ? ` is-${type}` : ""}`;
 }
 
 function formatBytes(bytes) {
@@ -77,7 +77,7 @@ function renderSources(sources) {
     const size = document.createElement("span");
     size.textContent = formatBytes(source.sizeBytes);
     const usage = document.createElement("span");
-    usage.className = `usage${source.usedByModel ? " active" : ""}`;
+    usage.className = `tag${source.usedByModel ? " is-active" : ""}`;
     usage.textContent = source.usedByModel ? "Used by active model" : "Available for training";
 
     row.append(name, uploaded, size, usage);

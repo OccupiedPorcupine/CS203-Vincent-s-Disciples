@@ -3,73 +3,88 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
+  <style>@view-transition { navigation: auto; }</style>
+  <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
+       follows it), so the page never shows undimmed between steps. Chrome; other browsers ignore it. -->
+  <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
 
   <meta name="api-base-url" content="http://localhost:8080">
 
-  <title>Demand Forecast · Chicky</title>
+  <title>Demand forecast · Chicky</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
 
+  <link rel="stylesheet" href="./css/base.css">
   <link rel="stylesheet" href="./css/forecast.css">
   <link rel="stylesheet" href="./css/assistant.css">
   <link rel="stylesheet" href="./css/guide.css">
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="./js/chart-theme.js"></script>
 </head>
 
 <body>
 
   <header class="topbar">
-    <!-- Same navigation menu as dashboard.html -->
-    <details class="navigation">
-      <summary aria-label="Toggle navigation"><img src="images/dashboard/sidebar.svg" alt=""></summary>
-      <nav aria-label="Main navigation">
-        <a href="dashboard.html">Dashboard</a>
-        <a href="forecast.html" aria-current="page">Demand Forecast</a>
+    <details class="navigation" data-guide-id="main-menu">
+      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""></summary>
+      <nav class="menu-panel" aria-label="Main navigation">
+        <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
+        <a href="forecast.html" aria-current="page">Demand forecast</a>
+        <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
       </nav>
     </details>
-
-    <div class="topbar-title">
-      <h1>Demand Forecast</h1>
-      <p>Predict demand, plan better and reduce food waste.</p>
-    </div>
-
-    <nav class="topbar-nav" aria-label="Primary navigation">
-      <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
-      <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
-      <a class="avatar" href="./index.html" aria-label="Your account">C</a>
-    </nav>
+    <a class="brand" href="dashboard.html">Chicky</a>
+    <details class="account-menu" data-guide-id="account-menu">
+      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""></summary>
+      <div class="menu-panel">
+        <p class="account-name">Signed in</p>
+        <p class="account-email"></p>
+        <button class="secondary-button" type="button" data-action="log-out">Log out</button>
+        <p class="status-text" role="status" aria-live="polite"></p>
+      </div>
+    </details>
   </header>
 
   <main class="page">
 
+    <section class="page-heading">
+      <div>
+        <h1>Demand forecast</h1>
+        <p class="lede">Predict demand, plan better and reduce food waste.</p>
+      </div>
+    </section>
+
     <!-- Forecast controls -->
     <section class="card controls">
 
-      <div class="control">
-        <label for="dish-select">Select dish / item</label>
+      <div class="field">
+        <label for="dish-select">Dish</label>
 
         <div class="select-wrap">
           <!-- Filled with the signed-in user's dishes by js/forecast.js. -->
-          <select id="dish-select" disabled data-guide-id="dish-select">
+          <select id="dish-select" class="input" disabled data-guide-id="dish-select">
             <option>Loading dishes…</option>
           </select>
         </div>
       </div>
 
-      <div class="control">
+      <div class="field">
         <label for="forecast-date">Forecast date</label>
 
         <div class="forecast-date-row">
-          <input id="forecast-date" type="date" data-guide-id="forecast-date">
+          <input id="forecast-date" class="input" type="date" data-guide-id="forecast-date">
 
-          <button id="forecast-button" class="generate-button" type="button" data-guide-id="forecast-button">
-            Generate
+          <button id="forecast-button" class="primary-button" type="button" data-guide-id="forecast-button">
+            Generate forecast
           </button>
         </div>
       </div>
+
+      <p id="forecast-status" class="status-text" role="status" aria-live="polite"></p>
 
     </section>
 
@@ -79,25 +94,25 @@
       <section class="card chart-card" data-guide-id="forecast-result">
 
         <div class="headline">
-          <span>Expected demand</span>
+          <h2 class="card-title">Expected demand</h2>
 
           <span class="number">
             <span id="predicted-demand">--</span>
-            <span class="forecast-unit"> portions</span>
+            <span class="unit"> portions</span>
           </span>
 
-          <span id="forecast-date-label">
+          <span id="forecast-date-label" class="note">
             Select a forecast date
           </span>
         </div>
 
         <div class="chart-toolbar">
 
-          <div class="view-toggle" role="group" aria-label="Chart view" data-guide-id="history-view">
+          <div class="segmented" role="group" aria-label="Chart view" data-guide-id="history-view">
 
             <button
               type="button"
-              class="view-button toggle-button active"
+              class="toggle-button"
               data-view="seven-days"
               aria-pressed="true"
             >
@@ -106,7 +121,7 @@
 
             <button
               type="button"
-              class="view-button toggle-button"
+              class="toggle-button"
               data-view="same-weekday"
               aria-pressed="false"
             >
@@ -120,7 +135,7 @@
         </div>
 
         <div class="chart">
-          <canvas id="history-chart"></canvas>
+          <canvas id="history-chart" role="img" aria-label="Line chart of portions sold on past days for the chosen dish"></canvas>
         </div>
 
       </section>
@@ -131,13 +146,14 @@
         <!-- Context -->
         <section class="card side-card" data-guide-id="demand-factors">
 
-          <h2>Factors affecting demand</h2>
+          <h2 class="card-title">Factors affecting demand</h2>
 
           <div class="factors">
 
             <div class="factor">
               <h3>
                 <svg
+                  aria-hidden="true"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -157,7 +173,21 @@
             </div>
 
             <div class="factor">
-              <h3>Public holiday</h3>
+              <h3>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                >
+                  <rect x="3.5" y="5" width="17" height="15" rx="2"/>
+                  <path d="M3.5 10h17M8 3v4M16 3v4"/>
+                </svg>
+
+                Public holiday
+              </h3>
 
               <p id="holiday-context">
                 Included in forecast model
@@ -169,14 +199,14 @@
           <div class="extra-context">
 
             <div>
-              <strong>Local Events</strong>
+              <h3>Local events</h3>
               <p id="event-context">
                 Checking for relevant events...
               </p>
             </div>
 
             <div>
-              <strong>Local Disruptions</strong>
+              <h3>Local disruptions</h3>
               <p id="disruption-context">
                 No major disruption detected
               </p>
@@ -189,7 +219,7 @@
         <!-- Chat -->
         <section class="card side-card chat-card">
 
-          <h2>Ask about forecast</h2>
+          <h2 class="card-title">Ask about this forecast</h2>
 
           <div id="chat-messages" class="messages">
 
@@ -203,6 +233,7 @@
 
             <input
               id="chat-input"
+              class="input"
               type="text"
               placeholder="Why is demand this number?"
               autocomplete="off"
@@ -212,7 +243,7 @@
             <button
               id="chat-send"
               type="button"
-              class="send-button"
+              class="secondary-button"
             >
               Ask
             </button>
@@ -228,8 +259,10 @@
   </main>
 
   <script src="./js/api.js"></script>
+  <script src="./js/app-shell.js"></script>
   <script src="./js/forecast.js"></script>
   <script src="./js/guide.js"></script>
+  <span id="guide-ready" hidden></span>
   <script src="./js/assistant.js"></script>
 
 </body>
