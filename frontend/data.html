@@ -7,13 +7,14 @@
   <title>Data ingestion · Chicky</title>
   <link rel="stylesheet" href="css/data.css">
   <link rel="stylesheet" href="css/assistant.css">
+  <link rel="stylesheet" href="css/guide.css">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="dashboard.html">Chicky</a>
     <nav aria-label="Primary navigation">
-      <a href="dashboard.html">Dashboard</a>
-      <a href="forecast.html">Forecast</a>
+      <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
+      <a href="forecast.html" data-guide-id="nav-forecast">Forecast</a>
       <a class="active" href="data.html">Data ingestion</a>
     </nav>
   </header>
@@ -37,7 +38,7 @@
       </div>
 
       <form id="upload-form">
-        <label id="drop-zone" class="drop-zone" for="source-file">
+        <label id="drop-zone" class="drop-zone" for="source-file" data-guide-id="upload-dropzone">
           <input id="source-file" name="file" type="file" accept=".csv,.xlsx" required>
           <span class="upload-mark" aria-hidden="true">↑</span>
           <strong id="file-label">Choose a file or drop it here</strong>
@@ -45,13 +46,13 @@
         </label>
         <div class="upload-actions">
           <button id="remove-file" class="text-button" type="button" hidden>Remove</button>
-          <button id="upload-button" class="primary-button" type="submit" disabled>Upload source</button>
+          <button id="upload-button" class="primary-button" type="submit" disabled data-guide-id="upload-button">Upload source</button>
         </div>
       </form>
       <p id="upload-status" class="status-message" role="status" aria-live="polite"></p>
     </section>
 
-    <section class="source-section" aria-labelledby="source-heading">
+    <section class="source-section" aria-labelledby="source-heading" data-guide-id="source-list">
       <div class="section-heading">
         <div>
           <h2 id="source-heading">Model data sources</h2>
@@ -73,6 +74,7 @@
 
   <script src="js/api.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/guide.js"></script>
   <script src="js/assistant.js"></script>
 </body>
 </html>

@@ -2,6 +2,8 @@ package app.assistant;
 
 import app.assistant.AssistantModelClient.ToolCall;
 import app.assistant.AssistantModelClient.ToolSpec;
+import app.assistant.guide.AppGuide;
+import app.assistant.guide.GuideStep;
 import app.dish.Dish;
 import app.dish.DishAlias;
 import app.dish.DishAliasRepository;
@@ -20,6 +22,7 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 // The functions the language model may call. None of them write to the database: the most the
 // model can do is propose sales, which the user then confirms. The user's ID comes from the
@@ -30,38 +33,55 @@ public class AssistantTools {
     static final String LIST_DISHES = "list_dishes";
     static final String GET_SALES = "get_sales";
     static final String PROPOSE_SALES_ENTRY = "propose_sales_entry";
+    static final String GET_GUIDE = "get_guide";
+    static final String GUIDE_USER = "guide_user";
     private static final int MAX_SALES_DAYS = 120;
+    private static final int MAX_GUIDE_STEPS = 8;
+    private static final int MAX_STEP_MESSAGE = 240;
 
     private final DishRepository dishRepository;
     private final DishAliasRepository dishAliasRepository;
     private final DailySaleRepository dailySaleRepository;
     private final ProposalValidator proposalValidator;
+    private final AppGuide appGuide;
     private final JsonMapper jsonMapper;
     private final List<ToolSpec> specs;
 
-    // What a turn's tool calls have produced so far. The last valid proposal in a turn is the one shown.
+    // What a turn's tool calls have produced so far. The last valid proposal and guide in a turn
+    // are the ones shown. liveElementIds are elements on the user's current page that the app
+    // guide doesn't describe yet, which guide_user may also point at.
     public static class TurnContext {
         final Long ownerId;
         final LocalDate today;
+        final String page;
+        final Set<String> liveElementIds;
         List<ProposedEntry> proposal;
+        List<GuideStep> guide;
 
-        public TurnContext(Long ownerId, LocalDate today) {
+        public TurnContext(Long ownerId, LocalDate today, String page, Set<String> liveElementIds) {
             this.ownerId = ownerId;
             this.today = today;
+            this.page = page;
+            this.liveElementIds = liveElementIds;
         }
 
         public List<ProposedEntry> proposal() {
             return proposal;
         }
+
+        public List<GuideStep> guide() {
+            return guide;
+        }
     }
 
     public AssistantTools(DishRepository dishRepository, DishAliasRepository dishAliasRepository,
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
-                          JsonMapper jsonMapper) {
+                          AppGuide appGuide, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
         this.proposalValidator = proposalValidator;
+        this.appGuide = appGuide;
         this.jsonMapper = jsonMapper;
         this.specs = List.of(
                 new ToolSpec(LIST_DISHES,
@@ -101,6 +121,34 @@ public class AssistantTools {
                                      "additionalProperties": false}}},
                                  "required": ["entries"],
                                  "additionalProperties": false}
+                                """)),
+                new ToolSpec(GET_GUIDE,
+                        "Get the full app guide section for a page or task ID from the guide index: "
+                                + "a page's elements, or a task's steps.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {"id": {"type": "string"}},
+                                 "required": ["id"],
+                                 "additionalProperties": false}
+                                """)),
+                new ToolSpec(GUIDE_USER,
+                        "Show the user where to go: dims the page and highlights one element at a time with your message. "
+                                + "Use task_id for a task in the guide (steps are filled in, including getting to the right page), "
+                                + "or steps for anything else, with guide_id from the guide or from the current page's visible elements.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {
+                                   "task_id": {"type": ["string", "null"]},
+                                   "steps": {"type": ["array", "null"], "items": {
+                                     "type": "object",
+                                     "properties": {
+                                       "page": {"type": "string", "description": "Page ID"},
+                                       "guide_id": {"type": "string"},
+                                       "message": {"type": "string", "description": "One short sentence"}},
+                                     "required": ["page", "guide_id", "message"],
+                                     "additionalProperties": false}}},
+                                 "required": ["task_id", "steps"],
+                                 "additionalProperties": false}
                                 """)));
     }
 
@@ -117,6 +165,9 @@ public class AssistantTools {
                 case LIST_DISHES -> listDishes(context);
                 case GET_SALES -> getSales(call.arguments(), context);
                 case PROPOSE_SALES_ENTRY -> proposeSalesEntry(call.arguments(), context);
+                case GET_GUIDE -> appGuide.section(call.arguments().path("id").asString())
+                        .orElseGet(() -> error("No guide section " + call.arguments().path("id").asString()));
+                case GUIDE_USER -> guideUser(call.arguments(), context);
                 default -> error("Unknown tool " + call.name());
             };
             return jsonMapper.writeValueAsString(result);
@@ -202,6 +253,51 @@ public class AssistantTools {
         output.set("entries", jsonMapper.valueToTree(result.entries()));
         output.put("note", "Shown to the user as a confirm card. Not saved until they confirm. "
                 + "Mention any entry that replaces an existing quantity (previousQuantity).");
+        return output;
+    }
+
+    private JsonNode guideUser(JsonNode arguments, TurnContext context) {
+        String taskId = textOrNull(arguments.path("task_id"));
+        List<GuideStep> steps = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+
+        if (taskId != null) {
+            steps = appGuide.stepsFor(taskId, context.page);
+            if (steps.isEmpty()) problems.add("No task " + taskId + ".");
+        } else {
+            for (JsonNode step : arguments.path("steps")) {
+                String page = step.path("page").asString();
+                String guideId = step.path("guide_id").asString();
+                String message = step.path("message").asString().strip();
+                boolean known = appGuide.hasElement(page, guideId)
+                        || (page.equals(context.page) && context.liveElementIds.contains(guideId));
+
+                if (appGuide.url(page) == null) {
+                    problems.add("No page " + page + ".");
+                } else if (!known) {
+                    problems.add("No element " + guideId + " on page " + page + ".");
+                } else if (message.isEmpty() || message.length() > MAX_STEP_MESSAGE) {
+                    problems.add("Step messages must be 1 to " + MAX_STEP_MESSAGE + " characters.");
+                } else {
+                    steps.add(appGuide.step(page, guideId, message));
+                }
+            }
+            if (steps.isEmpty() && problems.isEmpty()) problems.add("Give a task_id or at least one step.");
+        }
+        if (steps.size() > MAX_GUIDE_STEPS) problems.add("At most " + MAX_GUIDE_STEPS + " steps.");
+
+        ObjectNode output = jsonMapper.createObjectNode();
+        if (!problems.isEmpty()) {
+            output.put("ok", false);
+            ArrayNode list = output.putArray("problems");
+            problems.forEach(list::add);
+            return output;
+        }
+
+        context.guide = steps;
+        output.put("ok", true);
+        output.put("steps", steps.size());
+        output.put("note", "The tour starts when your reply is shown. Keep the reply to one short sentence.");
         return output;
     }
 

@@ -69,6 +69,7 @@ class AssistantServiceTest {
     PublicHolidaySyncService publicHolidaySyncService;
 
     @Autowired AssistantService assistant;
+    @Autowired AssistantTools assistantTools;
     @Autowired AppUserRepository users;
     @Autowired DishService dishService;
     @Autowired DailySaleService dailySaleService;
@@ -105,7 +106,7 @@ class AssistantServiceTest {
     }
 
     private AssistantMessageResponse say(Long user, String text) {
-        return assistant.handleMessage(user, new AssistantMessageRequest(null, text, "dashboard", "text"));
+        return assistant.handleMessage(user, new AssistantMessageRequest(null, text, "dashboard", "text", null));
     }
 
     @Test
@@ -238,6 +239,37 @@ class AssistantServiceTest {
 
         assertNull(response.proposal());
         assertTrue(response.reply().startsWith("Offline demo mode"));
+    }
+
+    @Test
+    void aHowToQuestionStartsAGuideFromTheCurrentPage() {
+        var response = say(owner, "how do I upload my sales data?");
+
+        assertNull(response.proposal());
+        assertEquals("Let me show you.", response.reply());
+        assertEquals(List.of("nav-data", "upload-dropzone", "upload-button", "source-list"),
+                response.guide().stream().map(step -> step.guideId()).toList());
+        assertEquals("data.html", response.guide().get(1).url());
+    }
+
+    @Test
+    void customGuideStepsMustPointAtKnownOrVisibleElements() {
+        var context = new AssistantTools.TurnContext(owner, TODAY, "data", java.util.Set.of("live-3"));
+        var jsonMapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        java.util.function.Function<String, AssistantModelClient.ToolCall> guideCall = steps ->
+                new AssistantModelClient.ToolCall("c1", AssistantTools.GUIDE_USER,
+                        jsonMapper.readTree("{\"task_id\": null, \"steps\": " + steps + "}"));
+
+        String unknown = assistantTools.execute(guideCall.apply("[{\"page\": \"data\", \"guide_id\": \"delete-everything\", \"message\": \"Click\"}]"), context);
+        assertTrue(unknown.contains("No element delete-everything"));
+        assertNull(context.guide());
+
+        String liveOnOtherPage = assistantTools.execute(guideCall.apply("[{\"page\": \"forecast\", \"guide_id\": \"live-3\", \"message\": \"Here\"}]"), context);
+        assertTrue(liveOnOtherPage.contains("\"ok\":false"));
+
+        String live = assistantTools.execute(guideCall.apply("[{\"page\": \"data\", \"guide_id\": \"live-3\", \"message\": \"This one\"}]"), context);
+        assertTrue(live.contains("\"ok\":true"));
+        assertEquals("live-3", context.guide().getFirst().guideId());
     }
 
     @Test

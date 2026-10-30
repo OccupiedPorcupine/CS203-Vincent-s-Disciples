@@ -8,15 +8,18 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // A rule-based stand-in for the language model (ASSISTANT_PROVIDER=offline), for demos,
 // development and tests without an OpenAI key. It is not AI: it only understands typed sales
-// like "yesterday chicken rice 42, char siew 30". It drives the same tools in the same order a
-// real model would (list_dishes, then propose_sales_entry), so the rest of the pipeline is real.
+// like "yesterday chicken rice 42, char siew 30", and "how do I ..." questions that share words
+// with a task in the app guide. It drives the same tools a real model would (list_dishes then
+// propose_sales_entry, or guide_user), so the rest of the pipeline is real.
 public class OfflineAssistantModelClient implements AssistantModelClient {
 
     private static final Pattern TODAY = Pattern.compile("Today is (\\d{4}-\\d{2}-\\d{2})");
@@ -28,7 +31,16 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             "\\b(today|yesterday|ytd|sold|sell|sells|selling|plates?|portions?|packets?|bowls?|lor|leh|lah|ah)\\b|今天|今日|昨天|昨日|卖了|卖|份|碗|盘",
             Pattern.CASE_INSENSITIVE);
 
-    private static final String HELP = "Offline demo mode: I only understand typed sales such as \"chicken rice 42, char siew rice 30\" or \"yesterday laksa 12\".";
+    private static final Pattern QUESTION = Pattern.compile(
+            "\\b(how|where|show me|help|guide)\\b|\\?|怎么|哪里|如何", Pattern.CASE_INSENSITIVE);
+    private static final Pattern WORD = Pattern.compile("[a-z]{3,}");
+    private static final Set<String> STOP_WORDS = Set.of(
+            "the", "how", "can", "where", "what", "and", "for", "you", "your", "with", "from", "this", "that",
+            "show", "help", "guide", "into", "use", "get", "want", "page", "one", "day");
+    private static final String GUIDE_MARKER = "App guide index, with the current page in full under current_page (JSON):";
+
+    private static final String HELP = "Offline demo mode: I only understand typed sales such as \"chicken rice 42, char siew rice 30\", "
+            + "or questions like \"how do I upload data?\".";
 
     private final JsonMapper jsonMapper;
     private final AtomicLong callIds = new AtomicLong();
@@ -63,6 +75,14 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         JsonNode last = input.getLast();
 
         if (!"function_call_output".equals(last.path("type").asString())) {
+            String text = lastUserText(input);
+            String taskId = QUESTION.matcher(text).find() ? matchTask(text, instructions) : null;
+            if (taskId != null) {
+                ObjectNode arguments = jsonMapper.createObjectNode();
+                arguments.put("task_id", taskId);
+                arguments.putNull("steps");
+                return call(AssistantTools.GUIDE_USER, arguments);
+            }
             return call(AssistantTools.LIST_DISHES, jsonMapper.createObjectNode());
         }
 
@@ -80,7 +100,9 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         }
 
         if (output.path("ok").asBoolean()) {
-            return message("Please check these and press Confirm to save them.");
+            return message(AssistantTools.GUIDE_USER.equals(toolName)
+                    ? "Let me show you."
+                    : "Please check these and press Confirm to save them.");
         }
         List<String> problems = new ArrayList<>();
         output.path("problems").forEach(problem -> problems.add(problem.asString()));
@@ -116,6 +138,41 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             entry.put("quantity", Integer.parseInt(quantity));
         }
         return entries;
+    }
+
+    // The task whose ID and summary share the most words with the question, from the guide index
+    // in the instructions. Null if none share a word.
+    private String matchTask(String text, String instructions) {
+        int markerAt = instructions.indexOf(GUIDE_MARKER);
+        if (markerAt < 0) {
+            return null;
+        }
+        String guideLine = instructions.substring(markerAt + GUIDE_MARKER.length()).strip().lines().findFirst().orElse("{}");
+        Set<String> asked = words(text);
+
+        String best = null;
+        int bestScore = 0;
+        for (JsonNode task : jsonMapper.readTree(guideLine).path("tasks")) {
+            Set<String> taskWords = words(task.path("id").asString().replace('-', ' ') + " " + task.path("summary").asString());
+            int score = (int) asked.stream().filter(taskWords::contains).count();
+            if (score > bestScore) {
+                best = task.path("id").asString();
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
+    // Lowercase words of 3+ letters, without common words, with a plural or -ing ending removed.
+    private static Set<String> words(String text) {
+        Set<String> words = new HashSet<>();
+        Matcher matcher = WORD.matcher(text.toLowerCase());
+        while (matcher.find()) {
+            if (!STOP_WORDS.contains(matcher.group())) {
+                words.add(matcher.group().replaceAll("(ing|s)$", ""));
+            }
+        }
+        return words;
     }
 
     // Exact name or other name first; otherwise the only dish whose name contains the phrase
