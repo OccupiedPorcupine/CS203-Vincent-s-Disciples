@@ -2,7 +2,7 @@
 
 - Java 21+
 - Maven 3.6.3+
-- A Google OAuth 2.0 Web client ID
+- Optional: a Google OAuth 2.0 Web client ID, for Google sign-in. Without one, the Google button is hidden and email/password login works as usual.
 
 ## Run locally
 
@@ -14,21 +14,17 @@ The easiest way to configure the backend is a `backend/.env` file, which is load
 cp backend/.env.example backend/.env
 ```
 
-Then set `GOOGLE_CLIENT_ID` in it. Alternatively, export the client ID in your shell:
+That is enough to start the backend. Google sign-in is optional: with `GOOGLE_CLIENT_ID` empty, the login page hides the Google button and email/password login works as usual.
 
-```powershell
-$env:GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-```
+### Google sign-in (optional)
 
-If you're using WSL/Linux/Mac, run the following instead
-```wsl
-export GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-```
+To turn Google sign-in on, set `GOOGLE_CLIENT_ID` in `backend/.env` to the team's client ID. It is shared privately in the team chat and never committed. The ID is created in Google Cloud Console under **APIs & Services → Credentials** (type **Web application**).
 
-Check that the GOOGLE_CLIENT_ID has been configured properly by using
-```wsl
-echo $GOOGLE_CLIENT_ID
-```
+Never use a placeholder such as `your-client-id.apps.googleusercontent.com` or `local-…`. The backend would start, but Google rejects the made-up ID with **Error 401: invalid_client** (issue #16). Leave the value empty instead.
+
+Every address the frontend is served from (for example `http://localhost:5500`) must be listed under **Authorized JavaScript origins** on that client in Google Cloud Console. Otherwise Google shows `origin_mismatch`. Ask whoever owns the Google Cloud project to add new origins.
+
+To check which ID the running backend is using, open `http://localhost:8080/api/config`. The frontend reads the ID only when the page loads, so reload the login page after restarting the backend.
 
 Start the backend with the following:
 ```wsl

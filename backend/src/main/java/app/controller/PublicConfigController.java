@@ -18,8 +18,9 @@ public class PublicConfigController {
 
     private final String googleClientId;
 
-    public PublicConfigController(@Value("${google.client-id}") String googleClientId) {
-        this.googleClientId = googleClientId;
+    public PublicConfigController(@Value("${google.client-id:}") String googleClientId) {
+        // Blank means Google sign-in is off; the login page then hides the Google button.
+        this.googleClientId = googleClientId.strip();
     }
     
     @Operation(summary = "Get public configuration", description = "Returns public configuration values required by the frontend.")

@@ -24,6 +24,12 @@ public class ApiExceptionHandler {
                 .body(new ErrorResponse("AUTHENTICATION_FAILED", "Unable to authenticate"));
     }
 
+    @ExceptionHandler(GoogleSignInNotConfiguredException.class)
+    public ResponseEntity<ErrorResponse> googleSignInNotConfigured(GoogleSignInNotConfiguredException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse("GOOGLE_SIGN_IN_NOT_CONFIGURED", exception.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> validationFailed(MethodArgumentNotValidException exception) {
         log.warn("Request validation failed: {}", exception.getBindingResult().getFieldErrors().stream()
