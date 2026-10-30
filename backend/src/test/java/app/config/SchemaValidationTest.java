@@ -23,6 +23,6 @@ class SchemaValidationTest {
 
     @Test
     void migrationsMatchEntities() {
-        assertEquals("10", flyway.info().current().getVersion().getVersion());
+        assertEquals("13", flyway.info().current().getVersion().getVersion());
     }
 }

@@ -29,7 +29,7 @@ public class ForecastController {
                 + "Uses the trained model when it can, and otherwise an average of the dish's own past sales; the response says which, and why.")
         @ApiResponses({
                 @ApiResponse(responseCode = "200", description = "Forecast generated successfully"),
-                @ApiResponse(responseCode = "400", description = "Invalid request: date out of range, unknown dish, or no sales recorded for the dish", content = @Content),
+                @ApiResponse(responseCode = "400", description = "Invalid request: date out of range, the stall is closed that day, unknown dish, or no sales recorded for the dish", content = @Content),
                 @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
         })
         @PostMapping
