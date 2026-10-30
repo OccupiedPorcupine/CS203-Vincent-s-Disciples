@@ -104,9 +104,27 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
                 .retrieve()
                 .body(String.class)));
 
+        // OpenAI's language tags change between runs for the same clip, so read them from the text.
+        String text = body.path("text").asString();
+        List<String> languages = languagesIn(text);
+        if (languages.isEmpty()) {
+            body.path("languages").forEach(language -> languages.add(language.path("code").asString()));
+        }
+        return new Transcription(text, languages);
+    }
+
+    // In order of first appearance: Chinese characters are "zh", Latin letters "en".
+    static List<String> languagesIn(String text) {
         List<String> languages = new ArrayList<>();
-        body.path("languages").forEach(language -> languages.add(language.path("code").asString()));
-        return new Transcription(body.path("text").asString(), languages);
+        text.codePoints().forEach(codePoint -> {
+            Character.UnicodeScript script = Character.UnicodeScript.of(codePoint);
+            String language = script == Character.UnicodeScript.HAN ? "zh"
+                    : script == Character.UnicodeScript.LATIN ? "en" : null;
+            if (language != null && !languages.contains(language)) {
+                languages.add(language);
+            }
+        });
+        return languages;
     }
 
     @Override

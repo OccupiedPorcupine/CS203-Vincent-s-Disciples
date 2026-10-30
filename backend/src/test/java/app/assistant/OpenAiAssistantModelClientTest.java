@@ -88,6 +88,20 @@ class OpenAiAssistantModelClientTest {
     }
 
     @Test
+    void transcriptionLanguagesComeFromTheTextNotOpenAisTags() {
+        server.expect(requestTo("https://api.test/v1/audio/transcriptions"))
+                .andRespond(withSuccess("""
+                        {"text": "好的，今天烧鸡饭四十二份。", "languages": [{"code": "en"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        var transcription = client.transcribe(new byte[]{1, 2, 3}, "speech.webm", List.of());
+
+        assertEquals(List.of("zh"), transcription.languages());
+        assertEquals(List.of("en", "zh"), OpenAiAssistantModelClient.languagesIn("Eh today 叉烧饭 30"));
+        assertEquals(List.of(), OpenAiAssistantModelClient.languagesIn("42, 30"));
+    }
+
+    @Test
     void anErrorFromOpenAiBecomesABadGateway() {
         server.expect(requestTo("https://api.test/v1/responses"))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
