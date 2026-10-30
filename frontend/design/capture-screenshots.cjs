@@ -2,13 +2,13 @@
 // login needed). Start the frontend first (node frontend/server.mjs), then from the repo root:
 //   npm install --prefix /tmp/chicky-pw playwright
 //   PW=/tmp/chicky-pw/node_modules/playwright node frontend/design/capture-screenshots.cjs
-// Uses the installed Google Chrome.
+// Uses the installed Google Chrome. BASE overrides the frontend address (default http://127.0.0.1:5500).
 const { chromium } = require(process.env.PW || "playwright");
 const path = require("path");
 
 const capture = async (page, out) => {
   const OUT = out;
-  const BASE = "http://127.0.0.1:5500";
+  const BASE = process.env.BASE || "http://127.0.0.1:5500";
   const dishes = [
     { id: 1, name: "Chicken rice" },
     { id: 2, name: "Char siew rice" },

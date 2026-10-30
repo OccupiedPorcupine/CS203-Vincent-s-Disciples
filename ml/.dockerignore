@@ -1,0 +1,7 @@
+# Only api/, src/, artifacts/production/ and requirements-api.txt go into the image.
+*
+!requirements-api.txt
+!api/
+!src/
+!artifacts/production/
+**/__pycache__

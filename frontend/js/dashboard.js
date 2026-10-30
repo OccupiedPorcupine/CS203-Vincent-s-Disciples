@@ -83,6 +83,7 @@ function isClosed(isoDate, { restDays, closedDates }) {
 function showEmpty(message) {
   document.getElementById("demand-note").textContent = message;
   document.getElementById("dish-note").textContent = message;
+  document.getElementById("revenue-note").textContent = message;
 }
 
 async function loadDashboard() {
@@ -157,6 +158,11 @@ async function loadDashboard() {
     dailyTotals
   );
 
+  loadRevenue(firstDay, latestDate).catch(error => {
+    console.error(error);
+    document.getElementById("revenue-note").textContent = "Revenue could not be loaded.";
+  });
+
   drawChart(
     "dish-chart",
     "bar",
@@ -164,6 +170,57 @@ async function loadDashboard() {
     dishes.map(dish => dish.name),
     dishTotals
   );
+}
+
+// ---- Revenue and margin (issue #43) ----
+
+const money = new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD", currencyDisplay: "narrowSymbol" });
+const wholeMoney = new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD", currencyDisplay: "narrowSymbol", maximumFractionDigits: 0 });
+
+async function loadRevenue(from, to) {
+  const revenue = await apiRequest(`/api/revenue?from=${from}&to=${to}`);
+  const total = document.getElementById("revenue-total");
+  const note = document.getElementById("revenue-note");
+  const missing = document.getElementById("revenue-missing");
+  const unpriced = revenue.dishes.filter(dish => dish.price === null && dish.portions > 0);
+
+  if (revenue.revenue === null) {
+    total.textContent = "--";
+    note.textContent = "Set your dish prices to see revenue.";
+  } else {
+    total.textContent = wholeMoney.format(Number(revenue.revenue));
+    const revenueValue = Number(revenue.revenue);
+    note.textContent = revenue.grossProfit === null
+      ? "Add each dish’s cost to see gross profit."
+      : `Gross profit ${wholeMoney.format(Number(revenue.grossProfit))}`
+        + (revenueValue > 0 ? ` · ${Math.round(Number(revenue.grossProfit) / revenueValue * 100)}% margin` : "")
+        + (revenue.portionsWithoutCost ? " (dishes without a cost left out)" : "");
+  }
+
+  missing.replaceChildren();
+  missing.hidden = unpriced.length === 0;
+  if (unpriced.length) {
+    const names = unpriced.map(dish => dish.name);
+    const list = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} more` : names.join(", ");
+    const link = document.createElement("a");
+    link.href = "dishes.html";
+    link.textContent = "Set prices";
+    missing.append(`Price not set: ${list}, so ${revenue.unpricedPortions} portions aren’t counted. `, link);
+  }
+
+  const top = document.getElementById("top-dishes");
+  top.replaceChildren(...revenue.dishes.filter(dish => dish.portions > 0).slice(0, 5).map(dish => {
+    const item = document.createElement("li");
+    const name = document.createElement("span");
+    name.textContent = dish.name;
+    const detail = document.createElement("span");
+    if (dish.price === null) detail.textContent = "Price not set";
+    else if (dish.grossProfit === null) detail.textContent = `${money.format(Number(dish.revenue))} revenue · cost not set`;
+    else detail.textContent = `${money.format(Number(dish.grossProfit))} · ${money.format(Number(dish.marginPerPortion))} a plate`;
+    item.append(name, detail);
+    return item;
+  }));
+  document.getElementById("top-dishes-note").textContent = top.children.length ? "" : "No sales in these 7 days.";
 }
 
 function refreshDashboard() {
