@@ -51,7 +51,7 @@ public class AssistantInteraction {
     @Column(nullable = false, length = 16)
     private Outcome outcome;
 
-    // SALES or PRICE when there is a proposal; see V13.
+    // SALES or PRICE when there is a proposal; see V16.
     @Column(length = 16)
     private String proposalType;
 
@@ -102,7 +102,7 @@ public class AssistantInteraction {
         return outcome;
     }
 
-    // Proposals saved before V13 have no type and are sales.
+    // Proposals saved before V16 have no type and are sales.
     public boolean isPriceProposal() {
         return "PRICE".equals(proposalType);
     }
