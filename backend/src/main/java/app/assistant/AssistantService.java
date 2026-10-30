@@ -13,6 +13,8 @@ import app.service.DailySaleService;
 import app.service.DishAliasService;
 import app.service.DishService;
 import app.user.AppUserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,8 @@ import java.util.*;
 // confirming or cancelling the sales it proposes. Only confirmProposal writes sales.
 @Service
 public class AssistantService {
+
+    private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
 
     static final Duration PROPOSAL_LIFETIME = Duration.ofMinutes(15);
     static final int MAX_MODEL_CALLS = 5;
@@ -87,8 +91,10 @@ public class AssistantService {
 
     public TranscriptionResponse transcribe(Long ownerId, MultipartFile audio) {
         rateLimiter.check(ownerId);
+        long started = System.nanoTime();
 
         if (audio == null || audio.isEmpty()) {
+            log.warn("Transcribe for user {}: no audio received", ownerId);
             throw new AssistantException(HttpStatus.BAD_REQUEST, "NO_AUDIO", "No audio was recorded.");
         }
         if (audio.getSize() > MAX_AUDIO_BYTES) {
@@ -97,12 +103,16 @@ public class AssistantService {
         String contentType = audio.getContentType() == null ? "" : audio.getContentType().split(";")[0].strip();
         String extension = AUDIO_EXTENSIONS.get(contentType);
         if (extension == null) {
+            log.warn("Transcribe for user {}: unsupported content type '{}' ({} bytes)", ownerId, audio.getContentType(), audio.getSize());
             throw new AssistantException(HttpStatus.BAD_REQUEST, "UNSUPPORTED_AUDIO", "This audio format isn't supported.");
         }
 
         try {
             AssistantModelClient.Transcription transcription = modelClient.transcribe(
                     audio.getBytes(), "speech." + extension, tools.dishVocabulary(ownerId));
+            log.info("Transcribed for user {}: {} bytes of {} in {} ms -> {} characters, languages {}", ownerId,
+                    audio.getSize(), contentType, millisSince(started), transcription.text().length(), transcription.languages());
+            log.debug("Transcript for user {}: {}", ownerId, transcription.text());
             return new TranscriptionResponse(transcription.text(), transcription.languages());
         } catch (IOException exception) {
             throw new AssistantException(HttpStatus.BAD_REQUEST, "NO_AUDIO", "The recording could not be read.");
@@ -115,11 +125,14 @@ public class AssistantService {
         String cleaned = text.strip();
         byte[] cached = speechCache.get(cleaned);
         if (cached != null) {
+            log.info("Speech for user {}: {} characters from cache ({} bytes)", ownerId, cleaned.length(), cached.length);
             return cached;
         }
         rateLimiter.check(ownerId);
+        long started = System.nanoTime();
         byte[] audio = modelClient.speak(cleaned);
         speechCache.put(cleaned, audio);
+        log.info("Speech for user {}: {} characters -> {} bytes in {} ms", ownerId, cleaned.length(), audio.length, millisSince(started));
         return audio;
     }
 
@@ -147,8 +160,11 @@ public class AssistantService {
                 guideRetriever.context(request.text(), request.page()), jsonMapper.writeValueAsString(pageElements));
         AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
         String reply = null;
+        List<String> toolsCalled = new ArrayList<>();
+        int modelCalls = 0;
 
         for (int call = 0; call < MAX_MODEL_CALLS && reply == null; call++) {
+            modelCalls++;
             ModelResponse response = modelClient.respond(instructions, items, tools.specs());
             items.addAll(response.outputItems());
 
@@ -156,6 +172,7 @@ public class AssistantService {
                 reply = response.text();
             }
             for (ToolCall toolCall : response.toolCalls()) {
+                toolsCalled.add(toolCall.name());
                 ObjectNode output = jsonMapper.createObjectNode();
                 output.put("type", "function_call_output");
                 output.put("call_id", toolCall.callId());
@@ -185,6 +202,12 @@ public class AssistantService {
                 (int) Duration.ofNanos(System.nanoTime() - started).toMillis(),
                 proposal == null ? null : jsonMapper.writeValueAsString(proposal),
                 clock.instant()));
+
+        log.info("Message from user {} ({}, page {}, {} characters, {}): {} model calls, tools {}, proposal {}, guide {} steps, {} ms",
+                ownerId, request.inputMode() == null ? "text" : request.inputMode(), request.page(), request.text().strip().length(), interaction.getDetectedLanguages(),
+                modelCalls, toolsCalled, proposal == null ? "none" : "#" + interaction.getId() + " with " + proposal.size() + " entries",
+                guide == null ? 0 : guide.size(), millisSince(started));
+        log.debug("Message from user {}: {} -> {}", ownerId, request.text().strip(), reply);
 
         AssistantMessageResponse.Proposal proposalView = proposal == null ? null : new AssistantMessageResponse.Proposal(
                 interaction.getId(), proposal, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
@@ -244,6 +267,7 @@ public class AssistantService {
 
         Outcome outcome = sameSales(proposed, result.entries()) ? Outcome.CONFIRMED : Outcome.EDITED;
         interaction.resolve(outcome, jsonMapper.writeValueAsString(saved), now);
+        log.info("Proposal #{} for user {}: {}, {} entries saved", proposalId, ownerId, outcome, saved.size());
         return new ConfirmProposalResponse(outcome.name(), saved);
     }
 
@@ -252,7 +276,10 @@ public class AssistantService {
         AssistantInteraction interaction = findProposal(ownerId, proposalId);
 
         switch (interaction.getOutcome()) {
-            case PENDING -> interaction.resolve(Outcome.CANCELLED, null, clock.instant());
+            case PENDING -> {
+                interaction.resolve(Outcome.CANCELLED, null, clock.instant());
+                log.info("Proposal #{} for user {}: CANCELLED", proposalId, ownerId);
+            }
             case CANCELLED, EXPIRED -> {
                 // Already closed; cancelling again is harmless.
             }
@@ -297,5 +324,9 @@ public class AssistantService {
 
     private static String truncate(String text, int length) {
         return text.length() <= length ? text : text.substring(0, length);
+    }
+
+    private static long millisSince(long startedNanos) {
+        return Duration.ofNanos(System.nanoTime() - startedNanos).toMillis();
     }
 }

@@ -106,7 +106,7 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
                 .forEach(keyword -> form.add("keywords[]", keyword));
         LANGUAGE_HINTS.forEach(language -> form.add("languages[]", language));
 
-        JsonNode body = jsonMapper.readTree(call(() -> restClient.post()
+        JsonNode body = jsonMapper.readTree(call("transcription (" + transcribeModel + ")", () -> restClient.post()
                 .uri("/audio/transcriptions")
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
@@ -127,22 +127,18 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
         request.put("instructions", SPEECH_STYLE);
         request.put("response_format", "mp3");
 
-        try {
-            return restClient.post()
-                    .uri("/audio/speech")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(jsonMapper.writeValueAsString(request))
-                    .retrieve()
-                    .body(byte[].class);
-        } catch (RestClientException exception) {
-            throw translate(exception);
-        }
+        return call("speech (" + speechModel + ")", () -> restClient.post()
+                .uri("/audio/speech")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(jsonMapper.writeValueAsString(request))
+                .retrieve()
+                .body(byte[].class));
     }
 
     @Override
     public ModelResponse respond(String instructions, List<JsonNode> input, List<ToolSpec> tools) {
         requireConfigured();
-        String responseBody = call(() -> restClient.post()
+        String responseBody = call("response (" + chatModel + ")", () -> restClient.post()
                 .uri("/responses")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(jsonMapper.writeValueAsString(buildRequest(instructions, input, tools)))
@@ -204,10 +200,14 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
         }
     }
 
-    private String call(java.util.function.Supplier<String> request) {
+    private <T> T call(String what, java.util.function.Supplier<T> request) {
+        long started = System.nanoTime();
         try {
-            return request.get();
+            T result = request.get();
+            log.info("OpenAI {} took {} ms", what, Duration.ofNanos(System.nanoTime() - started).toMillis());
+            return result;
         } catch (RestClientException exception) {
+            log.warn("OpenAI {} failed after {} ms", what, Duration.ofNanos(System.nanoTime() - started).toMillis());
             throw translate(exception);
         }
     }
@@ -227,6 +227,7 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
             }
             return AssistantException.upstream("The AI service returned an error (" + status + "). Please try again.");
         }
+        log.warn("OpenAI could not be reached: {}", error.getMessage());
         return AssistantException.upstream("The AI service could not be reached. Please try again.");
     }
 }

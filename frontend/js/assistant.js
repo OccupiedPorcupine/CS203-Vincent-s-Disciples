@@ -24,6 +24,7 @@
   let conversationId = readStored(CONVERSATION_KEY);
   let recorder = null;
   let fromVoice = false; // the text box holds a transcript
+  let stopReason = null; // why the last recording stopped, for the console
   let busy = false;
 
   const bubble = element("button", "assistant-bubble", {
@@ -67,9 +68,13 @@
   const statusLoaded = apiRequest("/api/assistant/status")
     .then(result => {
       status = result;
+      debug("status", result);
       return true;
     })
-    .catch(() => false);
+    .catch(error => {
+      warn("status failed, so the assistant is hidden:", error.status, error.message);
+      return false;
+    });
 
   // Used by js/guide.js to read tour steps aloud.
   window.chickyAssistant = { speak, stopSpeaking };
@@ -171,6 +176,7 @@
   async function send(text) {
     const inputMode = fromVoice ? "voice" : "text";
     fromVoice = false;
+    debug("sending message", { inputMode, characters: text.length, page: PAGE });
 
     addMessage("user", text);
     setBusy(true, "Thinking…");
@@ -182,6 +188,7 @@
       });
       conversationId = response.conversationId;
       writeStored(CONVERSATION_KEY, conversationId);
+      debug("reply", { proposal: response.proposal?.id ?? null, guideSteps: response.guide?.length ?? 0 });
       addMessage("assistant", response.reply);
       if (response.proposal) addConfirmCard(response.proposal);
       if (response.guide?.length && window.chickyGuide) {
@@ -192,6 +199,7 @@
         speak(response.reply);
       }
     } catch (error) {
+      warn("message failed:", error.status, error.code, error.message);
       addMessage("error", errorMessage(error));
     } finally {
       setBusy(false, "");
@@ -221,7 +229,10 @@
   async function speak(text) {
     stopSpeaking();
     const request = speechRequest;
-    if (!await statusLoaded || muted || !status.voice || !text) return;
+    if (!await statusLoaded || muted || !status.voice || !text) {
+      debug("not speaking:", muted ? "muted" : !status.voice ? "voice unavailable" : "nothing to say");
+      return;
+    }
 
     try {
       const audio = await apiRequest("/api/assistant/speech", {
@@ -229,14 +240,19 @@
         body: JSON.stringify({ text: text.slice(0, 500) }),
         responseType: "blob"
       });
-      if (request !== speechRequest || muted) return;
+      if (request !== speechRequest || muted) {
+        debug("speech arrived after it was stopped; not playing");
+        return;
+      }
 
       const url = URL.createObjectURL(audio);
       currentAudio = new Audio(url);
       currentAudio.addEventListener("ended", () => URL.revokeObjectURL(url));
       await currentAudio.play();
+      debug("playing speech", { bytes: audio.size, type: audio.type });
     } catch (error) {
-      // Text only.
+      // Text only. NotAllowedError means the browser blocked playback without a recent tap.
+      warn("speech failed:", error.name, error.status ?? "", error.code ?? "", error.message);
     }
   }
 
@@ -293,31 +309,50 @@
 
   async function toggleRecording() {
     if (recorder) {
+      debug("mic tapped: stopping");
+      stopReason = "tap";
       recorder.stop();
       return;
     }
-    if (!status.voice || busy) return;
+    if (!status.voice || busy) {
+      debug("mic tap ignored:", !status.voice ? "voice unavailable" : "busy");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      warn("this browser can't record here (needs https or localhost, and MediaRecorder)", location.origin);
+      addMessage("error", "This browser can’t record audio here. Please type instead.");
+      return;
+    }
 
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (error) {
+      warn("microphone refused:", error.name, error.message);
       addMessage("error", "I can’t use the microphone. Allow it from the icon in the address bar, or type instead.");
       return;
     }
+    const track = stream.getAudioTracks()[0];
+    debug("microphone", track?.label, track?.getSettings?.());
 
     const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(type => MediaRecorder.isTypeSupported(type));
     const chunks = [];
+    const started = performance.now();
+    stopReason = null;
     recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     recorder.addEventListener("dataavailable", event => {
       if (event.data.size) chunks.push(event.data);
     });
+    recorder.addEventListener("error", event => warn("recorder error:", event.error?.name, event.error?.message));
 
-    const stopIfRecording = () => {
-      if (recorder?.state === "recording") recorder.stop();
+    const stopIfRecording = reason => {
+      if (recorder?.state === "recording") {
+        stopReason = reason;
+        recorder.stop();
+      }
     };
-    const stopWatching = watchForSilence(stream, stopIfRecording);
-    const timer = setTimeout(stopIfRecording, MAX_RECORDING_MS);
+    const stopWatching = watchForSilence(stream, () => stopIfRecording("silence"));
+    const timer = setTimeout(() => stopIfRecording("time limit"), MAX_RECORDING_MS);
 
     recorder.addEventListener("stop", () => {
       clearTimeout(timer);
@@ -328,10 +363,19 @@
       setListening(false);
 
       const audio = new Blob(chunks, { type });
-      if (audio.size) transcribe(audio);
+      debug("recording stopped", {
+        reason: stopReason, seconds: ((performance.now() - started) / 1000).toFixed(1), bytes: audio.size, type
+      });
+      if (audio.size) {
+        transcribe(audio);
+      } else {
+        warn("the recording is empty");
+        addMessage("error", "Nothing was recorded. Check that the right microphone is selected, then try again.");
+      }
     });
 
     recorder.start();
+    debug("recording as", recorder.mimeType || "the browser's default format");
     setListening(true);
   }
 
@@ -349,25 +393,42 @@
     if (!AudioContextClass) return () => {};
 
     const context = new AudioContextClass();
+    // Created after awaiting the microphone, so browsers may start it suspended; a suspended
+    // context reads silence and the recording would never stop on its own.
+    debug("silence detector:", context.state);
+    if (context.state === "suspended") {
+      context.resume()
+        .then(() => debug("silence detector resumed:", context.state))
+        .catch(error => warn("silence detector can't start; tap the mic to stop:", error.name, error.message));
+    }
     const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
     context.createMediaStreamSource(stream).connect(analyser);
     const samples = new Float32Array(analyser.fftSize);
 
+    const started = performance.now();
     let heardSpeech = false;
-    let quietSince = performance.now();
+    let warnedQuiet = false;
+    let loudest = 0;
+    let quietSince = started;
     let frame = requestAnimationFrame(check);
 
     function check(now) {
       analyser.getFloatTimeDomainData(samples);
       const level = Math.sqrt(samples.reduce((total, sample) => total + sample * sample, 0) / samples.length);
+      loudest = Math.max(loudest, level);
 
       if (level > SPEECH_LEVEL) {
+        if (!heardSpeech) debug("speech detected, level", level.toFixed(3));
         heardSpeech = true;
         quietSince = now;
       } else if (heardSpeech && now - quietSince > SILENCE_MS) {
+        debug(`quiet for ${SILENCE_MS / 1000} s; stopping`);
         onSilence();
         return;
+      } else if (!heardSpeech && !warnedQuiet && now - started > 5000) {
+        warnedQuiet = true;
+        warn(`no speech after 5 s: loudest level ${loudest.toFixed(3)}, needs ${SPEECH_LEVEL}; detector ${context.state}`);
       }
       frame = requestAnimationFrame(check);
     }
@@ -384,7 +445,9 @@
       const extension = audio.type.includes("mp4") ? "m4a" : "webm";
       const body = new FormData();
       body.append("audio", audio, `speech.${extension}`);
+      debug("transcribing", { bytes: audio.size, type: audio.type });
       const result = await apiRequest("/api/assistant/transcribe", { method: "POST", body });
+      debug("transcript", { characters: result.text.length, languages: result.languages });
 
       if (!result.text.trim()) {
         addMessage("error", "I didn’t catch that. Please try again.");
@@ -396,6 +459,7 @@
       input.focus();
       return;
     } catch (error) {
+      warn("transcription failed:", error.status, error.code, error.message);
       addMessage("error", errorMessage(error));
     }
     setBusy(false, "");
@@ -531,6 +595,15 @@
   }
 
   // ---- Helpers ----
+
+  // What the widget is doing, in the browser console. Filter on "[assistant]".
+  function debug(...details) {
+    console.info("[assistant]", ...details);
+  }
+
+  function warn(...details) {
+    console.warn("[assistant]", ...details);
+  }
 
   function addMessage(kind, text) {
     const message = element("p", `assistant-message ${kind}`);
