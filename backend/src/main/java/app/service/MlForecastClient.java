@@ -2,6 +2,7 @@ package app.service;
 
 import app.dto.MlPredictionRequest;
 import app.dto.MlPredictionResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
@@ -19,13 +20,14 @@ public class MlForecastClient {
 
     private final RestClient restClient;
 
-    public MlForecastClient() {
+    public MlForecastClient(@Value("${app.ml.base-url}") String baseUrl) {
         // Short timeouts, so a stuck ML service falls back to the baseline forecast quickly.
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
         requestFactory.setReadTimeout(Duration.ofSeconds(10));
         this.restClient = RestClient.builder()
-                .baseUrl("http://localhost:8000")
+                // Strip a trailing slash so the base URL joins cleanly with "/predict".
+                .baseUrl(baseUrl.replaceAll("/+$", ""))
                 .requestFactory(requestFactory)
                 .build();
     }
