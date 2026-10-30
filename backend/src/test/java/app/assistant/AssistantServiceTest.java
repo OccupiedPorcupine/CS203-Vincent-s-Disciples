@@ -1,5 +1,8 @@
 package app.assistant;
 
+import app.closure.ClosedDate;
+import app.closure.ClosedDateRepository;
+import app.closure.RestDayRepository;
 import app.dish.Dish;
 import app.dish.DishAliasRepository;
 import app.dish.DishRepository;
@@ -11,6 +14,7 @@ import app.sale.DailySaleRepository;
 import app.service.DailySaleService;
 import app.service.DishService;
 import app.service.PublicHolidaySyncService;
+import app.service.StallClosureService;
 import app.user.AppUser;
 import app.user.AppUserRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -78,6 +82,9 @@ class AssistantServiceTest {
     @Autowired DailySaleRepository saleRepository;
     @Autowired AssistantInteractionRepository interactionRepository;
     @Autowired MutableClock clock;
+    @Autowired StallClosureService closureService;
+    @Autowired ClosedDateRepository closedDateRepository;
+    @Autowired RestDayRepository restDayRepository;
 
     static final LocalDate TODAY = LocalDate.of(2026, 10, 29);
     Long owner;
@@ -96,6 +103,8 @@ class AssistantServiceTest {
     @AfterEach
     void cleanUp() {
         interactionRepository.deleteAll();
+        closedDateRepository.deleteAll();
+        restDayRepository.deleteAll();
         aliasRepository.deleteAll();
         saleRepository.deleteAll();
         dishRepository.deleteAll();
@@ -231,6 +240,88 @@ class AssistantServiceTest {
         assertEquals(HttpStatus.CONFLICT, assertThrows(AssistantException.class,
                 () -> assistant.confirmProposal(owner, proposal.id(), null)).getStatus());
         assertTrue(saleRepository.findByDishIdOrderBySaleDateAsc(chickenRice.getId()).isEmpty());
+    }
+
+    @Test
+    void aClosureIsProposedWithoutSavingAnything() {
+        var response = say(owner, "closed tomorrow for centre cleaning");
+
+        assertEquals("Please check these and press Confirm to save them.", response.reply());
+        assertTrue(response.proposal().entries().isEmpty());
+        assertEquals(List.of(new ProposedClosure(TODAY.plusDays(1), true, "Centre cleaning")), response.proposal().closures());
+        assertTrue(closedDateRepository.findByOwnerIdOrderByClosedDateAsc(owner).isEmpty());
+    }
+
+    @Test
+    void salesAndAClosureShareOneCardAndAreSavedTogether() {
+        var proposal = say(owner, "today chicken rice 42, closed tomorrow").proposal();
+        assertEquals(1, proposal.entries().size());
+        assertEquals(1, proposal.closures().size());
+
+        var result = assistant.confirmProposal(owner, proposal.id(), null);
+
+        assertEquals("CONFIRMED", result.outcome());
+        assertEquals(42, saleRepository.findByDishIdAndSaleDate(chickenRice.getId(), TODAY).orElseThrow().getQuantitySold());
+        assertEquals(List.of(TODAY.plusDays(1)), closedDates());
+        assertEquals(result.closures(), assistant.confirmProposal(owner, proposal.id(), null).closures());
+    }
+
+    @Test
+    void removingEverySaleFromTheCardStillSavesTheClosure() {
+        var proposal = say(owner, "today chicken rice 42, closed tomorrow").proposal();
+
+        var result = assistant.confirmProposal(owner, proposal.id(), new ConfirmProposalRequest(List.of()));
+
+        assertEquals("EDITED", result.outcome());
+        assertTrue(saleRepository.findByDishIdOrderBySaleDateAsc(chickenRice.getId()).isEmpty());
+        assertEquals(List.of(TODAY.plusDays(1)), closedDates());
+    }
+
+    @Test
+    void closingADayAgainWithoutAReasonKeepsTheEarlierReason() {
+        closureService.closeDate(owner, TODAY.plusDays(1), "Centre cleaning");
+
+        assistant.confirmProposal(owner, say(owner, "closed tomorrow").proposal().id(), null);
+
+        assertEquals("Centre cleaning", closedDateRepository.findByOwnerIdAndClosedDate(owner, TODAY.plusDays(1)).orElseThrow().getReason());
+    }
+
+    @Test
+    void openingAgainNeedsADayThatIsMarkedClosed() {
+        var nothingToOpen = say(owner, "we will open tomorrow after all");
+        assertNull(nothingToOpen.proposal());
+        assertTrue(nothingToOpen.reply().contains("isn't marked as closed"), nothingToOpen.reply());
+
+        closureService.closeDate(owner, TODAY.plusDays(1), "Holiday");
+        var proposal = say(owner, "we will open tomorrow after all").proposal();
+        assertEquals(List.of(new ProposedClosure(TODAY.plusDays(1), false, null)), proposal.closures());
+
+        assistant.confirmProposal(owner, proposal.id(), null);
+        assertTrue(closedDates().isEmpty());
+    }
+
+    @Test
+    void weeklyRestDaysAreNotChangedThroughTheAssistant() {
+        closureService.setRestDays(owner, List.of(TODAY.plusDays(1).getDayOfWeek()));
+
+        var response = say(owner, "closed tomorrow");
+
+        assertNull(response.proposal());
+        assertTrue(response.reply().contains("weekly rest day"), response.reply());
+    }
+
+    @Test
+    void anotherUserCannotSeeOrConfirmAClosure() {
+        var proposal = say(owner, "closed tomorrow").proposal();
+
+        var error = assertThrows(AssistantException.class, () -> assistant.confirmProposal(newUser(), proposal.id(), null));
+
+        assertEquals("PROPOSAL_NOT_FOUND", error.getCode());
+        assertTrue(closedDates().isEmpty());
+    }
+
+    private List<LocalDate> closedDates() {
+        return closedDateRepository.findByOwnerIdOrderByClosedDateAsc(owner).stream().map(ClosedDate::getClosedDate).toList();
     }
 
     @Test
