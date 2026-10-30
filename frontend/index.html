@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
+  <style>@view-transition { navigation: auto; }</style>
 
   <!-- Public runtime configuration. Google configuration is loaded from the backend. -->
   <meta name="api-base-url" content="http://localhost:8080">
@@ -12,6 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/base.css">
   <link rel="stylesheet" href="./css/styles.css">
 </head>
 
@@ -25,19 +28,19 @@
       <form id="login-form" class="sign-in-form">
         <div class="field">
           <label for="email">Email</label>
-          <input id="email" name="email" type="email" placeholder="Email Address" autocomplete="email" required>
+          <input class="input" id="email" name="email" type="email" placeholder="Email address" autocomplete="email" required>
         </div>
 
         <div class="field password-field">
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" required>
-          <a class="forgot-password" href="#">Forgot Password?</a>
+          <input class="input" id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" required>
+          <a class="forgot-password" href="#">Forgot password?</a>
         </div>
 
-        <button class="primary-button login-button" type="submit">Log In</button>
+        <button class="primary-button login-button" type="submit">Log in</button>
       </form>
 
-      <p id="login-status" class="form-status" role="status" aria-live="polite"></p>
+      <p id="login-status" class="status-text" role="status" aria-live="polite"></p>
 
       <div class="separator"><span>OR</span></div>
 
@@ -50,7 +53,7 @@
 
       <div class="sign-up-row">
         <span>Don’t have an account?</span>
-        <button id="show-signup" class="primary-button sign-up-button" type="button">Sign Up</button>
+        <button id="show-signup" class="secondary-button sign-up-button" type="button">Sign up</button>
       </div>
     </section>
 
@@ -62,32 +65,32 @@
       <form id="signup-form" class="sign-in-form">
         <div class="field">
           <label for="signup-name">Name</label>
-          <input id="signup-name" name="name" type="text" placeholder="Your name" autocomplete="name" maxlength="100" required>
+          <input class="input" id="signup-name" name="name" type="text" placeholder="Your name" autocomplete="name" maxlength="100" required>
         </div>
 
         <div class="field">
           <label for="signup-email">Email</label>
-          <input id="signup-email" name="email" type="email" placeholder="Email Address" autocomplete="email" maxlength="254" required>
+          <input class="input" id="signup-email" name="email" type="email" placeholder="Email address" autocomplete="email" maxlength="254" required>
         </div>
 
         <div class="field">
           <label for="signup-password">Password</label>
-          <input id="signup-password" name="password" type="password" placeholder="At least 12 characters" autocomplete="new-password" minlength="12" maxlength="256" required>
+          <input class="input" id="signup-password" name="password" type="password" placeholder="At least 12 characters" autocomplete="new-password" minlength="12" maxlength="256" required>
         </div>
 
         <div class="field">
           <label for="signup-confirm-password">Confirm password</label>
-          <input id="signup-confirm-password" name="confirmPassword" type="password" placeholder="Repeat password" autocomplete="new-password" minlength="12" maxlength="256" required>
+          <input class="input" id="signup-confirm-password" name="confirmPassword" type="password" placeholder="Repeat password" autocomplete="new-password" minlength="12" maxlength="256" required>
         </div>
 
-        <button class="primary-button form-submit-button" type="submit">Create Account</button>
+        <button class="primary-button form-submit-button" type="submit">Create account</button>
       </form>
 
-      <p id="signup-status" class="form-status" role="status" aria-live="polite"></p>
+      <p id="signup-status" class="status-text" role="status" aria-live="polite"></p>
 
       <div class="sign-up-row">
         <span>Already have an account?</span>
-        <button id="show-login" class="text-button" type="button">Log In</button>
+        <button id="show-login" class="text-button" type="button">Log in</button>
       </div>
     </section>
 
@@ -97,8 +100,8 @@
       <img id="account-picture" class="account-picture" alt="" hidden>
       <p id="account-name" class="account-name"></p>
       <p id="account-email" class="account-email"></p>
-      <button id="logout-button" class="primary-button logout-button" type="button">Log Out</button>
-      <p id="account-status" class="form-status" role="status" aria-live="polite"></p>
+      <button id="logout-button" class="primary-button logout-button" type="button">Log out</button>
+      <p id="account-status" class="status-text" role="status" aria-live="polite"></p>
     </section>
 
   </main>
