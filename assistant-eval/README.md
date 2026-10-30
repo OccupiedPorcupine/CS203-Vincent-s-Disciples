@@ -61,7 +61,8 @@ WHERE proposal_json IS NOT NULL
 GROUP BY outcome;
 ```
 
-And by input type and language:
+And by input type and language. Each message is labelled `en`, `zh` or `mixed` from the scripts in the
+text that was sent (empty when it's only numbers):
 
 ```sql
 SELECT input_mode, detected_languages, outcome, count(*)

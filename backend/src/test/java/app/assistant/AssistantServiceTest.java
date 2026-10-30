@@ -106,7 +106,20 @@ class AssistantServiceTest {
     }
 
     private AssistantMessageResponse say(Long user, String text) {
-        return assistant.handleMessage(user, new AssistantMessageRequest(null, text, "dashboard", "text", null, null));
+        return assistant.handleMessage(user, new AssistantMessageRequest(null, text, "dashboard", "text", null));
+    }
+
+    @Test
+    void eachMessageIsLabelledEnglishMandarinOrMixed() {
+        say(owner, "today chicken rice 42");
+        say(owner, "今天鸡饭四十二");
+        say(owner, "今天 chicken rice 42");
+        say(owner, "42");
+
+        var labels = interactionRepository.findAll().stream().map(AssistantInteraction::getDetectedLanguages).toList();
+        assertEquals(4, labels.size());
+        assertTrue(labels.containsAll(List.of("en", "zh", "mixed")));
+        assertTrue(labels.contains(null));
     }
 
     @Test

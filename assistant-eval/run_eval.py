@@ -135,13 +135,13 @@ def run_case(api, case):
     started = time.monotonic()
 
     for number, text in enumerate(turns):
-        input_mode, languages = "text", None
+        input_mode = "text"
         if audio and number == 0:
             transcription = api.upload_audio(audio)
-            text, transcript, languages, input_mode = transcription["text"], transcription["text"], transcription["languages"], "voice"
+            text, transcript, input_mode = transcription["text"], transcription["text"], "voice"
         response = api.request("POST", "/api/assistant/messages", {
             "conversationId": conversation_id, "text": text, "page": "dashboard",
-            "inputMode": input_mode, "languages": languages,
+            "inputMode": input_mode,
         })
         conversation_id = response["conversationId"]
         if response.get("proposal"):
