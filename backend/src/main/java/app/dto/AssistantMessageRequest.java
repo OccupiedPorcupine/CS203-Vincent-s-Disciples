@@ -5,12 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-import java.util.List;
-
 public record AssistantMessageRequest(
         @Pattern(regexp = "[A-Za-z0-9-]{1,64}") @Schema(description = "Conversation to continue; omit to start a new one") String conversationId,
         @NotBlank @Size(max = 1000) @Schema(description = "What the user said or typed", example = "today chicken rice 42, char siew 30") String text,
         @Size(max = 64) @Schema(description = "Page the user is on", example = "dashboard") String page,
-        @Pattern(regexp = "voice|text") @Schema(description = "How the text was entered", example = "voice") String inputMode,
-        @Size(max = 5) @Schema(description = "Languages detected by transcription", example = "[\"en\", \"zh\"]") List<@Size(max = 8) String> languages
+        @Pattern(regexp = "voice|text") @Schema(description = "How the text was entered", example = "voice") String inputMode
 ) {}

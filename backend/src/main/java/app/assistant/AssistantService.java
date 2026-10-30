@@ -152,7 +152,7 @@ public class AssistantService {
                 request.page(),
                 request.inputMode() == null ? "text" : request.inputMode(),
                 request.text().strip(),
-                request.languages() == null ? null : String.join(",", request.languages()),
+                MessageLanguages.label(request.text()),
                 truncate(reply, 4000),
                 modelClient.modelName(),
                 (int) Duration.ofNanos(System.nanoTime() - started).toMillis(),
