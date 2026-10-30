@@ -472,16 +472,29 @@
       addPriceCard(proposal);
       return;
     }
+    const closures = proposal.closures || [];
     const card = element("div", "assistant-card");
     const heading = element("p", "assistant-card-title");
-    heading.textContent = "Save these sales?";
+    heading.textContent = closures.length === 0 ? "Save these sales?"
+      : proposal.entries.length === 0 ? "Save these opening days?"
+      : "Save these sales and opening days?";
 
     const table = element("table", "assistant-entries");
     table.innerHTML = `<thead><tr><th scope="col">Date</th><th scope="col">Dish</th><th scope="col">Portions</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>`;
     const rows = element("tbody");
     table.append(rows);
+    table.hidden = proposal.entries.length === 0;
 
     proposal.entries.forEach(entry => rows.append(entryRow(entry)));
+
+    // Closed days aren't editable on the card: confirm them as they are, or cancel.
+    const closureList = element("ul", "assistant-closures");
+    closureList.hidden = closures.length === 0;
+    closures.forEach(closure => {
+      const item = element("li");
+      item.textContent = describeClosure(closure);
+      closureList.append(item);
+    });
 
     const actions = element("div", "assistant-card-actions");
     const cancel = element("button", "assistant-secondary", { type: "button" });
@@ -490,14 +503,14 @@
     confirm.textContent = "Confirm";
     actions.append(cancel, confirm);
 
-    card.append(heading, table, actions);
+    card.append(heading, table, closureList, actions);
     log.append(card);
     log.scrollTop = log.scrollHeight;
     confirm.focus();
 
     confirm.addEventListener("click", async () => {
       const entries = [...rows.querySelectorAll("tr")].map(readRow);
-      if (entries.length === 0) {
+      if (entries.length === 0 && closures.length === 0) {
         cancel.click();
         return;
       }
@@ -507,8 +520,15 @@
           method: "POST",
           body: JSON.stringify({ entries })
         });
-        closeCard(card, `Saved ${result.saved.length} ${result.saved.length === 1 ? "entry" : "entries"}.`);
+        const savedClosures = result.closures || [];
+        const parts = [];
+        if (result.saved.length) parts.push(`${result.saved.length} ${result.saved.length === 1 ? "entry" : "entries"}`);
+        if (savedClosures.length) parts.push(`${savedClosures.length} ${savedClosures.length === 1 ? "opening day" : "opening days"}`);
+        closeCard(card, `Saved ${parts.join(" and ")}.`);
         window.dispatchEvent(new CustomEvent("chicky:sales-saved", { detail: result.saved }));
+        if (savedClosures.length) {
+          window.dispatchEvent(new CustomEvent("chicky:closures-saved", { detail: savedClosures }));
+        }
       } catch (error) {
         addMessage("error", errorMessage(error));
         if (error.status === 409 || error.status === 404) {
@@ -617,6 +637,16 @@
     input.placeholder = placeholder;
     input.value = value === null ? "" : Number(value).toFixed(2);
     return input;
+  }
+
+  // "Closed · Thu 5 Nov · Centre cleaning" or "Open again · Thu 5 Nov".
+  function describeClosure(closure) {
+    const day = new Date(`${closure.date}T00:00:00Z`).toLocaleDateString("en-SG", {
+      weekday: "short", day: "numeric", month: "short", timeZone: "UTC"
+    });
+    return closure.closed
+      ? ["Closed", day, closure.reason].filter(Boolean).join(" · ")
+      : `Open again · ${day}`;
   }
 
   function entryRow(entry) {

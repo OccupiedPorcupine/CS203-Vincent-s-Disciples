@@ -12,6 +12,8 @@ import app.dto.ProposalEntryInput;
 import app.price.DishPriceService;
 import app.price.PriceBook;
 import app.sale.DailySaleRepository;
+import app.service.StallClosureService;
+import app.service.StallClosureService.StallClosures;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -22,13 +24,16 @@ import tools.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 // The functions the language model may call. None of them write to the database: the most the
-// model can do is propose sales, which the user then confirms. The user's ID comes from the
+// model can do is propose sales and closed days, which the user then confirms. The user's ID comes from the
 // session (TurnContext), never from the model.
 @Component
 public class AssistantTools {
@@ -40,6 +45,11 @@ public class AssistantTools {
     static final String GUIDE_USER = "guide_user";
     static final String PROPOSE_PRICE_CHANGE = "propose_price_change";
     private static final BigDecimal MAX_PRICE = new BigDecimal("10000");
+    static final String PROPOSE_CLOSURE = "propose_closure";
+    // Closed days can be proposed from this many days ago up to a year ahead.
+    static final int MAX_CLOSURE_DAYS_BACK = 60;
+    static final int MAX_CLOSURE_DAYS_AHEAD = 365;
+    private static final int MAX_CLOSURES = 31;
     private static final int MAX_SALES_DAYS = 120;
     private static final int MAX_GUIDE_STEPS = 8;
     private static final int MAX_STEP_MESSAGE = 240;
@@ -49,6 +59,7 @@ public class AssistantTools {
     private final DailySaleRepository dailySaleRepository;
     private final ProposalValidator proposalValidator;
     private final DishPriceService priceService;
+    private final StallClosureService stallClosureService;
     private final AppGuide appGuide;
     private final JsonMapper jsonMapper;
     private final List<ToolSpec> specs;
@@ -63,6 +74,7 @@ public class AssistantTools {
         final Set<String> liveElementIds;
         List<ProposedEntry> proposal;
         ProposedPrice priceChange;
+        List<ProposedClosure> closures;
         List<GuideStep> guide;
 
         public TurnContext(Long ownerId, LocalDate today, String page, Set<String> liveElementIds) {
@@ -80,6 +92,10 @@ public class AssistantTools {
             return priceChange;
         }
 
+        public List<ProposedClosure> closures() {
+            return closures;
+        }
+
         public List<GuideStep> guide() {
             return guide;
         }
@@ -87,12 +103,14 @@ public class AssistantTools {
 
     public AssistantTools(DishRepository dishRepository, DishAliasRepository dishAliasRepository,
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
-                          DishPriceService priceService, AppGuide appGuide, JsonMapper jsonMapper) {
+                          DishPriceService priceService, StallClosureService stallClosureService,
+                          AppGuide appGuide, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
         this.proposalValidator = proposalValidator;
         this.priceService = priceService;
+        this.stallClosureService = stallClosureService;
         this.appGuide = appGuide;
         this.jsonMapper = jsonMapper;
         this.specs = List.of(
@@ -150,6 +168,26 @@ public class AssistantTools {
                                  "required": ["dish_id", "price", "unit_cost", "effective_from"],
                                  "additionalProperties": false}
                                 """)),
+                new ToolSpec(PROPOSE_CLOSURE,
+                        "Show the user a confirm card that marks specific days as closed (the stall doesn't trade, "
+                                + "e.g. a holiday or hawker centre cleaning) or open again. This does NOT save anything; "
+                                + "the user confirms. Not for weekly rest days (\"closed every Tuesday\"): guide the user "
+                                + "with task set-opening-days instead. If the message also has sales, call "
+                                + "propose_sales_entry as well; both go on one card.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {
+                                   "closures": {"type": "array", "items": {
+                                     "type": "object",
+                                     "properties": {
+                                       "date": {"type": "string", "description": "YYYY-MM-DD"},
+                                       "closed": {"type": "boolean", "description": "true to mark closed, false to open again"},
+                                       "reason": {"type": ["string", "null"], "description": "Why, if the user said, in a few words"}},
+                                     "required": ["date", "closed", "reason"],
+                                     "additionalProperties": false}}},
+                                 "required": ["closures"],
+                                 "additionalProperties": false}
+                                """)),
                 new ToolSpec(GET_GUIDE,
                         "Get the full app guide section for a page or task ID from the guide index: "
                                 + "a page's elements, or a task's steps.",
@@ -194,6 +232,7 @@ public class AssistantTools {
                 case GET_SALES -> getSales(call.arguments(), context);
                 case PROPOSE_SALES_ENTRY -> proposeSalesEntry(call.arguments(), context);
                 case PROPOSE_PRICE_CHANGE -> proposePriceChange(call.arguments(), context);
+                case PROPOSE_CLOSURE -> proposeClosure(call.arguments(), context);
                 case GET_GUIDE -> appGuide.section(call.arguments().path("id").asString())
                         .orElseGet(() -> error("No guide section " + call.arguments().path("id").asString()));
                 case GUIDE_USER -> guideUser(call.arguments(), context);
@@ -317,7 +356,9 @@ public class AssistantTools {
         }
 
         context.priceChange = new ProposedPrice(dishId, dish.getName(), price, unitCost, effectiveFrom, currentPrice, currentCost);
+        // A price change has its own card, so it replaces any sales or closed days from this turn.
         context.proposal = null;
+        context.closures = null;
         ObjectNode output = jsonMapper.createObjectNode();
         output.put("ok", true);
         output.set("price_change", jsonMapper.valueToTree(context.priceChange));
@@ -332,6 +373,74 @@ public class AssistantTools {
         BigDecimal value = node.decimalValue().stripTrailingZeros();
         if (value.signum() < 0 || value.compareTo(MAX_PRICE) > 0 || value.scale() > 2) return null;
         return value.setScale(2);
+    }
+
+    private JsonNode proposeClosure(JsonNode arguments, TurnContext context) {
+        StallClosures current = stallClosureService.getClosures(context.ownerId);
+        Set<LocalDate> closedDates = new HashSet<>();
+        current.closedDates().forEach(closedDate -> closedDates.add(closedDate.getClosedDate()));
+
+        List<ProposedClosure> closures = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        Set<LocalDate> seen = new HashSet<>();
+
+        for (JsonNode item : arguments.path("closures")) {
+            LocalDate date = LocalDate.parse(item.path("date").asString());
+            boolean closed = item.path("closed").asBoolean();
+            String reason = textOrNull(item.path("reason"));
+            String weekday = date.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+
+            if (!seen.add(date)) {
+                problems.add(date + " is listed twice.");
+            } else if (date.isBefore(context.today.minusDays(MAX_CLOSURE_DAYS_BACK))
+                    || date.isAfter(context.today.plusDays(MAX_CLOSURE_DAYS_AHEAD))) {
+                problems.add(date + " is out of range: use a date from " + MAX_CLOSURE_DAYS_BACK
+                        + " days ago to a year ahead.");
+            } else if (current.restDays().contains(date.getDayOfWeek())) {
+                problems.add(date + " is a " + weekday + ", a weekly rest day. Rest days are changed on the Data page "
+                        + "(task set-opening-days), not here.");
+            } else if (!closed && !closedDates.contains(date)) {
+                problems.add(date + " isn't marked as closed, so there is nothing to open again.");
+            } else if (reason != null && reason.strip().length() > 100) {
+                problems.add("Keep the reason for " + date + " under 100 characters.");
+            } else {
+                closures.add(new ProposedClosure(date, closed, closed && reason != null ? reason.strip() : null));
+            }
+        }
+        if (closures.isEmpty() && problems.isEmpty()) problems.add("Give at least one date.");
+        if (closures.size() > MAX_CLOSURES) problems.add("At most " + MAX_CLOSURES + " days at a time.");
+
+        ObjectNode output = jsonMapper.createObjectNode();
+        if (!problems.isEmpty()) {
+            output.put("ok", false);
+            ArrayNode list = output.putArray("problems");
+            problems.forEach(list::add);
+            output.put("note", "Nothing was shown to the user. Fix the dates, or ask the user what they meant.");
+            return output;
+        }
+
+        context.closures = closures;
+        context.priceChange = null;
+        output.put("ok", true);
+        output.set("closures", jsonMapper.valueToTree(closures));
+        output.put("note", "Shown to the user on the confirm card. Not saved until they confirm.");
+        return output;
+    }
+
+    // The stall's weekly rest days and closed days from today on, for the instructions.
+    @Transactional(readOnly = true)
+    public ObjectNode closures(Long ownerId, LocalDate today) {
+        StallClosures current = stallClosureService.getClosures(ownerId);
+        ObjectNode node = jsonMapper.createObjectNode();
+        ArrayNode restDays = node.putArray("rest_days");
+        current.restDays().stream().sorted().forEach(day -> restDays.add(day.name()));
+        ArrayNode closedDates = node.putArray("closed_dates");
+        current.closedDates().stream()
+                .filter(closedDate -> !closedDate.getClosedDate().isBefore(today))
+                .forEach(closedDate -> closedDates.addObject()
+                        .put("date", closedDate.getClosedDate().toString())
+                        .put("reason", closedDate.getReason()));
+        return node;
     }
 
     private JsonNode guideUser(JsonNode arguments, TurnContext context) {

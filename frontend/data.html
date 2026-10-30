@@ -130,11 +130,49 @@
         <div id="source-list"></div>
       </div>
     </section>
+
+    <section class="section" aria-labelledby="closures-heading" data-guide-id="closures-panel">
+      <div class="section-heading">
+        <div>
+          <h2 id="closures-heading">Opening days</h2>
+          <p>Days your stall is closed aren’t counted as days with no sales, and aren’t forecast. A day you record sales on counts as open.</p>
+        </div>
+      </div>
+
+      <fieldset class="rest-days" data-guide-id="rest-days">
+        <legend>Weekly rest days</legend>
+        <div class="rest-day-list">
+          <label class="rest-day"><input type="checkbox" name="rest-day" value="MONDAY"> Mon</label>
+          <label class="rest-day"><input type="checkbox" name="rest-day" value="TUESDAY"> Tue</label>
+          <label class="rest-day"><input type="checkbox" name="rest-day" value="WEDNESDAY"> Wed</label>
+          <label class="rest-day"><input type="checkbox" name="rest-day" value="THURSDAY"> Thu</label>
+          <label class="rest-day"><input type="checkbox" name="rest-day" value="FRIDAY"> Fri</label>
+          <label class="rest-day"><input type="checkbox" name="rest-day" value="SATURDAY"> Sat</label>
+          <label class="rest-day"><input type="checkbox" name="rest-day" value="SUNDAY"> Sun</label>
+        </div>
+      </fieldset>
+
+      <form id="closed-date-form" class="closed-date-form" data-guide-id="closed-date-form">
+        <div class="field">
+          <label for="closed-date">Closed on</label>
+          <input id="closed-date" class="input" type="date" required>
+        </div>
+        <div class="field">
+          <label for="closed-reason">Reason (optional)</label>
+          <input id="closed-reason" class="input" type="text" maxlength="100" placeholder="e.g. Centre cleaning">
+        </div>
+        <button class="secondary-button" type="submit">Add closed day</button>
+      </form>
+
+      <ul id="closed-date-list" class="closed-date-list" aria-label="Closed days"></ul>
+      <p id="closures-status" class="status-text" role="status" aria-live="polite"></p>
+    </section>
   </main>
 
   <script src="js/api.js"></script>
   <script src="js/app-shell.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/closures.js"></script>
   <script src="js/guide.js"></script>
   <span id="guide-ready" hidden></span>
   <script src="js/assistant.js"></script>

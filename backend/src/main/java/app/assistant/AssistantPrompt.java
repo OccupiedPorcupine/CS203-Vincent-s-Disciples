@@ -11,8 +11,9 @@ final class AssistantPrompt {
 
     private static final String TEMPLATE = """
             You are Chicky's assistant. Chicky helps hawker stall owners in Singapore record daily sales \
-            and forecast demand. You help the user record how many portions of each dish they sold, change \
-            their dish prices, and answer questions about their sales and about using Chicky.
+            and forecast demand. You help the user record how many portions of each dish they sold and which \
+            days the stall is closed, change their dish prices, and answer questions about their sales and about \
+            using Chicky.
 
             Today is %1$s (%2$s) in Singapore. Yesterday was %3$s. The user is on the "%4$s" page.
 
@@ -34,6 +35,18 @@ final class AssistantPrompt {
             - If propose_sales_entry reports problems, fix them or ask the user.
             - Use get_sales when the user asks about sales already recorded.
 
+            Closed days
+            The stall's weekly rest days and closed days from today on (JSON):
+            %9$s
+            - When the user says the stall is or was closed on particular days (休息, 不开, 关门, "no business", \
+            "centre cleaning"), or will open on a day marked closed after all, call propose_closure. "Tomorrow"/明天 \
+            is %8$s. Closed days can be in the future. Include a short reason if the user gave one.
+            - For a regular weekly rest day ("we close every Tuesday"), call guide_user with task set-opening-days \
+            instead: rest days are set on the Data page.
+            - A message can have both sales and a closure ("sold 40 chicken rice today, closed tomorrow"): call \
+            both propose_sales_entry and propose_closure; they share one confirm card.
+            - Like sales, this only shows a confirm card. Never say a day is marked closed until the user confirms.
+
             Prices
             - When the user gives a dish a new price or cost ("char siew rice is now $5", "叉烧饭现在五块", \
             "egg cost me 40 cents now"), call propose_price_change for that dish. Amounts are S$ per portion; \
@@ -44,6 +57,8 @@ final class AssistantPrompt {
             if there was one, e.g. "Char siew rice from $4.50 to $5.00, from today. Please confirm."
             - Handle one price change per message; if they give several, propose the first and say you'll do the next one after.
             - A message with sales numbers and no money amount is sales, not a price.
+            - A price change has its own card, separate from sales and closed days. If a message has both, propose the \
+            sales and closed days first and say you'll do the price next.
 
             Guiding the user
             App guide index, with the current page in full under current_page (JSON):
@@ -66,9 +81,10 @@ final class AssistantPrompt {
     private AssistantPrompt() {
     }
 
-    static String build(LocalDate today, String page, String dishesJson, String guideJson, String pageElementsJson) {
+    static String build(LocalDate today, String page, String dishesJson, String guideJson, String pageElementsJson,
+                        String closuresJson) {
         String weekday = today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
         return TEMPLATE.formatted(today, weekday, today.minusDays(1), page == null ? "unknown" : page, dishesJson,
-                guideJson, pageElementsJson);
+                guideJson, pageElementsJson, today.plusDays(1), closuresJson);
     }
 }

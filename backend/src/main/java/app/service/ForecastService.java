@@ -18,6 +18,7 @@ import app.dto.ForecastResponse.FallbackReason;
 import app.dto.ForecastResponse.Method;
 import app.dto.MlPredictionRequest;
 import app.exception.InvalidForecastDateException;
+import app.exception.StallClosedException;
 import app.sale.DailySale;
 import app.service.BaselineForecaster.Estimate;
 import app.service.BaselineForecaster.Observation;
@@ -42,14 +43,16 @@ public class ForecastService {
     private final NeaWeatherForecastService neaWeatherForecastService;
     private final PublicHolidayService publicHolidayService;
     private final MlForecastClient mlForecastClient;
+    private final StallClosureService stallClosureService;
     private final Clock clock;
 
     public ForecastService(ForecastDataService forecastDataService, NeaWeatherForecastService neaWeatherForecastService, PublicHolidayService publicHolidayService,
-                           MlForecastClient mlForecastClient, Clock clock) {
+                           MlForecastClient mlForecastClient, StallClosureService stallClosureService, Clock clock) {
         this.forecastDataService = forecastDataService;
         this.neaWeatherForecastService = neaWeatherForecastService;
         this.publicHolidayService = publicHolidayService;
         this.mlForecastClient = mlForecastClient;
+        this.stallClosureService = stallClosureService;
         this.clock = clock;
     }
 
@@ -60,6 +63,9 @@ public class ForecastService {
         }
 
         Dish dish = forecastDataService.getOwnedDish(dishId, ownerId);
+        stallClosureService.closureMessage(ownerId, date).ifPresent(message -> {
+            throw new StallClosedException(message);
+        });
         List<DailySale> sales = forecastDataService.getSalesHistory(dish.getId(), date);
         List<Observation> history = sales.stream()
                 .map(sale -> new Observation(sale.getSaleDate(), sale.getQuantitySold()))

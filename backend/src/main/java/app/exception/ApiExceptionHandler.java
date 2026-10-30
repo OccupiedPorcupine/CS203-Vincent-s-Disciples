@@ -78,6 +78,11 @@ public class ApiExceptionHandler {
         return ResponseEntity.badRequest().body(new ErrorResponse("INVALID_FORECAST_DATE", ex.getMessage()));
     }
 
+    @ExceptionHandler(StallClosedException.class)
+    public ResponseEntity<ErrorResponse> stallClosed(StallClosedException exception) {
+        return ResponseEntity.badRequest().body(new ErrorResponse("STALL_CLOSED", exception.getMessage()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> invalidRequest(IllegalArgumentException exception) {
         return ResponseEntity.badRequest()
