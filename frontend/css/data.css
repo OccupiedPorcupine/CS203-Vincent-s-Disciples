@@ -6,6 +6,10 @@
   --teal-soft: #e6f3f1;
   --border: #dfe5e4;
   --surface: #fffefc;
+  --error: #b3261e;
+  --error-soft: #fdecea;
+  --warning: #7a4b00;
+  --warning-soft: #fff1d6;
 }
 
 * { box-sizing: border-box; }
@@ -123,14 +127,24 @@ button { font: inherit; }
 .primary-button:hover { background: var(--teal-dark); }
 .primary-button:disabled { cursor: not-allowed; opacity: .45; }
 .text-button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.secondary-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+}
+.secondary-button:hover { border-color: var(--teal); background: var(--teal-soft); }
 .status-message { min-height: 20px; margin: 10px 0 0; color: var(--muted); font-size: 13px; }
-.status-message.error { color: #b24a43; }
+.status-message.error { color: var(--error); }
 .status-message.success { color: var(--teal-dark); }
 
 .source-table { margin-top: 20px; border-top: 1px solid var(--border); }
 .source-row {
   display: grid;
-  grid-template-columns: minmax(240px, 1.7fr) 1fr .6fr 1fr;
+  grid-template-columns: minmax(200px, 1.6fr) 1fr .5fr .9fr 1fr;
   gap: 24px;
   align-items: center;
   min-height: 76px;
@@ -145,20 +159,66 @@ button { font: inherit; }
 .source-name span { margin-top: 5px; color: var(--muted); font: 11px monospace; }
 .usage { width: fit-content; padding: 6px 9px; border-radius: 999px; background: #f0f2f2; color: var(--muted); font-size: 12px; }
 .usage.active { background: var(--teal-soft); color: var(--teal-dark); }
+.source-import { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.source-import span { color: var(--muted); font-size: 12px; }
+
+/* Import panel: one row per dish name in the file. */
+.import-table { margin-top: 20px; border-top: 1px solid var(--border); }
+.import-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.4fr) .4fr minmax(220px, 1.2fr);
+  gap: 24px;
+  align-items: center;
+  min-height: 64px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.import-choice { display: flex; align-items: center; gap: 8px; }
+.import-choice select {
+  min-width: 0;
+  flex: 1;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+}
+.usage.new-dish { flex: none; background: var(--warning-soft); color: var(--warning); }
+.usage[hidden] { display: none; }
+.import-existing { margin: 20px 0 0; padding: 0; border: 0; }
+.import-existing legend { margin-bottom: 10px; }
+.import-existing label { display: block; margin: 6px 0; cursor: pointer; }
+.import-errors {
+  max-height: 320px;
+  overflow: auto;
+  margin: 20px 0 0;
+  padding: 14px 14px 14px 32px;
+  border-radius: 8px;
+  background: var(--error-soft);
+  color: var(--error);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 .empty-state { padding: 42px 4px; border-bottom: 1px solid var(--border); color: var(--muted); text-align: center; }
 
-button:focus-visible, a:focus-visible, .drop-zone:focus-within { outline: 2px solid var(--teal); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, select:focus-visible, .drop-zone:focus-within { outline: 2px solid var(--teal); outline-offset: 3px; }
 
 @media (max-width: 760px) {
   .topbar { align-items: flex-start; padding: 18px 24px; }
   nav { gap: 14px; }
   nav a { padding: 5px 0 9px; }
-  .page { width: min(100% - 32px, 1120px); padding-top: 36px; }
+  /* Room below the last button for the assistant's floating mic. */
+  .page { width: min(100% - 32px, 1120px); padding-top: 36px; padding-bottom: 104px; }
   .page-heading { display: block; }
   .count-label { display: inline-block; margin-top: 18px; }
   .source-header { display: none; }
   .source-row { grid-template-columns: 1fr auto; gap: 8px 18px; }
   .source-row > span:nth-child(2), .source-row > span:nth-child(3) { color: var(--muted); font-size: 12px; }
+  .import-row { grid-template-columns: 1fr auto; gap: 8px 18px; }
+  .import-choice { grid-column: 1 / -1; }
 }
 
 @media (max-width: 520px) {

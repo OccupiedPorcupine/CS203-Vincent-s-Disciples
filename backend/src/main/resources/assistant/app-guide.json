@@ -49,7 +49,9 @@
         { "guideId": "nav-forecast", "description": "Link to the Demand Forecast page, top of the page." },
         { "guideId": "upload-dropzone", "description": "Area to drop a CSV or XLSX file onto, or click to choose one (maximum 25 MB)." },
         { "guideId": "upload-button", "description": "Uploads the chosen file. Disabled until a file is chosen." },
-        { "guideId": "source-list", "description": "Table of uploaded files, when they were uploaded, their size and whether the model uses them." }
+        { "guideId": "source-list", "description": "Table of uploaded files, when they were uploaded, their size, whether the model uses them, and an Import sales button that turns a file's rows into daily sales." },
+        { "guideId": "import-panel", "description": "Shown after an upload or after pressing Import sales: what is in the file (rows, dates, problems by row) and, for each dish name in the file, which dish to record it as, a new dish, or leave it out. Days that already have sales can be kept or replaced." },
+        { "guideId": "import-button", "description": "Imports the file's rows into daily sales, inside the import panel. Nothing is saved before this is pressed." }
       ]
     }
   ],
@@ -81,11 +83,11 @@
     },
     {
       "id": "upload-training-data",
-      "summary": "Upload a file of past sales so the forecasting model can learn from it.",
+      "summary": "Upload a CSV or Excel file of past sales (a date, dish and quantity sold column) and import it, so the dashboard and forecasts can use it without typing the sales in.",
       "steps": [
         { "page": "data", "guideId": "upload-dropzone", "message": "Drop your CSV or Excel file here, or click to choose it." },
         { "page": "data", "guideId": "upload-button", "message": "Then press Upload source." },
-        { "page": "data", "guideId": "source-list", "message": "Your uploaded files are listed here." }
+        { "page": "data", "guideId": "source-list", "message": "After uploading, check how each dish name will be recorded and press Import. Your files are listed here, with an Import sales button to import one again." }
       ]
     }
   ]
