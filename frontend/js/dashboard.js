@@ -28,7 +28,7 @@ const sum = values => values.reduce((total, value) => total + value, 0);
 // Charts by canvas ID, so they can be redrawn after new sales are saved.
 const charts = {};
 
-// Same chart style as the forecast page's history chart.
+// Colours and fonts come from js/chart-theme.js, shared with the forecast page.
 function drawChart(canvasId, type, label, labels, values) {
   charts[canvasId]?.destroy();
 
@@ -41,9 +41,7 @@ function drawChart(canvasId, type, label, labels, values) {
       datasets: [{
         label,
         data: values,
-        borderWidth: 2,
-        tension: 0.3,
-        pointRadius: 4
+        ...(type === "bar" ? chickyChart.recordedBar : chickyChart.recordedLine)
       }]
     },
 

@@ -113,10 +113,13 @@ public class TrainingDataSourceService {
         }
     }
 
-    private TrainingDataSourceResponse toResponse(TrainingDataSource source) {
+    public TrainingDataSourceResponse toResponse(TrainingDataSource source) {
         return new TrainingDataSourceResponse(
                 source.getId(), source.getOriginalFilename(), source.getContentType(), source.getSizeBytes(),
-                source.getSha256(), source.getStatus(), source.isUsedByModel(), source.getUploadedAt()
+                source.getSha256(), source.getStatus(), source.isUsedByModel(), source.getUploadedAt(),
+                source.getImportedAt() == null ? null : new TrainingDataSourceResponse.LastImport(
+                        source.getImportedAt(), source.getImportRowsAdded(),
+                        source.getImportRowsOverwritten(), source.getImportRowsSkipped())
         );
     }
 }

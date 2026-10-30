@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Style guide · Chicky</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/base.css">
+  <style>
+    /* Layout for this page only. Everything it shows comes from base.css. */
+    .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 20px; }
+    .swatch { border: 1px solid var(--divider); border-radius: var(--radius-md); overflow: hidden; background: var(--surface); font-size: var(--text-xs); }
+    .swatch span { display: block; height: 48px; }
+    .swatch p { padding: 8px 10px; }
+    .swatch code { color: var(--muted); }
+    .type-scale { display: grid; gap: 12px; margin-top: 20px; }
+    .type-scale p { display: flex; align-items: baseline; gap: 16px; }
+    .type-scale code { width: 120px; flex: none; color: var(--muted); font-size: var(--text-xs); }
+    .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 20px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 20px; }
+    .ui-font { font-family: var(--font-ui); }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <details class="navigation" open>
+      <summary aria-label="Menu"><img src="../images/dashboard/sidebar.svg" alt=""></summary>
+      <nav class="menu-panel" aria-label="Main navigation">
+        <a href="#colour" aria-current="page">Current page</a>
+        <a href="#type">Another page</a>
+      </nav>
+    </details>
+    <a class="brand" href="#">Chicky</a>
+    <details class="account-menu">
+      <summary class="avatar" aria-label="Your account"><img src="../images/dashboard/avatar.png" alt=""></summary>
+      <div class="menu-panel">
+        <p class="account-name">Mei Ling</p>
+        <p class="account-email">mei@example.com</p>
+        <button class="secondary-button" type="button">Log out</button>
+      </div>
+    </details>
+  </header>
+
+  <main class="page" style="padding-top: 160px">
+    <section class="page-heading">
+      <div>
+        <h1>Style guide</h1>
+        <p class="lede">Every token and shared component in css/base.css. See frontend/DESIGN.md for when to use each.</p>
+      </div>
+      <span class="tag is-active">Page-level tag</span>
+    </section>
+
+    <section class="section" id="colour">
+      <div class="section-heading">
+        <h2>Colour</h2>
+        <p>Teal is the only accent. Text is ink or muted, never pure black.</p>
+      </div>
+      <div class="swatches">
+        <div class="swatch"><span style="background: var(--ink)"></span><p>Ink<br><code>--ink #425664</code></p></div>
+        <div class="swatch"><span style="background: var(--muted)"></span><p>Muted<br><code>--muted #66767f</code></p></div>
+        <div class="swatch"><span style="background: var(--subtle)"></span><p>Subtle<br><code>--subtle #9aa6af</code></p></div>
+        <div class="swatch"><span style="background: var(--teal)"></span><p>Teal<br><code>--teal #1ba098</code></p></div>
+        <div class="swatch"><span style="background: var(--teal-strong)"></span><p>Teal strong<br><code>--teal-strong #0f7d77</code></p></div>
+        <div class="swatch"><span style="background: var(--teal-soft)"></span><p>Teal soft<br><code>--teal-soft #d9efec</code></p></div>
+        <div class="swatch"><span style="background: var(--teal-tint)"></span><p>Teal tint<br><code>--teal-tint #ebf6f5</code></p></div>
+        <div class="swatch"><span style="background: var(--neutral-soft)"></span><p>Neutral soft<br><code>--neutral-soft #f1f4f5</code></p></div>
+        <div class="swatch"><span style="background: var(--page)"></span><p>Page<br><code>--page #fffcf5</code></p></div>
+        <div class="swatch"><span style="background: var(--border)"></span><p>Border<br><code>--border #d8dce1</code></p></div>
+        <div class="swatch"><span style="background: var(--error)"></span><p>Error<br><code>--error #b3261e</code></p></div>
+        <div class="swatch"><span style="background: var(--warning-soft)"></span><p>Warning soft<br><code>--warning-soft #fff1d6</code></p></div>
+        <div class="swatch"><span style="background: var(--header-gradient)"></span><p>Header<br><code>--header-gradient</code></p></div>
+      </div>
+    </section>
+
+    <section class="section" id="type">
+      <div class="section-heading">
+        <h2>Type</h2>
+        <p>Kaisei HarunoUmi at weight 400 for the app. Inter for the assistant’s own surfaces.</p>
+      </div>
+      <div class="type-scale">
+        <p><code>--text-number 40</code><span style="font-size: var(--text-number); line-height: 1">838</span></p>
+        <p><code>--text-xl 32</code><span style="font-size: var(--text-xl)">Page title</span></p>
+        <p><code>--text-lg 20</code><span style="font-size: var(--text-lg)">Section heading</span></p>
+        <p><code>--text-md 16</code><span>Body text and card titles</span></p>
+        <p><code>--text-sm 14</code><span style="font-size: var(--text-sm)">Controls, labels, table cells</span></p>
+        <p><code>--text-xs 12</code><span style="font-size: var(--text-xs); color: var(--muted)">Captions and metadata</span></p>
+        <p><code>--font-ui</code><span class="ui-font">Inter: Chicky assistant, guided tour</span></p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <h2>Buttons and tags</h2>
+        <p>One primary button per view.</p>
+      </div>
+      <div class="row">
+        <button class="primary-button" type="button">Generate forecast</button>
+        <button class="secondary-button" type="button">Cancel</button>
+        <button class="text-button" type="button">Remove</button>
+        <button class="primary-button" type="button" disabled>Disabled</button>
+        <div class="segmented" role="group" aria-label="Example view">
+          <button type="button" aria-pressed="true">Last 7 days</button>
+          <button type="button" aria-pressed="false">Same weekday</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="tag">Available for training</span>
+        <span class="tag is-active">Used by active model</span>
+        <span class="tag is-warning">New dish</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <h2>Cards and fields</h2>
+        <p>Cards hold one idea each. Fields stack a label above a 40px control.</p>
+      </div>
+      <div class="grid-2">
+        <section class="card">
+          <div class="headline">
+            <h3 class="card-title">Expected demand</h3>
+            <span class="number">47<span class="unit"> portions</span></span>
+            <span class="note">Saturday, 31 Oct</span>
+          </div>
+        </section>
+        <section class="card">
+          <div class="field">
+            <label for="sg-dish">Dish</label>
+            <div class="select-wrap">
+              <select id="sg-dish" class="input"><option>Chicken rice</option></select>
+            </div>
+          </div>
+          <div class="field" style="margin-top: 12px">
+            <label for="sg-date">Forecast date</label>
+            <input id="sg-date" class="input" type="text" placeholder="Choose a date">
+          </div>
+          <p class="status-text is-error">Choose a forecast date first.</p>
+          <p class="status-text is-success">Source uploaded and available for training.</p>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -46,6 +46,12 @@ public class TrainingDataSource {
     @Column(nullable = false)
     private Instant uploadedAt;
 
+    // The latest import into daily sales; null until imported.
+    private Instant importedAt;
+    private Integer importRowsAdded;
+    private Integer importRowsOverwritten;
+    private Integer importRowsSkipped;
+
     protected TrainingDataSource() {}
 
     public TrainingDataSource(AppUser owner, String originalFilename, String contentType,
@@ -69,4 +75,16 @@ public class TrainingDataSource {
     public String getStatus() { return status; }
     public boolean isUsedByModel() { return usedByModel; }
     public Instant getUploadedAt() { return uploadedAt; }
+    public String getStoredPath() { return storedPath; }
+    public Instant getImportedAt() { return importedAt; }
+    public Integer getImportRowsAdded() { return importRowsAdded; }
+    public Integer getImportRowsOverwritten() { return importRowsOverwritten; }
+    public Integer getImportRowsSkipped() { return importRowsSkipped; }
+
+    public void recordImport(Instant at, int added, int overwritten, int skipped) {
+        this.importedAt = at;
+        this.importRowsAdded = added;
+        this.importRowsOverwritten = overwritten;
+        this.importRowsSkipped = skipped;
+    }
 }
