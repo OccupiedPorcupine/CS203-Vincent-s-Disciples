@@ -8,6 +8,7 @@ public record SalesImportResponse(
         int rowsSkipped,
         int rowsLeftOut,
         List<CreatedDish> createdDishes,
+        int pricesSet,
         TrainingDataSourceResponse source
 ) {
     public record CreatedDish(Long id, String name) {}

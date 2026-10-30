@@ -9,6 +9,7 @@ import app.dish.DishRepository;
 import app.dto.SalesImportPreviewResponse;
 import app.dto.SalesImportRequest;
 import app.dto.SalesImportResponse;
+import app.price.DishPriceService;
 import app.salesimport.SalesFileReader.RowError;
 import app.salesimport.SalesFileReader.SalesFile;
 import app.salesimport.SalesFileReader.SalesRow;
@@ -47,12 +48,14 @@ public class SalesImportService {
     private final DishAliasService dishAliasService;
     private final DailySaleService dailySaleService;
     private final DailySaleRepository saleRepository;
+    private final DishPriceService priceService;
     private final Clock clock;
 
     public SalesImportService(TrainingDataSourceRepository sources, TrainingDataSourceService sourceService,
                               DishRepository dishRepository, DishAliasRepository aliasRepository,
                               DishService dishService, DishAliasService dishAliasService,
-                              DailySaleService dailySaleService, DailySaleRepository saleRepository, Clock clock) {
+                              DailySaleService dailySaleService, DailySaleRepository saleRepository,
+                              DishPriceService priceService, Clock clock) {
         this.sources = sources;
         this.sourceService = sourceService;
         this.dishRepository = dishRepository;
@@ -61,6 +64,7 @@ public class SalesImportService {
         this.dishAliasService = dishAliasService;
         this.dailySaleService = dailySaleService;
         this.saleRepository = saleRepository;
+        this.priceService = priceService;
         this.clock = clock;
     }
 
@@ -75,6 +79,7 @@ public class SalesImportService {
         SalesFile file = read(source);
         Map<String, NameInFile> names = groupByName(file.rows());
         Map<String, MatchedDish> matches = match(ownerId, names.keySet());
+        Map<String, SalesFileReader.FilePrice> prices = filePrices(file);
 
         Map<Long, Set<LocalDate>> salesDates = new HashMap<>();
         List<SalesImportPreviewResponse.DishInFile> dishes = new ArrayList<>();
@@ -88,13 +93,16 @@ public class SalesImportService {
                 existing = (int) name.rows().stream().map(SalesRow::date).distinct().filter(dates::contains).count();
             }
             rowsWithExistingSales += existing;
+            SalesFileReader.FilePrice price = prices.get(entry.getKey());
             dishes.add(new SalesImportPreviewResponse.DishInFile(
                     name.name(),
                     name.rows().size(),
                     name.rows().stream().mapToLong(SalesRow::quantity).sum(),
                     matched == null ? null : new SalesImportPreviewResponse.Match(
                             matched.dish().getId(), matched.dish().getName(), matched.by()),
-                    existing));
+                    existing,
+                    price == null ? null : price.price(),
+                    price == null ? null : price.unitCost()));
         }
 
         // Rows that land on the same dish and day are added together: a name repeated on one day,
@@ -209,6 +217,16 @@ public class SalesImportService {
             names.get(key).rows().forEach(row -> byDate.merge(row.date(), row.quantity(), Integer::sum));
         });
 
+        // Prices from the file, only for dishes without one, from the first day of their sales.
+        Map<String, SalesFileReader.FilePrice> prices = filePrices(file);
+        int pricesSet = 0;
+        for (Map.Entry<String, Dish> entry : targets.entrySet()) {
+            SalesFileReader.FilePrice price = prices.get(entry.getKey());
+            if (price == null) continue;
+            LocalDate firstDay = names.get(entry.getKey()).rows().stream().map(SalesRow::date).min(Comparator.naturalOrder()).orElseThrow();
+            if (priceService.setPriceIfMissing(entry.getValue(), firstDay, price.price(), price.unitCost())) pricesSet++;
+        }
+
         boolean overwrite = request.existingSales() == SalesImportRequest.ExistingSales.OVERWRITE;
         int added = 0, overwritten = 0, skipped = 0;
         for (Map.Entry<Long, Map<LocalDate, Integer>> entry : quantities.entrySet()) {
@@ -220,10 +238,17 @@ public class SalesImportService {
         }
 
         source.recordImport(clock.instant(), added, overwritten, skipped);
-        log.info("Imported source {} for user {}: {} added, {} overwritten, {} skipped, {} left out, {} new dishes",
-                sourceId, ownerId, added, overwritten, skipped, rowsLeftOut, createdDishes.size());
-        return new SalesImportResponse(added, overwritten, skipped, rowsLeftOut, createdDishes,
+        log.info("Imported source {} for user {}: {} added, {} overwritten, {} skipped, {} left out, {} new dishes, {} prices set",
+                sourceId, ownerId, added, overwritten, skipped, rowsLeftOut, createdDishes.size(), pricesSet);
+        return new SalesImportResponse(added, overwritten, skipped, rowsLeftOut, createdDishes, pricesSet,
                 sourceService.toResponse(source));
+    }
+
+    // Keyed by normalised name, like the sales rows.
+    private static Map<String, SalesFileReader.FilePrice> filePrices(SalesFile file) {
+        Map<String, SalesFileReader.FilePrice> prices = new HashMap<>();
+        file.prices().forEach((name, price) -> prices.put(DishAlias.normalize(name), price));
+        return prices;
     }
 
     private TrainingDataSource findSource(Long ownerId, Long sourceId) {

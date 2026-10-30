@@ -2,10 +2,16 @@ package app.config;
 
 import app.service.PublicHolidaySyncService;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationInfo;
+import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -21,8 +27,16 @@ class SchemaValidationTest {
     @Autowired
     Flyway flyway;
 
+    // Every migration on the classpath ran. Compares with the newest one found rather than a fixed
+    // number, so branches that each add a migration don't all edit (and conflict on) this line.
     @Test
     void migrationsMatchEntities() {
-        assertEquals("10", flyway.info().current().getVersion().getVersion());
+        MigrationVersion newest = Arrays.stream(flyway.info().all())
+                .map(MigrationInfo::getVersion)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElseThrow();
+        assertEquals(newest, flyway.info().current().getVersion());
+        assertEquals(0, flyway.info().pending().length);
     }
 }

@@ -7,6 +7,8 @@ import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,23 +22,38 @@ import java.util.function.IntFunction;
 // sold. Column names vary (date / dish or item / quantity_sold or qty sold), the header can
 // sit below a title row, and in a workbook the first sheet with those columns is used, e.g.
 // "Daily Item Sales" in hawker_sales.xlsx. Other columns are ignored.
+//
+// Prices are optional (issue #43): a menu sheet in a workbook (an item column and a price column,
+// such as "Menu" in hawker_sales.xlsx), or else price and unit cost columns on the sales rows,
+// taking each dish's latest row. A price that can't be read is skipped, never an error.
 public final class SalesFileReader {
 
     public record SalesRow(int row, LocalDate date, String dish, int quantity) {}
 
     public record RowError(Integer row, String column, String message) {}
 
+    // unitCost is null when the file has no cost.
+    public record FilePrice(BigDecimal price, BigDecimal unitCost) {}
+
     // sheet is null for CSV. errors holds the first MAX_ERRORS; errorCount is the total.
-    public record SalesFile(String sheet, List<SalesRow> rows, List<RowError> errors, int errorCount) {}
+    // prices is keyed by dish name as written in the file.
+    public record SalesFile(String sheet, List<SalesRow> rows, List<RowError> errors, int errorCount,
+                            Map<String, FilePrice> prices) {}
 
     static final int MAX_ERRORS = 50;
     static final int MAX_QUANTITY = 100_000;
+    static final BigDecimal MAX_PRICE = new BigDecimal("10000");
     private static final int HEADER_SEARCH_ROWS = 10;
 
     private static final Set<String> DATE_HEADERS = Set.of("date", "sale date", "sales date", "business date");
     private static final Set<String> DISH_HEADERS = Set.of("dish", "dish name", "item", "item name", "menu item", "product");
     private static final Set<String> QUANTITY_HEADERS = Set.of(
             "quantity sold", "quantity", "qty sold", "qty", "portions", "portions sold", "units sold", "sold");
+    // Per portion only: "Revenue (S$)" or "COGS (S$)" are totals and don't match.
+    private static final Set<String> PRICE_HEADERS = Set.of(
+            "price", "unit price", "selling price", "price s", "unit price s", "selling price s", "price sgd", "unit price sgd");
+    private static final Set<String> COST_HEADERS = Set.of(
+            "unit cost", "cost per portion", "cost per unit", "unit cost s", "unit cost sgd", "cost", "cost s");
 
     // Day first, as written in Singapore: 1/7/2026 is 1 July. Strict, so 31/6/2026 is an error
     // rather than quietly becoming 30 June ("uuuu" because strict "yyyy" also needs an era).
@@ -78,8 +95,13 @@ public final class SalesFileReader {
             FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
             for (Sheet sheet : workbook) {
                 if (findHeader(sheet.getLastRowNum() + 1, row -> new SheetRow(sheet.getRow(row), evaluator)) != null) {
-                    return readTable(sheet.getSheetName(), sheet.getLastRowNum() + 1,
+                    SalesFile sales = readTable(sheet.getSheetName(), sheet.getLastRowNum() + 1,
                             row -> new SheetRow(sheet.getRow(row), evaluator), today);
+                    Map<String, FilePrice> prices = new LinkedHashMap<>(sales.prices());
+                    for (Sheet other : workbook) {
+                        if (other != sheet) prices.putAll(readMenu(other, evaluator));
+                    }
+                    return new SalesFile(sales.sheet(), sales.rows(), sales.errors(), sales.errorCount(), prices);
                 }
             }
             return missingColumns();
@@ -105,7 +127,8 @@ public final class SalesFileReader {
         }
     }
 
-    private record Header(int row, int date, int dish, int quantity) {}
+    // price and cost are -1 when the file has no such column.
+    private record Header(int row, int date, int dish, int quantity, int price, int cost) {}
 
     // Keeps the first MAX_ERRORS errors and counts the rest.
     private static final class Errors {
@@ -124,6 +147,8 @@ public final class SalesFileReader {
 
         List<SalesRow> sales = new ArrayList<>();
         Errors errors = new Errors();
+        Map<String, LocalDate> priceDates = new HashMap<>();
+        Map<String, FilePrice> prices = new LinkedHashMap<>();
 
         for (int index = header.row() + 1; index < rowCount; index++) {
             Row row = rows.apply(index);
@@ -161,24 +186,85 @@ public final class SalesFileReader {
 
             if (errors.count == errorsBefore) {
                 sales.add(new SalesRow(rowNumber, date, dish, quantity));
+                FilePrice price = readPrice(row, header.price(), header.cost());
+                if (price != null && !date.isBefore(priceDates.getOrDefault(dish, LocalDate.MIN))) {
+                    priceDates.put(dish, date);
+                    prices.put(dish, price);
+                }
             }
         }
-        return new SalesFile(sheet, sales, errors.kept, errors.count);
+        return new SalesFile(sheet, sales, errors.kept, errors.count, prices);
     }
 
     private static Header findHeader(int rowCount, IntFunction<Row> rows) {
         for (int index = 0; index < Math.min(rowCount, HEADER_SEARCH_ROWS); index++) {
             Row row = rows.apply(index);
-            int date = -1, dish = -1, quantity = -1;
+            int date = -1, dish = -1, quantity = -1, price = -1, cost = -1;
             for (int column = 0; column < 50; column++) {
                 String name = headerName(row.text(column));
                 if (date < 0 && DATE_HEADERS.contains(name)) date = column;
                 else if (dish < 0 && DISH_HEADERS.contains(name)) dish = column;
                 else if (quantity < 0 && QUANTITY_HEADERS.contains(name)) quantity = column;
+                else if (price < 0 && PRICE_HEADERS.contains(name)) price = column;
+                else if (cost < 0 && COST_HEADERS.contains(name)) cost = column;
             }
-            if (date >= 0 && dish >= 0 && quantity >= 0) return new Header(index, date, dish, quantity);
+            if (date >= 0 && dish >= 0 && quantity >= 0) return new Header(index, date, dish, quantity, price, cost);
         }
         return null;
+    }
+
+    // A sheet with an item column and a price column but no dates, e.g. "Menu" in hawker_sales.xlsx.
+    private static Map<String, FilePrice> readMenu(Sheet sheet, FormulaEvaluator evaluator) {
+        Map<String, FilePrice> prices = new LinkedHashMap<>();
+        int rowCount = sheet.getLastRowNum() + 1;
+        for (int index = 0; index < Math.min(rowCount, HEADER_SEARCH_ROWS); index++) {
+            Row header = new SheetRow(sheet.getRow(index), evaluator);
+            int dish = -1, price = -1, cost = -1, date = -1;
+            for (int column = 0; column < 50; column++) {
+                String name = headerName(header.text(column));
+                if (dish < 0 && DISH_HEADERS.contains(name)) dish = column;
+                else if (price < 0 && PRICE_HEADERS.contains(name)) price = column;
+                else if (cost < 0 && COST_HEADERS.contains(name)) cost = column;
+                else if (date < 0 && DATE_HEADERS.contains(name)) date = column;
+            }
+            if (dish < 0 || price < 0 || date >= 0) continue;
+
+            for (int rowIndex = index + 1; rowIndex < rowCount; rowIndex++) {
+                Row row = new SheetRow(sheet.getRow(rowIndex), evaluator);
+                String name = row.text(dish).strip();
+                FilePrice filePrice = readPrice(row, price, cost);
+                if (!name.isEmpty() && name.length() <= 100 && filePrice != null) prices.put(name, filePrice);
+            }
+            return prices;
+        }
+        return prices;
+    }
+
+    private static FilePrice readPrice(Row row, int priceColumn, int costColumn) {
+        if (priceColumn < 0) return null;
+        BigDecimal price = parseMoney(row.number(priceColumn), row.text(priceColumn));
+        if (price == null) return null;
+        BigDecimal cost = costColumn < 0 ? null : parseMoney(row.number(costColumn), row.text(costColumn));
+        return new FilePrice(price, cost);
+    }
+
+    // "4.5", "$4.50", "S$ 4.50" → 4.50. Null if it isn't an amount from 0 to MAX_PRICE.
+    static BigDecimal parseMoney(Double number, String text) {
+        BigDecimal value;
+        if (number != null) {
+            if (number.isNaN() || number.isInfinite()) return null;
+            value = BigDecimal.valueOf(number);
+        } else {
+            String cleaned = text.strip().replaceFirst("^(?i)(S\\$|SGD|\\$)\\s*", "").replace(",", "");
+            if (cleaned.isEmpty()) return null;
+            try {
+                value = new BigDecimal(cleaned);
+            } catch (NumberFormatException exception) {
+                return null;
+            }
+        }
+        if (value.signum() < 0 || value.compareTo(MAX_PRICE) > 0) return null;
+        return value.setScale(2, RoundingMode.HALF_UP);
     }
 
     private static SalesFile missingColumns() {
@@ -187,7 +273,7 @@ public final class SalesFileReader {
     }
 
     private static SalesFile fileError(String message) {
-        return new SalesFile(null, List.of(), List.of(new RowError(null, null, message)), 1);
+        return new SalesFile(null, List.of(), List.of(new RowError(null, null, message)), 1, Map.of());
     }
 
     // "Qty Sold", "quantity_sold" and "QUANTITY-SOLD" are all "qty sold" / "quantity sold".

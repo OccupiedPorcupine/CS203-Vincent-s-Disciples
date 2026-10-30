@@ -1,6 +1,5 @@
 package app.exception;
 
-import java.util.Map;
 import app.assistant.AssistantException;
 import app.dto.ErrorResponse;
 import app.dto.SalesImportErrorResponse;
@@ -75,8 +74,8 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(InvalidForecastDateException.class)
-    public ResponseEntity<Map<String, String>> handleInvalidForecastDate(InvalidForecastDateException ex) {
-        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    public ResponseEntity<ErrorResponse> handleInvalidForecastDate(InvalidForecastDateException ex) {
+        return ResponseEntity.badRequest().body(new ErrorResponse("INVALID_FORECAST_DATE", ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
