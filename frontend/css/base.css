@@ -1,0 +1,300 @@
+/* Chicky design tokens and shared components. Load before any page stylesheet.
+   The rules behind these values are in frontend/DESIGN.md: change them there and here together. */
+:root {
+  /* Colour */
+  --ink: #425664;            /* text, icons, recorded data */
+  --muted: #66767f;          /* secondary text; 4.6:1 on --page */
+  --subtle: #9aa6af;         /* decorative or switched-off icons only, never text */
+  --teal: #1ba098;           /* brand accent: focus ring, selected outlines, predictions, icon fills */
+  --teal-strong: #0f7d77;    /* teal behind or as text: buttons, user bubbles, success text */
+  --teal-hover: #0b6a65;
+  --teal-soft: #d9efec;      /* selected state */
+  --teal-tint: #ebf6f5;      /* hover state */
+  --neutral-soft: #f1f4f5;   /* neutral hover, assistant bubbles, inactive tags */
+  --border: #d8dce1;         /* control and card outlines */
+  --divider: #e6e8eb;        /* rules between rows and sections */
+  --page: #fffcf5;           /* warm cream page background */
+  --surface: #fff;           /* cards, controls, menus */
+  --surface-muted: #fbfcfc;  /* inset areas: drop zone, cards inside the assistant */
+  --error: #b3261e;
+  --error-soft: #fdecea;
+  --warning: #7a4b00;
+  --warning-soft: #fff1d6;
+  --header-gradient: linear-gradient(90deg, #a9dcd6 0%, #dfe5dc 55%, #f5e3d2 100%);
+
+  /* Type */
+  --font-display: "Kaisei HarunoUmi", Georgia, "Times New Roman", serif;
+  --font-ui: Inter, Arial, sans-serif;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 32px;
+  --text-number: 40px;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 2px 3px 3px rgb(0 0 0 / 22%);
+  --shadow-menu: 0 8px 24px rgb(66 86 100 / 13%);
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 18%);
+  --control-height: 40px;
+
+  /* Motion. js/guide.js mirrors these durations. */
+  --duration-fast: 160ms;    /* menus, hover */
+  --duration-base: 300ms;    /* fades, page changes */
+  --duration-slow: 450ms;    /* the tour's spotlight moving */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Base */
+*, *::before, *::after { box-sizing: border-box; }
+html { min-height: 100%; }
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  background: var(--page);
+  font: var(--text-md)/1.5 var(--font-display);
+}
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { font-weight: 400; line-height: 1.25; }
+button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* App header: menu, wordmark, account */
+.topbar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 12px 24px;
+  background: var(--header-gradient);
+}
+.brand { color: var(--teal-strong); font-size: 24px; text-decoration: none; }
+/* Both header menus are <details>: js/app-shell.js closes them on an outside click or Escape. */
+.topbar details { position: relative; }
+.topbar summary { list-style: none; cursor: pointer; }
+.topbar summary::-webkit-details-marker { display: none; }
+.menu-panel {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  width: 220px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease-out); }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-4px); } }
+
+.navigation summary {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  transition: background var(--duration-fast);
+}
+.navigation summary:hover { background: rgb(255 255 255 / 40%); }
+.navigation summary img { width: 24px; height: 24px; opacity: 0.6; }
+.navigation a {
+  display: block;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  text-decoration: none;
+}
+.navigation a:hover { background: var(--teal-tint); }
+.navigation a[aria-current="page"] { background: var(--teal-soft); }
+
+.account-menu { margin-left: auto; }
+.account-menu .menu-panel { right: 0; left: auto; width: 240px; padding: 16px; }
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--ink);
+  transition: box-shadow var(--duration-fast);
+}
+.avatar:hover, .account-menu[open] .avatar { box-shadow: 0 0 0 3px rgb(255 255 255 / 60%); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-name { overflow-wrap: anywhere; }
+.account-email { margin-bottom: 12px; color: var(--muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.account-menu .secondary-button { width: 100%; }
+.account-menu .status-text:empty { display: none; }
+
+/* Page layout */
+.page {
+  width: min(1120px, 100% - 48px);
+  margin: 0 auto;
+  padding: 40px 0 96px; /* bottom room so the assistant button never covers content */
+}
+.page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.page-heading h1 { font-size: var(--text-xl); }
+.lede { margin-top: 4px; color: var(--muted); }
+.eyebrow { color: var(--teal-strong); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; }
+
+.section { margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--divider); }
+.section-heading h2 { font-size: var(--text-lg); }
+.section-heading p { margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
+
+/* Cards */
+.card {
+  padding: 20px 24px;
+  border: 1px solid #f0ece4;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.card-title { margin-bottom: 12px; font-size: var(--text-md); }
+
+/* A big figure with its caption, e.g. "838 portions". */
+.headline { font-size: var(--text-sm); }
+.headline .number { display: block; margin-top: 4px; font-size: var(--text-number); line-height: 1.1; color: var(--ink); }
+.headline .unit { font-size: var(--text-md); }
+.headline .note { display: block; color: var(--muted); }
+
+/* Buttons */
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--control-height);
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.primary-button { border: 1px solid var(--teal-strong); background: var(--teal-strong); color: #fff; }
+.primary-button:hover { border-color: var(--teal-hover); background: var(--teal-hover); }
+.secondary-button { border: 1px solid var(--border); background: var(--surface); color: var(--ink); }
+.secondary-button:hover { background: var(--teal-tint); }
+.text-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--teal-strong);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+:is(.primary-button, .secondary-button, .text-button):disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Two to four mutually exclusive views; the chosen button has aria-pressed="true". */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--neutral-soft);
+}
+.segmented button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / 15%); }
+
+/* Form fields */
+.field { display: grid; gap: 4px; }
+.field > label, .field > legend { padding: 0; font-size: var(--text-sm); }
+fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.input {
+  width: 100%;
+  min-width: 0;
+  height: var(--control-height);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+.input::placeholder { color: var(--muted); opacity: 1; }
+.input:disabled { background: var(--neutral-soft); cursor: not-allowed; }
+.select-wrap { position: relative; }
+.select-wrap .input { appearance: none; padding-right: 36px; cursor: pointer; }
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* Inline feedback. Add .is-error or .is-success; never use alert(). */
+.status-text { min-height: 1.5em; margin-top: 8px; color: var(--muted); font-size: var(--text-sm); }
+.status-text.is-error { color: var(--error); }
+.status-text.is-success { color: var(--teal-strong); }
+
+/* Small labels, e.g. "Used by active model" */
+.tag {
+  display: inline-block;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--neutral-soft);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.tag.is-active { background: var(--teal-soft); color: var(--teal-strong); }
+.tag.is-warning { background: var(--warning-soft); color: var(--warning); }
+
+.empty-state { padding: 40px 4px; color: var(--muted); text-align: center; }
+
+/* Moving between pages: the header stays put while the page content cross-fades. The guided tour
+   skips the fade (js/guide.js) because it carries its own dimmed screen over to the next page;
+   the names are off during tours too, in case a browser runs the fade anyway.
+   The opt-in, @view-transition { navigation: auto; }, is an inline <style> in each page's <head>:
+   from this file Chrome sometimes reads it too late and skips the transition. */
+.topbar { view-transition-name: topbar; }
+.page { view-transition-name: page; }
+.guide-active :is(.topbar, .page) { view-transition-name: none; }
+::view-transition-old(page) { animation: page-out var(--duration-fast) ease-in both; }
+::view-transition-new(page) { animation: page-in var(--duration-base) var(--ease-out) 60ms both; }
+::view-transition-group(page) { animation-duration: var(--duration-base); }
+@keyframes page-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes page-in { from { opacity: 0; transform: translateY(10px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+
+@media (max-width: 760px) {
+  .topbar { padding: 12px 16px; }
+  .page { width: min(100% - 32px, 1120px); padding-top: 28px; }
+  .page-heading { display: block; }
+  .page-heading h1 { font-size: 28px; }
+}

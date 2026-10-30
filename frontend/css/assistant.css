@@ -1,12 +1,15 @@
-/* Voice assistant widget (js/assistant.js). Scoped to .assistant-* so it fits on every page. */
+/* Voice assistant widget (js/assistant.js). Scoped to .assistant-* so it fits on every page.
+   Colours come from base.css; the fallbacks keep it usable on a page that forgets to load it.
+   Assistant surfaces use the UI font (Inter), page content the display font (see DESIGN.md). */
 .assistant-bubble,
 .assistant-panel {
-  --assistant-ink: #425664;
-  --assistant-teal: #1ba098;
-  --assistant-teal-dark: #13807a;
-  --assistant-border: #d8dce1;
-  --assistant-error: #b3261e;
-  font-family: Inter, Arial, sans-serif;
+  --assistant-ink: var(--ink, #425664);
+  --assistant-muted: var(--muted, #66767f);
+  --assistant-teal: var(--teal-strong, #0f7d77);
+  --assistant-teal-dark: var(--teal-hover, #0b6a65);
+  --assistant-border: var(--border, #d8dce1);
+  --assistant-error: var(--error, #b3261e);
+  font-family: var(--font-ui, Inter, Arial, sans-serif);
   color: var(--assistant-ink);
   box-sizing: border-box;
 }
@@ -31,8 +34,11 @@
   background: var(--assistant-teal);
   box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
   cursor: pointer;
+  /* Kept out of the page cross-fade (base.css) so it never disappears behind the content. */
+  view-transition-name: assistant-bubble;
 }
 .assistant-bubble:hover { background: var(--assistant-teal-dark); }
+.guide-active .assistant-bubble { view-transition-name: none; }
 
 .assistant-panel {
   position: fixed;
@@ -46,7 +52,7 @@
   border: 1px solid var(--assistant-border);
   border-radius: 16px;
   background: #fff;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  box-shadow: var(--shadow-float, 0 8px 24px rgb(0 0 0 / 18%));
   overflow: hidden;
 }
 .assistant-panel[hidden] { display: none; }
@@ -73,8 +79,8 @@
   cursor: pointer;
 }
 .assistant-sound[hidden] { display: none; }
-.assistant-sound:hover { background: #f1f3f5; }
-.assistant-sound[aria-pressed="true"] { color: #9aa6af; }
+.assistant-sound:hover { background: var(--neutral-soft, #f1f4f5); }
+.assistant-sound[aria-pressed="true"] { color: var(--subtle, #9aa6af); }
 .assistant-close {
   width: 32px;
   height: 32px;
@@ -87,7 +93,7 @@
   line-height: 1;
   cursor: pointer;
 }
-.assistant-close:hover { background: #f1f3f5; }
+.assistant-close:hover { background: var(--neutral-soft, #f1f4f5); }
 
 .assistant-log {
   flex: 1;
@@ -106,23 +112,23 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.assistant-message.assistant { background: #f1f5f6; }
+.assistant-message.assistant { background: var(--neutral-soft, #f1f4f5); }
 .assistant-message.user { margin-left: auto; color: #fff; background: var(--assistant-teal); }
-.assistant-message.error { color: var(--assistant-error); background: #fdecea; }
+.assistant-message.error { color: var(--assistant-error); background: var(--error-soft, #fdecea); }
 
 .assistant-card {
   margin: 0 0 12px;
   padding: 12px;
   border: 1px solid var(--assistant-border);
   border-radius: 12px;
-  background: #fbfcfc;
+  background: var(--surface-muted, #fbfcfc);
   font-size: 14px;
 }
 .assistant-card-title { margin: 0 0 8px; font-weight: 600; }
 
 .assistant-entries { width: 100%; border-collapse: collapse; }
-.assistant-entries th { padding: 0 4px 6px; font-size: 12px; font-weight: 500; text-align: left; color: #6b7c88; }
-.assistant-entries td { padding: 4px; vertical-align: top; border-top: 1px solid #eef0f2; }
+.assistant-entries th { padding: 0 4px 6px; font-size: 12px; font-weight: 500; text-align: left; color: var(--assistant-muted); }
+.assistant-entries td { padding: 4px; vertical-align: top; border-top: 1px solid var(--divider, #e6e8eb); }
 .assistant-entries input {
   width: 100%;
   min-width: 0;
@@ -138,14 +144,14 @@
 .assistant-entries td:last-child { width: 28px; }
 .assistant-dish { overflow-wrap: anywhere; }
 .assistant-heard,
-.assistant-previous { display: block; margin-top: 2px; font-size: 12px; color: #6b7c88; }
+.assistant-previous { display: block; margin-top: 2px; font-size: 12px; color: var(--assistant-muted); }
 .assistant-tag {
   display: inline-block;
   padding: 0 6px;
   border-radius: 8px;
   font-size: 11px;
-  color: #7a4b00;
-  background: #fff1d6;
+  color: var(--warning, #7a4b00);
+  background: var(--warning-soft, #fff1d6);
 }
 .assistant-remove {
   width: 24px;
@@ -154,12 +160,12 @@
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #6b7c88;
+  color: var(--assistant-muted);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
 }
-.assistant-remove:hover { background: #f1f3f5; }
+.assistant-remove:hover { background: var(--neutral-soft, #f1f4f5); }
 
 .assistant-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .assistant-primary,
@@ -172,9 +178,9 @@
 .assistant-primary { border: 0; color: #fff; background: var(--assistant-teal); }
 .assistant-primary:hover { background: var(--assistant-teal-dark); }
 .assistant-secondary { border: 1px solid var(--assistant-border); color: var(--assistant-ink); background: #fff; }
-.assistant-card-note { margin: 8px 0 0; font-size: 13px; color: #6b7c88; }
+.assistant-card-note { margin: 8px 0 0; font-size: 13px; color: var(--assistant-muted); }
 
-.assistant-status { min-height: 18px; margin: 0; padding: 0 16px; font-size: 12px; color: #6b7c88; }
+.assistant-status { min-height: 18px; margin: 0; padding: 0 16px; font-size: 12px; color: var(--assistant-muted); }
 
 .assistant-input {
   display: flex;
@@ -206,7 +212,7 @@
   cursor: pointer;
   flex-shrink: 0;
 }
-.assistant-mic { color: var(--assistant-teal); background: #e8f6f5; }
+.assistant-mic { color: var(--assistant-teal); background: var(--teal-soft, #d9efec); }
 .assistant-mic.listening { color: #fff; background: var(--assistant-error); animation: assistant-pulse 1.2s ease-in-out infinite; }
 .assistant-send { color: #fff; background: var(--assistant-teal); }
 .assistant-panel button:disabled { opacity: 0.45; cursor: not-allowed; animation: none; }
@@ -218,16 +224,6 @@
 
 .assistant-bubble:focus-visible,
 .assistant-panel :is(button, input, textarea):focus-visible { outline: 2px solid var(--assistant-teal); outline-offset: 2px; }
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 
 @media (max-width: 600px) {
   .assistant-bubble { right: 16px; bottom: 16px; }

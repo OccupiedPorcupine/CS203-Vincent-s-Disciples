@@ -1,0 +1,107 @@
+# Runs on every pull request and on every push to main.
+# None of these jobs use secrets or touch the real Supabase project: the migrations job
+# starts Supabase's own Postgres image inside the runner and throws it away afterwards.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to the same branch cancels the run still going for the previous push.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      # Tests use H2 (src/test/resources/application.properties), so they never reach Supabase.
+      - run: ./mvnw -B verify
+
+  migrations:
+    name: Migrations on Supabase Postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Supabase's Postgres image, with the anon and authenticated roles the
+        # db/migration/postgresql scripts lock out. Main-database runs Postgres 17.
+        image: supabase/postgres:17.11.0.013
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -h localhost"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      SPRING_PROFILES_ACTIVE: supabase
+      DATABASE_URL: jdbc:postgresql://localhost:5432/postgres
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      GOOGLE_CLIENT_ID: ci-placeholder.apps.googleusercontent.com
+      ASSISTANT_PROVIDER: offline
+      TRAINING_DATA_STORAGE_PATH: /tmp/training-data
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build backend
+        working-directory: backend
+        run: ./mvnw -B -DskipTests package
+      # Starting the app runs every Flyway migration the way production does, then
+      # Hibernate checks that the entities match the resulting tables.
+      - name: Start backend against Supabase Postgres
+        working-directory: backend
+        run: |
+          java -jar target/*.jar > "$RUNNER_TEMP/backend.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api/config > /dev/null; then
+              echo "Backend started"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not start within 120 seconds"
+          exit 1
+      - name: Check every table is locked out of Supabase's Data API
+        run: psql -v ON_ERROR_STOP=1 -f scripts/ci/check-supabase-lockdown.sql
+      - name: Show backend log
+        if: always()
+        run: cat "$RUNNER_TEMP/backend.log"
+
+  ml:
+    name: ML tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: ml/requirements.txt
+      - run: pip install -r ml/requirements.txt
+      # Tests that need the trained model skip themselves, because ml/artifacts is not in Git.
+      - run: python -m pytest ml/tests

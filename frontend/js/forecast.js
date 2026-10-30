@@ -4,6 +4,7 @@ const forecastDateLabel = document.getElementById("forecast-date-label");
 const forecastButton = document.getElementById("forecast-button");
 const dishSelect = document.getElementById("dish-select");
 const historyNote = document.getElementById("history-note");
+const forecastStatus = document.getElementById("forecast-status");
 
 const toggleButtons = document.querySelectorAll(".toggle-button");
 
@@ -24,9 +25,7 @@ const historyChart = new Chart(chartContext, {
         datasets: [{
             label: "Portions sold",
             data: [],
-            borderWidth: 2,
-            tension: 0.3,
-            pointRadius: 4
+            ...chickyChart.recordedLine
         }]
     },
 
@@ -156,11 +155,9 @@ async function loadDishes() {
 toggleButtons.forEach(button => {
     button.addEventListener("click", () => {
 
-        toggleButtons.forEach(button => {
-            button.classList.remove("active");
+        toggleButtons.forEach(other => {
+            other.setAttribute("aria-pressed", String(other === button));
         });
-
-        button.classList.add("active");
 
         currentView = button.dataset.view;
         updateHistoryChart();
@@ -178,12 +175,13 @@ forecastButton.addEventListener("click", async () => {
     const forecastDate = forecastDateInput.value;
 
     if (!forecastDate) {
-        alert("Please select a forecast date.");
+        setForecastStatus("Choose a forecast date first.", true);
         return;
     }
 
     forecastButton.disabled = true;
-    forecastButton.textContent = "Generating...";
+    forecastButton.textContent = "Generating…";
+    setForecastStatus("");
 
     try {
         const result = await requestForecast(dishId, forecastDate);
@@ -204,12 +202,17 @@ forecastButton.addEventListener("click", async () => {
     } catch (error) {
         console.error(error);
 
-        alert("Unable to generate forecast.");
+        setForecastStatus("Couldn’t generate a forecast. Try again in a moment.", true);
     } finally {
         forecastButton.disabled = false;
-        forecastButton.textContent = "Generate Forecast";
+        forecastButton.textContent = "Generate forecast";
     }
 });
+
+function setForecastStatus(message, isError = false) {
+    forecastStatus.textContent = message;
+    forecastStatus.classList.toggle("is-error", isError);
+}
 
 async function requestForecast(dishId, forecastDate) {
     return apiRequest("/api/forecast", {
