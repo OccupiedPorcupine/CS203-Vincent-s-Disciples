@@ -30,7 +30,8 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository,
+                                                   @Value("${app.security.require-https:false}") boolean requireHttps) throws Exception {
 
         CsrfTokenRequestAttributeHandler csrfTokenRequestHandler = new CsrfTokenRequestAttributeHandler();
         csrfTokenRequestHandler.setCsrfRequestAttributeName(null);
@@ -68,8 +69,15 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/auth/google",
                                 "/api/auth/signup",
-                                "/api/auth/login"
+                                "/api/auth/login",
+                                "/api/auth/password-reset",
+                                "/api/auth/password-reset/confirm",
+                                "/api/auth/verify-email"
                         ).permitAll()
+
+                        // Error responses ({code, message}, see ApiErrorAttributes), so a 401 or 403
+                        // keeps its body instead of being refused a second time.
+                        .requestMatchers("/error").permitAll()
 
                         // Swagger / OpenAPI.
                         .requestMatchers(
@@ -104,6 +112,10 @@ public class SecurityConfig {
                         .logoutSuccessHandler((request, response, authentication) ->
                                 response.setStatus(HttpServletResponse.SC_NO_CONTENT))
                 );
+
+        if (requireHttps) {
+            http.redirectToHttps(Customizer.withDefaults());
+        }
 
         return http.build();
     }

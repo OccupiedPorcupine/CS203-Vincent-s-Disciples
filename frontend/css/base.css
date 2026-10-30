@@ -138,6 +138,8 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .account-name { overflow-wrap: anywhere; }
 .account-email { margin-bottom: 12px; color: var(--muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.account-unconfirmed { margin: -4px 0 12px; color: var(--warning); font-size: var(--text-xs); }
+.account-unconfirmed .text-button { font-size: var(--text-xs); }
 .account-menu .secondary-button { width: 100%; }
 .account-menu .status-text:empty { display: none; }
 

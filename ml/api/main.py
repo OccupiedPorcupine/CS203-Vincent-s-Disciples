@@ -1,7 +1,10 @@
+import hmac
+import os
 from contextlib import asynccontextmanager
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from ml.api.schemas import (
     HealthResponse,
@@ -32,6 +35,22 @@ app = FastAPI(
     title="Demand Forecasting Service",
     lifespan=lifespan,
 )
+
+
+# When ML_SHARED_SECRET is set, only callers that send it (the backend, as X-ML-Secret) are
+# served, apart from /health. For hosts where this service can't be kept off the internet;
+# on Vercel only the backend can reach it anyway (see deploy/README.md).
+@app.middleware("http")
+async def require_shared_secret(request: Request, call_next):
+    secret = os.environ.get("ML_SHARED_SECRET", "")
+    if secret and request.url.path != "/health":
+        sent = request.headers.get("x-ml-secret", "")
+        if not hmac.compare_digest(sent.encode(), secret.encode()):
+            return JSONResponse(
+                status_code=401,
+                content={"code": "ML_SECRET_REQUIRED", "message": "Missing or wrong X-ML-Secret header"},
+            )
+    return await call_next(request)
 
 
 @app.get(

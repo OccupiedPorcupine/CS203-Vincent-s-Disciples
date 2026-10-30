@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import app.account.AccountService;
+import app.account.AuthRateLimiter;
+import app.account.AuthRateLimiter.Limit;
 import app.dto.AuthResponse;
 import app.dto.LoginRequest;
 import app.dto.SignupRequest;
@@ -31,20 +34,28 @@ public class LocalAuthController {
 
     private final LocalAuthService localAuthService;
     private final SessionAuthenticationService sessionAuthenticationService;
+    private final AccountService accountService;
+    private final AuthRateLimiter rateLimiter;
 
     public LocalAuthController(
             LocalAuthService localAuthService,
-            SessionAuthenticationService sessionAuthenticationService
+            SessionAuthenticationService sessionAuthenticationService,
+            AccountService accountService,
+            AuthRateLimiter rateLimiter
     ) {
         this.localAuthService = localAuthService;
         this.sessionAuthenticationService = sessionAuthenticationService;
+        this.accountService = accountService;
+        this.rateLimiter = rateLimiter;
     }
 
-    @Operation(summary = "Sign up", description = "Creates a new local user account and starts an authenticated session.")
+    @Operation(summary = "Sign up", description = "Creates a new local user account, starts an authenticated session "
+            + "and emails a link to confirm the address.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Account created successfully"),
             @ApiResponse(responseCode = "400", description = "Invalid signup data", content = @Content),
-            @ApiResponse(responseCode = "409", description = "Account already exists", content = @Content)
+            @ApiResponse(responseCode = "409", description = "Account already exists", content = @Content),
+            @ApiResponse(responseCode = "429", description = "Too many signups from this address", content = @Content)
     })
     @PostMapping("/signup")
     public ResponseEntity<AuthResponse> signup(
@@ -52,7 +63,9 @@ public class LocalAuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse
     ) {
+        rateLimiter.check(Limit.SIGNUP_PER_IP, httpRequest.getRemoteAddr());
         AppUser user = localAuthService.signup(request);
+        accountService.sendVerification(user);
         sessionAuthenticationService.authenticate(user, httpRequest, httpResponse);
         return ResponseEntity.status(HttpStatus.CREATED).body(AuthResponse.from(user));
     }
@@ -61,14 +74,17 @@ public class LocalAuthController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Authentication successful"),
             @ApiResponse(responseCode = "400", description = "Invalid login request", content = @Content),
-            @ApiResponse(responseCode = "401", description = "Invalid email or password", content = @Content)
-    })    
+            @ApiResponse(responseCode = "401", description = "Invalid email or password", content = @Content),
+            @ApiResponse(responseCode = "429", description = "Too many attempts for this email or from this address", content = @Content)
+    })
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse
     ) {
+        rateLimiter.check(Limit.LOGIN_PER_IP, httpRequest.getRemoteAddr());
+        rateLimiter.check(Limit.LOGIN_PER_EMAIL, request.email().strip());
         AppUser user = localAuthService.login(request);
         sessionAuthenticationService.authenticate(user, httpRequest, httpResponse);
         return ResponseEntity.ok(AuthResponse.from(user));

@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "app_users")
 public class AppUser {
@@ -32,6 +34,9 @@ public class AppUser {
     @Column(nullable = false)
     private String role = "ROLE_USER";
 
+    // When the user proved they own the email address; null until then. See V19__account_tokens.sql.
+    private Instant emailVerifiedAt;
+
     protected AppUser() {
         // Required by JPA.
     }
@@ -41,6 +46,8 @@ public class AppUser {
         this.email = email;
         this.name = name;
         this.pictureUrl = pictureUrl;
+        // Google only issues sign-in tokens for addresses it has verified.
+        this.emailVerifiedAt = Instant.now();
     }
 
     public static AppUser localUser(String email, String passwordHash, String name) {
@@ -52,9 +59,26 @@ public class AppUser {
     }
 
     public void updateProfile(String email, String name, String pictureUrl) {
+        if (!email.equals(this.email) || emailVerifiedAt == null) {
+            this.emailVerifiedAt = Instant.now();
+        }
         this.email = email;
         this.name = name;
         this.pictureUrl = pictureUrl;
+    }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void markEmailVerified(Instant at) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = at;
+        }
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
     }
 
     public Long getId() {
