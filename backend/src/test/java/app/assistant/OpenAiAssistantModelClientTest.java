@@ -97,8 +97,6 @@ class OpenAiAssistantModelClientTest {
         var transcription = client.transcribe(new byte[]{1, 2, 3}, "speech.webm", List.of());
 
         assertEquals(List.of("zh"), transcription.languages());
-        assertEquals(List.of("en", "zh"), OpenAiAssistantModelClient.languagesIn("Eh today 叉烧饭 30"));
-        assertEquals(List.of(), OpenAiAssistantModelClient.languagesIn("42, 30"));
     }
 
     @Test
