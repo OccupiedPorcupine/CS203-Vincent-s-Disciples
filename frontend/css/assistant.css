@@ -144,6 +144,10 @@
 .assistant-entries td:first-child { width: 128px; }
 .assistant-entries td:nth-child(3) { width: 72px; }
 .assistant-entries td:last-child { width: 28px; }
+.assistant-prices td { vertical-align: middle; }
+.assistant-prices td:first-child { width: 64px; }
+.assistant-prices td:nth-child(2) { width: auto; color: var(--assistant-muted); }
+.assistant-prices td:last-child { width: 96px; }
 .assistant-dish { overflow-wrap: anywhere; }
 .assistant-heard,
 .assistant-previous { display: block; margin-top: 2px; font-size: 12px; color: var(--assistant-muted); }
