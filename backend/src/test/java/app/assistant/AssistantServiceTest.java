@@ -278,6 +278,7 @@ class AssistantServiceTest {
         var text = new MockMultipartFile("audio", "notes.txt", "text/plain", new byte[]{1});
 
         assertEquals("VOICE_UNAVAILABLE", assertThrows(AssistantException.class, () -> assistant.transcribe(owner, webm)).getCode());
+        assertEquals("VOICE_UNAVAILABLE", assertThrows(AssistantException.class, () -> assistant.speak(owner, "Hello")).getCode());
         assertEquals("UNSUPPORTED_AUDIO", assertThrows(AssistantException.class, () -> assistant.transcribe(owner, text)).getCode());
     }
 }

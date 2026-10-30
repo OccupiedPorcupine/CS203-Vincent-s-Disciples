@@ -108,6 +108,21 @@ class AssistantGuardsTest {
     }
 
     @Test
+    void speechCacheKeepsTheMostRecentlyUsedEntries() {
+        var cache = new SpeechCache();
+        for (int i = 0; i < SpeechCache.MAX_ENTRIES; i++) {
+            cache.put("text " + i, new byte[]{(byte) i});
+        }
+        cache.get("text 0"); // used recently, so kept
+
+        cache.put("one more", new byte[]{1});
+
+        assertNotNull(cache.get("text 0"));
+        assertNull(cache.get("text 1"));
+        assertNotNull(cache.get("one more"));
+    }
+
+    @Test
     void trimmingKeepsFunctionCallsWithTheirOutputs() {
         List<JsonNode> items = new ArrayList<>();
         for (int turn = 0; turn < 20; turn++) {

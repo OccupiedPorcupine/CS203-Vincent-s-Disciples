@@ -3,6 +3,8 @@ package app.exception;
 import java.util.Map;
 import app.assistant.AssistantException;
 import app.dto.ErrorResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
     @ExceptionHandler({InvalidGoogleCredentialException.class, InvalidLoginException.class})
     public ResponseEntity<ErrorResponse> authenticationFailed() {
         // Deliberately avoid revealing why a credential was rejected.
@@ -21,7 +25,9 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> validationFailed() {
+    public ResponseEntity<ErrorResponse> validationFailed(MethodArgumentNotValidException exception) {
+        log.warn("Request validation failed: {}", exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + " " + error.getDefaultMessage()).toList());
         return ResponseEntity.badRequest()  //error 400
                 .body(new ErrorResponse("VALIDATION_FAILED", "The request is not valid"));
     }
@@ -43,6 +49,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(AssistantException.class)
     public ResponseEntity<ErrorResponse> assistantError(AssistantException exception) {
+        log.warn("Assistant request failed: {} {} ({})", exception.getStatus().value(), exception.getCode(), exception.getMessage());
         return ResponseEntity.status(exception.getStatus())
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
     }

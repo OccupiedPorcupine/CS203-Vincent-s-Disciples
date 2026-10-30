@@ -71,6 +71,12 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     }
 
     @Override
+    public byte[] speak(String text) {
+        throw new AssistantException(HttpStatus.SERVICE_UNAVAILABLE, "VOICE_UNAVAILABLE",
+                "Spoken replies need the OpenAI key on the server.");
+    }
+
+    @Override
     public ModelResponse respond(String instructions, List<JsonNode> input, List<ToolSpec> tools) {
         JsonNode last = input.getLast();
 
