@@ -20,7 +20,8 @@ Contents:
 ## How it behaves
 
 - **Idle shutdown and cold starts:** both containers stop after 5 minutes without traffic. The next request starts them again, which takes about 15–20 seconds for the backend and about 15 seconds for the first forecast, while the ML service loads. Pages load straight away, because they come from the CDN.
-- **Migrations run on deploy:** Flyway runs every time the backend starts, so a deployment applies any new migrations to whichever database it's configured for. This is why Preview and Production must use different databases (see below).
+- **25-second startup limit:** Vercel gives a container about 25 seconds to start listening on `PORT`, or the request fails with `FUNCTION_INVOCATION_FAILED`. The backend makes many small database round trips on startup (Flyway, Hibernate validation), so the database has to be close by. Against a database in Asia it starts in about 8 seconds. Against one in Europe it took over 20, and over 30 when it also had migrations to apply.
+- **Migrations run on deploy:** Flyway runs every time the backend starts, so a deployment applies any new migrations to whichever database it's configured for. This is why Preview and Production must use different databases (see below). A fresh database takes about 25 seconds to migrate from scratch, so run the backend against it once from your own machine before the first deployment uses it.
 - **Vercel's internal CA:** calls over a service binding use Vercel's own certificate authority. Java doesn't trust it by default, so `backend/docker-start.sh` adds it to a copy of Java's trust store at startup.
 
 ## Environment variables
@@ -37,7 +38,9 @@ Set these in the Vercel project under **Settings → Environment Variables**, or
 | `ASSISTANT_PROVIDER` | `offline`, or leave unset to use OpenAI | Unset, to use OpenAI |
 | `OPENAI_API_KEY` | Optional, as a sensitive variable | Required, as a sensitive variable |
 | `SPRING_PROFILES_ACTIVE` | `supabase` | `supabase` |
-| `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project | **Main-database** |
+| `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project (Seoul, `ap-northeast-2`) | **Main-database** |
+
+Use each project's **Session pooler** address from Supabase's **Connect** panel, as `jdbc:postgresql://<host>:5432/postgres?sslmode=require`. The direct address is IPv6-only, and Vercel can't reach it. Put any new Supabase project in an Asian region, because of the startup limit above.
 
 Without the `SPRING_PROFILES_ACTIVE` and database variables, the backend uses an in-memory H2 database. It's wiped every time the container stops, which is fine for a quick check of a preview and nothing else.
 
