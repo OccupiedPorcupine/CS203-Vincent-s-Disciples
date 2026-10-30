@@ -18,6 +18,14 @@
 .graph .card-title { margin-bottom: 0; }
 .graph .chart { position: relative; flex: 1; min-height: 0; margin-top: 16px; }
 
+.money { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 3fr); gap: 32px 48px; margin-top: 32px; }
+.money .note { color: var(--muted); font-size: var(--text-sm); }
+.money-warning { margin-top: 12px; color: var(--warning); font-size: var(--text-sm); }
+.money-warning a { color: var(--teal-strong); }
+.top-dishes { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.top-dishes li { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--divider); }
+.top-dishes li span:last-child { color: var(--muted); text-align: right; }
+
 .checklist { display: grid; gap: 16px; margin-top: 20px; }
 .check-field { display: flex; gap: 12px; width: fit-content; cursor: pointer; }
 .check-field input { width: 16px; height: 16px; margin: 4px 0 0; accent-color: var(--teal-strong); cursor: pointer; }
@@ -76,4 +84,5 @@
   .welcome, .demand, .by-dish { grid-column: 1; }
   .demand { grid-row: 2; }
   .by-dish { grid-row: 3; }
+  .money { grid-template-columns: 1fr; gap: 24px; }
 }

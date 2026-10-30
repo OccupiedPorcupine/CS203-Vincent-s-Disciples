@@ -71,6 +71,23 @@
       </section>
     </div>
 
+    <!-- Revenue and margin from dish prices (GET /api/revenue), same 7 days as the charts. -->
+    <div class="money">
+      <section class="card" aria-labelledby="revenue-heading" data-guide-id="revenue-card">
+        <div class="headline">
+          <h2 id="revenue-heading" class="card-title">Revenue, same 7 days</h2>
+          <span class="number" id="revenue-total">--</span>
+          <span class="note" id="revenue-note">Loading prices&hellip;</span>
+        </div>
+        <p class="money-warning" id="revenue-missing" hidden></p>
+      </section>
+      <section class="card" aria-labelledby="top-dishes-heading" data-guide-id="top-dishes">
+        <h2 id="top-dishes-heading" class="card-title">Top dishes by gross profit</h2>
+        <ol class="top-dishes" id="top-dishes"></ol>
+        <p class="note" id="top-dishes-note"></p>
+      </section>
+    </div>
+
     <section class="section actions" aria-labelledby="actions-heading" data-guide-id="actions-needed">
       <div class="section-heading"><h2 id="actions-heading">Actions needed</h2></div>
       <div class="checklist">

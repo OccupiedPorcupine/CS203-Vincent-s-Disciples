@@ -271,7 +271,8 @@ function dishRow(dish, dishes) {
   const strong = document.createElement("strong");
   strong.textContent = dish.name;
   const note = document.createElement("span");
-  note.textContent = dish.match?.by === "nickname" ? `Nickname for ${dish.match.dishName}` : `${dish.portions.toLocaleString("en-SG")} portions`;
+  const filePrice = dish.price === null ? "" : ` · ${money.format(Number(dish.price))} in the file`;
+  note.textContent = (dish.match?.by === "nickname" ? `Nickname for ${dish.match.dishName}` : `${dish.portions.toLocaleString("en-SG")} portions`) + filePrice;
   name.append(strong, note);
 
   const days = document.createElement("span");
@@ -329,14 +330,107 @@ async function runImport() {
     closeImport();
     const created = result.createdDishes.length
       ? ` Added ${plural(result.createdDishes.length, "new dish", "new dishes")}.` : "";
+    const priced = result.pricesSet ? ` Prices from the file set for ${plural(result.pricesSet, "dish", "dishes")}.` : "";
     const changed = result.rowsAdded || result.rowsOverwritten
       ? " The dashboard and forecasts use them now." : "";
-    showStatus(`Imported: ${describeImport(result)}.${created}${changed}`, "success");
+    showStatus(`Imported: ${describeImport(result)}.${created}${priced}${changed}`, "success");
     renderSources(await apiRequest("/api/data-sources"));
+    loadPrices();
   } catch (error) {
     showStatus(error.message || "The sales could not be imported.", "error", importStatus);
     importButton.disabled = false;
     importButton.textContent = `Import ${plural(importing.preview.rows, "row")}`;
+  }
+}
+
+// ---- Dish prices (issue #43) ----
+
+const priceList = document.getElementById("price-list");
+const priceStatus = document.getElementById("price-status");
+const money = new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD", currencyDisplay: "narrowSymbol" });
+
+function amountInput(value, label) {
+  const input = document.createElement("input");
+  input.className = "input";
+  input.type = "number";
+  input.min = "0";
+  input.max = "10000";
+  input.step = "0.01";
+  input.inputMode = "decimal";
+  input.placeholder = "Not set";
+  input.value = value === null ? "" : Number(value).toFixed(2);
+  input.setAttribute("aria-label", label);
+  return input;
+}
+
+function marginText(price, cost) {
+  if (price === "" || cost === "") return price === "" ? "Price not set" : "Add the cost to see the margin";
+  const margin = Number(price) - Number(cost);
+  const percent = Number(price) > 0 ? ` (${Math.round(margin / Number(price) * 100)}%)` : "";
+  return `${money.format(margin)} a plate${percent}`;
+}
+
+function priceRow(dish) {
+  const row = document.createElement("div");
+  row.className = "price-row";
+  row.setAttribute("role", "row");
+
+  const name = document.createElement("span");
+  name.textContent = dish.name;
+  const price = amountInput(dish.price, `Price of ${dish.name} in S$`);
+  const cost = amountInput(dish.unitCost, `Cost of one ${dish.name} in S$`);
+  const margin = document.createElement("span");
+  margin.className = "price-margin";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "secondary-button";
+  save.textContent = "Save";
+  save.setAttribute("aria-label", `Save the price of ${dish.name}`);
+
+  let saved = [price.value, cost.value];
+  const update = () => {
+    margin.textContent = marginText(price.value, cost.value);
+    save.disabled = price.value === "" || (price.value === saved[0] && cost.value === saved[1]);
+  };
+  price.addEventListener("input", update);
+  cost.addEventListener("input", update);
+  update();
+
+  save.addEventListener("click", async () => {
+    save.disabled = true;
+    try {
+      const result = await apiRequest(`/api/dishes/${dish.id}/price`, {
+        method: "PUT",
+        body: JSON.stringify({ price: Number(price.value), unitCost: cost.value === "" ? null : Number(cost.value) })
+      });
+      price.value = Number(result.price).toFixed(2);
+      cost.value = result.unitCost === null ? "" : Number(result.unitCost).toFixed(2);
+      saved = [price.value, cost.value];
+      update();
+      showStatus(`Saved ${dish.name}: ${money.format(Number(result.price))} from today.`, "success", priceStatus);
+    } catch (error) {
+      showStatus(error.message || "The price could not be saved.", "error", priceStatus);
+      update();
+    }
+  });
+
+  row.append(name, price, cost, margin, save);
+  return row;
+}
+
+async function loadPrices() {
+  try {
+    const dishes = await apiRequest("/api/dishes");
+    if (!dishes.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = "Your dishes appear here once you import sales or record them with the assistant.";
+      priceList.replaceChildren(empty);
+      return;
+    }
+    priceList.replaceChildren(...dishes.map(priceRow));
+  } catch (error) {
+    if (error.status !== 401) showStatus("Dishes could not be loaded.", "error", priceStatus);
   }
 }
 
@@ -347,3 +441,4 @@ importCancel.addEventListener("click", () => {
 });
 
 loadSources();
+loadPrices();
