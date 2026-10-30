@@ -1,4 +1,8 @@
-const API_BASE_URL = document.querySelector('meta[name="api-base-url"]').content;
+// Locally the pages (port 5500) call the backend at the address in the api-base-url meta tag.
+// When deployed, the backend is served under /api on the same address as the pages.
+const API_BASE_URL = ["localhost", "127.0.0.1"].includes(location.hostname)
+    ? document.querySelector('meta[name="api-base-url"]').content
+    : "";
 
 async function getCsrf() {
     const response = await fetch(`${API_BASE_URL}/api/csrf`, {

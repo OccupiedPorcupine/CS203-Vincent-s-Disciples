@@ -1,0 +1,13 @@
+# Never upload local secrets or build output when deploying from a laptop with `vercel deploy`.
+.env
+.env.*
+**/.env
+**/.env.*
+backend/target/
+**/.venv/
+**/__pycache__/
+**/catboost_info/
+.worktrees/
+# Local dev server only (node frontend/server.mjs). On Vercel the frontend is plain static files,
+# and this file would make Vercel treat frontend/ as a Node app.
+frontend/server.mjs

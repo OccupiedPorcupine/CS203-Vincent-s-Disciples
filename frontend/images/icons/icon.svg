@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Chicky app icon: a bowl of chicken rice on the brand teal. Source for the PNGs next to it
+       (frontend/design/render-icons.cjs). Full-bleed square: iOS and Android round the corners. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1ba098"/>
+      <stop offset="1" stop-color="#0f7d77"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="none" stroke="#fffcf5" stroke-width="14" stroke-linecap="round" opacity="0.75">
+    <path d="M206 168c-16-20 16-34 0-56"/>
+    <path d="M256 160c-16-20 16-34 0-56"/>
+    <path d="M306 168c-16-20 16-34 0-56"/>
+  </g>
+  <!-- rice -->
+  <path d="M132 276c8-52 60-82 124-82s116 30 124 82z" fill="#fff1d6"/>
+  <!-- chicken slices -->
+  <path d="M196 236c22-26 66-30 92-10l-14 22c-20-12-46-10-62 6z" fill="#f5e3d2" stroke="#e9c9a8" stroke-width="4"/>
+  <!-- bowl -->
+  <path d="M112 268h288c0 78-62 136-144 136s-144-58-144-136z" fill="#fffcf5"/>
+  <rect x="200" y="400" width="112" height="22" rx="11" fill="#fffcf5"/>
+  <path d="M136 300h240" stroke="#a9dcd6" stroke-width="12" stroke-linecap="round"/>
+</svg>

@@ -39,9 +39,9 @@
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "dish-select", "description": "Drop-down to choose which dish to forecast." },
-        { "guideId": "forecast-date", "description": "Date to forecast. Only dates covered by the current NEA 24-hour weather forecast work." },
+        { "guideId": "forecast-date", "description": "Date to forecast, from today up to 7 days ahead. Dates beyond the NEA weather forecast use the dish's past sales only." },
         { "guideId": "forecast-button", "description": "Button that runs the forecast for the chosen dish and date." },
-        { "guideId": "forecast-result", "description": "Predicted portions and the chart of past sales for the chosen dish." },
+        { "guideId": "forecast-result", "description": "Predicted portions, the likely range, how the forecast was worked out (the model, or an average of past sales such as the last 4 Saturdays, and why), and the chart of past sales for the chosen dish." },
         { "guideId": "history-view", "description": "Switch the chart between the last 7 days and the same weekday in past weeks." },
         { "guideId": "demand-factors", "description": "Weather, holiday, event and disruption factors behind the forecast." }
       ]

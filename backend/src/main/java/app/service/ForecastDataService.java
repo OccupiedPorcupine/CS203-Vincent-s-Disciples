@@ -2,7 +2,6 @@ package app.service;
 
 import app.dish.Dish;
 import app.dish.DishRepository;
-import app.dto.MlPredictionRequest;
 import app.sale.DailySale;
 import app.sale.DailySaleRepository;
 import org.springframework.stereotype.Service;
@@ -31,22 +30,8 @@ public class ForecastDataService {
                 );
     }
 
-    public List<MlPredictionRequest.SalesRecord> getSalesHistory(Long dishId, LocalDate forecastDate) {
-        List<DailySale> sales =
-                dailySaleRepository
-                        .findByDishIdAndSaleDateBeforeOrderBySaleDateAsc(
-                                dishId,
-                                forecastDate
-                        );
-
-        return sales.stream()
-                .map(
-                        sale ->
-                                new MlPredictionRequest.SalesRecord(
-                                        sale.getSaleDate().toString(),
-                                        sale.getQuantitySold()
-                                )
-                )
-                .toList();
+    // The dish's sales strictly before the forecast date, oldest first.
+    public List<DailySale> getSalesHistory(Long dishId, LocalDate forecastDate) {
+        return dailySaleRepository.findByDishIdAndSaleDateBeforeOrderBySaleDateAsc(dishId, forecastDate);
     }
 }
