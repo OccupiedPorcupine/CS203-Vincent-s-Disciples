@@ -38,15 +38,20 @@ public final class SalesFileReader {
     private static final Set<String> QUANTITY_HEADERS = Set.of(
             "quantity sold", "quantity", "qty sold", "qty", "portions", "portions sold", "units sold", "sold");
 
-    // Day first, as written in Singapore: 1/7/2026 is 1 July.
+    // Day first, as written in Singapore: 1/7/2026 is 1 July. Strict, so 31/6/2026 is an error
+    // rather than quietly becoming 30 June ("uuuu" because strict "yyyy" also needs an era).
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE,
-            DateTimeFormatter.ofPattern("yyyy/M/d"),
-            DateTimeFormatter.ofPattern("d/M/yyyy"),
-            DateTimeFormatter.ofPattern("d-M-yyyy"),
-            DateTimeFormatter.ofPattern("d.M.yyyy"),
-            DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH),
+            strict("uuuu/M/d"),
+            strict("d/M/uuuu"),
+            strict("d-M-uuuu"),
+            strict("d.M.uuuu"),
+            strict("d MMM uuuu"),
             DateTimeFormatter.BASIC_ISO_DATE);
+
+    private static DateTimeFormatter strict(String pattern) {
+        return DateTimeFormatter.ofPattern(pattern, Locale.ENGLISH).withResolverStyle(java.time.format.ResolverStyle.STRICT);
+    }
 
     private SalesFileReader() {
     }

@@ -53,6 +53,19 @@ class SalesFileReaderTest {
     }
 
     @Test
+    void readsEachDateFormatAndRejectsDaysThatDoNotExist() {
+        assertEquals(LocalDate.of(2026, 7, 1), SalesFileReader.parseDate("2026-07-01"));
+        assertEquals(LocalDate.of(2026, 7, 1), SalesFileReader.parseDate("2026/7/1"));
+        assertEquals(LocalDate.of(2026, 7, 1), SalesFileReader.parseDate("1/7/2026"));
+        assertEquals(LocalDate.of(2026, 7, 1), SalesFileReader.parseDate("01-07-2026"));
+        assertEquals(LocalDate.of(2026, 7, 1), SalesFileReader.parseDate("1 Jul 2026"));
+        assertEquals(LocalDate.of(2026, 7, 1), SalesFileReader.parseDate("20260701"));
+        assertNull(SalesFileReader.parseDate("31/6/2026"));
+        assertNull(SalesFileReader.parseDate("2026-02-29"));
+        assertNull(SalesFileReader.parseDate("13/13/2026"));
+    }
+
+    @Test
     void readsSemicolonSeparatedFiles() throws Exception {
         SalesFile file = csv("Date;Dish;Quantity\n02.07.2026;Wanton mee;12\n");
 
