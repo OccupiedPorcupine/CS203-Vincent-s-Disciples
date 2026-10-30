@@ -11,6 +11,7 @@ import app.dish.DishRepository;
 import app.dto.*;
 import app.service.DailySaleService;
 import app.service.DishAliasService;
+import app.service.StallClosureService;
 import app.service.DishService;
 import app.user.AppUserRepository;
 import org.slf4j.Logger;
@@ -57,6 +58,7 @@ public class AssistantService {
     private final DishService dishService;
     private final DailySaleService dailySaleService;
     private final DishAliasService dishAliasService;
+    private final StallClosureService stallClosureService;
     private final GuideRetriever guideRetriever;
     private final SpeechCache speechCache;
     private final JsonMapper jsonMapper;
@@ -66,7 +68,8 @@ public class AssistantService {
                             AssistantRateLimiter rateLimiter, AssistantInteractionRepository interactions,
                             AppUserRepository users, ProposalValidator proposalValidator, DishRepository dishRepository,
                             DishService dishService, DailySaleService dailySaleService,
-                            DishAliasService dishAliasService, GuideRetriever guideRetriever,
+                            DishAliasService dishAliasService, StallClosureService stallClosureService,
+                            GuideRetriever guideRetriever,
                             SpeechCache speechCache, JsonMapper jsonMapper, Clock clock) {
         this.modelClient = modelClient;
         this.tools = tools;
@@ -79,6 +82,7 @@ public class AssistantService {
         this.dishService = dishService;
         this.dailySaleService = dailySaleService;
         this.dishAliasService = dishAliasService;
+        this.stallClosureService = stallClosureService;
         this.guideRetriever = guideRetriever;
         this.speechCache = speechCache;
         this.jsonMapper = jsonMapper;
@@ -157,7 +161,8 @@ public class AssistantService {
         pageElements.forEach(element -> liveElementIds.add(element.id()));
 
         String instructions = AssistantPrompt.build(today, request.page(), tools.listDishes(ownerId).toString(),
-                guideRetriever.context(request.text(), request.page()), jsonMapper.writeValueAsString(pageElements));
+                guideRetriever.context(request.text(), request.page()), jsonMapper.writeValueAsString(pageElements),
+                tools.closures(ownerId, today).toString());
         AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
         String reply = null;
         List<String> toolsCalled = new ArrayList<>();
@@ -182,9 +187,10 @@ public class AssistantService {
         }
 
         List<ProposedEntry> proposal = context.proposal();
+        List<ProposedClosure> closures = context.closures();
         List<GuideStep> guide = context.guide();
         if (reply == null || reply.isBlank()) {
-            reply = proposal != null ? "Please check these and press Confirm to save them."
+            reply = proposal != null || closures != null ? "Please check these and press Confirm to save them."
                     : guide != null ? "Let me show you."
                     : "Sorry, I couldn't work that out. Please try again.";
         }
@@ -201,28 +207,33 @@ public class AssistantService {
                 modelClient.modelName(),
                 (int) Duration.ofNanos(System.nanoTime() - started).toMillis(),
                 proposal == null ? null : jsonMapper.writeValueAsString(proposal),
+                closures == null ? null : jsonMapper.writeValueAsString(closures),
                 clock.instant()));
 
         log.info("Message from user {} ({}, page {}, {} characters, {}): {} model calls, tools {}, proposal {}, guide {} steps, {} ms",
                 ownerId, request.inputMode() == null ? "text" : request.inputMode(), request.page(), request.text().strip().length(), interaction.getDetectedLanguages(),
-                modelCalls, toolsCalled, proposal == null ? "none" : "#" + interaction.getId() + " with " + proposal.size() + " entries",
+                modelCalls, toolsCalled, proposal == null && closures == null ? "none" : "#" + interaction.getId() + " with "
+                        + (proposal == null ? 0 : proposal.size()) + " entries and " + (closures == null ? 0 : closures.size()) + " closures",
                 guide == null ? 0 : guide.size(), millisSince(started));
         log.debug("Message from user {}: {} -> {}", ownerId, request.text().strip(), reply);
 
-        AssistantMessageResponse.Proposal proposalView = proposal == null ? null : new AssistantMessageResponse.Proposal(
-                interaction.getId(), proposal, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
+        AssistantMessageResponse.Proposal proposalView = proposal == null && closures == null ? null : new AssistantMessageResponse.Proposal(
+                interaction.getId(), proposal == null ? List.of() : proposal, closures == null ? List.of() : closures,
+                interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
         return new AssistantMessageResponse(conversationId, reply, proposalView, guide);
     }
 
     // Saves a proposal, as proposed or as the user edited it. Confirming again returns the same
     // result without saving twice. Entries are checked again because the user may have edited them.
+    // Closed-day changes can't be edited on the card; they are saved as proposed.
     @Transactional(noRollbackFor = AssistantException.class)
     public ConfirmProposalResponse confirmProposal(Long ownerId, Long proposalId, ConfirmProposalRequest request) {
         AssistantInteraction interaction = findProposal(ownerId, proposalId);
 
         switch (interaction.getOutcome()) {
             case CONFIRMED, EDITED -> {
-                return new ConfirmProposalResponse(interaction.getOutcome().name(), readEntries(interaction.getFinalJson()));
+                return new ConfirmProposalResponse(interaction.getOutcome().name(),
+                        readEntries(interaction.getFinalJson()), readClosures(interaction.getClosuresJson()));
             }
             case CANCELLED, EXPIRED -> throw closed(interaction);
             default -> {
@@ -236,11 +247,18 @@ public class AssistantService {
         }
 
         List<ProposedEntry> proposed = readEntries(interaction.getProposalJson());
+        List<ProposedClosure> closures = readClosures(interaction.getClosuresJson());
         List<ProposalEntryInput> inputs = request == null || request.entries() == null
                 ? proposed.stream().map(AssistantService::toInput).toList()
                 : request.entries();
 
-        ProposalValidator.Result result = proposalValidator.validate(ownerId, inputs, LocalDate.now(clock));
+        if (inputs.isEmpty() && closures.isEmpty()) {
+            throw new AssistantException(HttpStatus.BAD_REQUEST, "INVALID_PROPOSAL", "There is nothing to save.");
+        }
+        // A card with only closed days has no sales to check.
+        ProposalValidator.Result result = inputs.isEmpty()
+                ? new ProposalValidator.Result(List.of(), List.of())
+                : proposalValidator.validate(ownerId, inputs, LocalDate.now(clock));
         if (!result.isValid()) {
             throw new AssistantException(HttpStatus.BAD_REQUEST, "INVALID_PROPOSAL", String.join(" ", result.problems()));
         }
@@ -265,10 +283,24 @@ public class AssistantService {
                     entry.date(), entry.quantity(), sale.previousQuantity()));
         }
 
+        Set<LocalDate> alreadyClosed = new HashSet<>();
+        stallClosureService.getClosures(ownerId).closedDates().forEach(closed -> alreadyClosed.add(closed.getClosedDate()));
+        for (ProposedClosure closure : closures) {
+            if (closure.closed()) {
+                // "Closed tomorrow" again shouldn't wipe a reason given before, e.g. "Centre cleaning".
+                if (closure.reason() != null || !alreadyClosed.contains(closure.date())) {
+                    stallClosureService.closeDate(ownerId, closure.date(), closure.reason());
+                }
+            } else {
+                stallClosureService.reopenDate(ownerId, closure.date());
+            }
+        }
+
         Outcome outcome = sameSales(proposed, result.entries()) ? Outcome.CONFIRMED : Outcome.EDITED;
         interaction.resolve(outcome, jsonMapper.writeValueAsString(saved), now);
-        log.info("Proposal #{} for user {}: {}, {} entries saved", proposalId, ownerId, outcome, saved.size());
-        return new ConfirmProposalResponse(outcome.name(), saved);
+        log.info("Proposal #{} for user {}: {}, {} entries and {} closures saved", proposalId, ownerId, outcome,
+                saved.size(), closures.size());
+        return new ConfirmProposalResponse(outcome.name(), saved, closures);
     }
 
     @Transactional(noRollbackFor = AssistantException.class)
@@ -318,8 +350,13 @@ public class AssistantService {
         return new ProposalEntryInput(entry.dishId(), entry.newDishName(), entry.spokenName(), entry.date(), entry.quantity());
     }
 
+    // A card with only closed days has no sales (null JSON).
     private List<ProposedEntry> readEntries(String json) {
-        return jsonMapper.readValue(json, new TypeReference<List<ProposedEntry>>() {});
+        return json == null ? List.of() : jsonMapper.readValue(json, new TypeReference<List<ProposedEntry>>() {});
+    }
+
+    private List<ProposedClosure> readClosures(String json) {
+        return json == null ? List.of() : jsonMapper.readValue(json, new TypeReference<List<ProposedClosure>>() {});
     }
 
     private static String truncate(String text, int length) {

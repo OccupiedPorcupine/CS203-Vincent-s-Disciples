@@ -98,3 +98,6 @@ async function loadClosures() {
 }
 
 loadClosures();
+
+// Sent by js/assistant.js when the user confirms closed days with the voice assistant.
+window.addEventListener("chicky:closures-saved", loadClosures);

@@ -57,6 +57,10 @@ public class AssistantInteraction {
     @Column(length = 20000)
     private String finalJson;
 
+    // Proposed changes to closed days (JSON list of ProposedClosure); null when there were none.
+    @Column(length = 4000)
+    private String closuresJson;
+
     private Instant resolvedAt;
 
     protected AssistantInteraction() {
@@ -64,7 +68,7 @@ public class AssistantInteraction {
 
     public AssistantInteraction(AppUser owner, String conversationId, String page, String inputMode, String userText,
                                 String detectedLanguages, String reply, String model, int latencyMs,
-                                String proposalJson, Instant createdAt) {
+                                String proposalJson, String closuresJson, Instant createdAt) {
         this.owner = owner;
         this.conversationId = conversationId;
         this.page = page;
@@ -75,7 +79,8 @@ public class AssistantInteraction {
         this.model = model;
         this.latencyMs = latencyMs;
         this.proposalJson = proposalJson;
-        this.outcome = proposalJson == null ? Outcome.NONE : Outcome.PENDING;
+        this.closuresJson = closuresJson;
+        this.outcome = proposalJson == null && closuresJson == null ? Outcome.NONE : Outcome.PENDING;
         this.createdAt = createdAt;
     }
 
@@ -99,6 +104,10 @@ public class AssistantInteraction {
 
     public String getProposalJson() {
         return proposalJson;
+    }
+
+    public String getClosuresJson() {
+        return closuresJson;
     }
 
     public String getFinalJson() {

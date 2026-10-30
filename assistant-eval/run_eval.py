@@ -44,6 +44,8 @@ def resolve_date(token, today):
         return today
     if token == "yesterday":
         return today - timedelta(days=1)
+    if token == "tomorrow":
+        return today + timedelta(days=1)
     if token.startswith("today-"):
         return today - timedelta(days=int(token.split("-")[1]))
     if token == "last-monday":
@@ -97,6 +99,10 @@ def expected_key(entry, today):
     return dish, resolve_date(entry["date"], today).isoformat(), entry["quantity"]
 
 
+def closure_keys(closures):
+    return {(closure["date"], closure["closed"]) for closure in closures}
+
+
 def same_dish(expected_dish, actual_dish):
     # A new dish only needs to contain the expected name ("laksa" vs "Laksa noodles").
     if expected_dish.startswith("new:"):
@@ -109,7 +115,14 @@ def score(case, result, today):
     proposal, guide = result["proposal"], result["guide"]
     fields = None
 
-    if expect["type"] == "sales":
+    # Closed-day changes must match exactly; a sales-only case must not propose any.
+    closures_ok = closure_keys((proposal or {}).get("closures", [])) == {
+        (resolve_date(closure["date"], today).isoformat(), closure["closed"]) for closure in expect.get("closures", [])
+    }
+
+    if expect["type"] == "closure":
+        passed = proposal is not None and not proposal.get("entries") and closures_ok
+    elif expect["type"] == "sales":
         actual = [entry_key(entry) for entry in (proposal or {}).get("entries", [])]
         wanted = [expected_key(entry, today) for entry in expect["entries"]]
         fields = {"entries": len(wanted), "dish": 0, "date": 0, "quantity": 0}
@@ -118,7 +131,7 @@ def score(case, result, today):
             fields["dish"] += bool(dish_matches)
             fields["date"] += any(a[1] == date for a in dish_matches)
             fields["quantity"] += any(a[1] == date and a[2] == quantity for a in dish_matches)
-        passed = len(actual) == len(wanted) and fields["quantity"] == len(wanted)
+        passed = len(actual) == len(wanted) and fields["quantity"] == len(wanted) and closures_ok
     elif expect["type"] in ("question", "refuse"):
         passed = proposal is None and not guide
     elif expect["type"] == "guide":
