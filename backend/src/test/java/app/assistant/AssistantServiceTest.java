@@ -253,6 +253,19 @@ class AssistantServiceTest {
     }
 
     @Test
+    void askingWhatToPrepReadsOutTomorrowsPrepList() {
+        for (int daysAgo = 1; daysAgo <= 7; daysAgo++) {
+            dailySaleService.setSale(chickenRice.getId(), owner, TODAY.minusDays(daysAgo), 40);
+        }
+
+        var response = say(owner, "what do I prep for tomorrow?");
+
+        assertNull(response.proposal());
+        assertNull(response.guide());
+        assertEquals("Prepare Chicken rice 40. Add recipes on the Prep list page to see the ingredients.", response.reply());
+    }
+
+    @Test
     void customGuideStepsMustPointAtKnownOrVisibleElements() {
         var context = new AssistantTools.TurnContext(owner, TODAY, "data", java.util.Set.of("live-3"));
         var jsonMapper = tools.jackson.databind.json.JsonMapper.builder().build();

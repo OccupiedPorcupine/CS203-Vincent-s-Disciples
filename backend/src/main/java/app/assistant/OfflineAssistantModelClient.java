@@ -17,13 +17,15 @@ import java.util.regex.Pattern;
 
 // A rule-based stand-in for the language model (ASSISTANT_PROVIDER=offline), for demos,
 // development and tests without an OpenAI key. It is not AI: it only understands typed sales
-// like "yesterday chicken rice 42, char siew 30", and "how do I ..." questions that share words
-// with a task in the app guide. It drives the same tools a real model would (list_dishes then
-// propose_sales_entry, or guide_user), so the rest of the pipeline is real.
+// like "yesterday chicken rice 42, char siew 30", "what do I prep for tomorrow?", and "how do I ..."
+// questions that share words with a task in the app guide. It drives the same tools a real model
+// would (list_dishes then propose_sales_entry, get_prep_list, or guide_user), so the rest of the
+// pipeline is real.
 public class OfflineAssistantModelClient implements AssistantModelClient {
 
     private static final Pattern TODAY = Pattern.compile("Today is (\\d{4}-\\d{2}-\\d{2})");
     private static final Pattern YESTERDAY = Pattern.compile("Yesterday was (\\d{4}-\\d{2}-\\d{2})");
+    private static final Pattern TOMORROW = Pattern.compile("Tomorrow is (\\d{4}-\\d{2}-\\d{2})");
     private static final Pattern SEGMENT_SEPARATOR = Pattern.compile("[,，;；、\\n]|\\band\\b|\\bthen\\b");
     private static final Pattern NUMBER = Pattern.compile("\\d+");
     private static final Pattern YESTERDAY_WORD = Pattern.compile("yesterday|ytd|昨天|昨日", Pattern.CASE_INSENSITIVE);
@@ -31,6 +33,8 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             "\\b(today|yesterday|ytd|sold|sell|sells|selling|plates?|portions?|packets?|bowls?|lor|leh|lah|ah)\\b|今天|今日|昨天|昨日|卖了|卖|份|碗|盘",
             Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern PREP = Pattern.compile("\\b(prep|prepare)\\b|准备|备料", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TODAY_WORD = Pattern.compile("\\btoday\\b|今天|今日", Pattern.CASE_INSENSITIVE);
     private static final Pattern QUESTION = Pattern.compile(
             "\\b(how|where|show me|help|guide)\\b|\\?|怎么|哪里|如何", Pattern.CASE_INSENSITIVE);
     private static final Pattern WORD = Pattern.compile("[a-z]{3,}");
@@ -40,7 +44,7 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     private static final String GUIDE_MARKER = "App guide index, with the current page in full under current_page (JSON):";
 
     private static final String HELP = "Offline demo mode: I only understand typed sales such as \"chicken rice 42, char siew rice 30\", "
-            + "or questions like \"how do I upload data?\".";
+            + "\"what do I prep for tomorrow?\", or questions like \"how do I upload data?\".";
 
     private final JsonMapper jsonMapper;
     private final AtomicLong callIds = new AtomicLong();
@@ -82,6 +86,11 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
 
         if (!"function_call_output".equals(last.path("type").asString())) {
             String text = lastUserText(input);
+            if (PREP.matcher(text).find()) {
+                ObjectNode arguments = jsonMapper.createObjectNode();
+                arguments.put("date", find(TODAY_WORD.matcher(text).find() ? TODAY : TOMORROW, instructions));
+                return call(AssistantTools.GET_PREP_LIST, arguments);
+            }
             String taskId = QUESTION.matcher(text).find() ? matchTask(text, instructions) : null;
             if (taskId != null) {
                 ObjectNode arguments = jsonMapper.createObjectNode();
@@ -105,6 +114,10 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             return call(AssistantTools.PROPOSE_SALES_ENTRY, arguments);
         }
 
+        if (AssistantTools.GET_PREP_LIST.equals(toolName)) {
+            return message(prepListReply(output));
+        }
+
         if (output.path("ok").asBoolean()) {
             return message(AssistantTools.GUIDE_USER.equals(toolName)
                     ? "Let me show you."
@@ -113,6 +126,20 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         List<String> problems = new ArrayList<>();
         output.path("problems").forEach(problem -> problems.add(problem.asString()));
         return message("I couldn't use that: " + String.join(" ", problems));
+    }
+
+    private static String prepListReply(JsonNode prepList) {
+        if (prepList.has("error")) return prepList.path("error").asString();
+        if (prepList.has("closed")) return prepList.path("closed").asString();
+        if (prepList.path("dishes").isEmpty()) return "Record some sales first, then I can tell you what to prepare.";
+
+        List<String> dishes = new ArrayList<>();
+        prepList.path("dishes").forEach(dish -> dishes.add(dish.path("dish").asString() + " " + dish.path("portions").asInt()));
+        List<String> ingredients = new ArrayList<>();
+        prepList.path("ingredients").forEach(ingredient -> ingredients.add(ingredient.path("ingredient").asString() + " "
+                + ingredient.path("quantity").asString() + " " + ingredient.path("unit").asString()));
+        return "Prepare " + String.join(", ", dishes) + "."
+                + (ingredients.isEmpty() ? " Add recipes on the Prep list page to see the ingredients." : " You need " + String.join(", ", ingredients) + ".");
     }
 
     private ArrayNode parseSales(String text, JsonNode dishes, String instructions) {

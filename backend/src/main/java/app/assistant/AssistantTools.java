@@ -8,8 +8,11 @@ import app.dish.Dish;
 import app.dish.DishAlias;
 import app.dish.DishAliasRepository;
 import app.dish.DishRepository;
+import app.dto.PrepListResponse;
 import app.dto.ProposalEntryInput;
+import app.exception.InvalidForecastDateException;
 import app.sale.DailySaleRepository;
+import app.service.PrepListService;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -35,6 +38,7 @@ public class AssistantTools {
     static final String PROPOSE_SALES_ENTRY = "propose_sales_entry";
     static final String GET_GUIDE = "get_guide";
     static final String GUIDE_USER = "guide_user";
+    static final String GET_PREP_LIST = "get_prep_list";
     private static final int MAX_SALES_DAYS = 120;
     private static final int MAX_GUIDE_STEPS = 8;
     private static final int MAX_STEP_MESSAGE = 240;
@@ -43,6 +47,7 @@ public class AssistantTools {
     private final DishAliasRepository dishAliasRepository;
     private final DailySaleRepository dailySaleRepository;
     private final ProposalValidator proposalValidator;
+    private final PrepListService prepListService;
     private final AppGuide appGuide;
     private final JsonMapper jsonMapper;
     private final List<ToolSpec> specs;
@@ -76,11 +81,12 @@ public class AssistantTools {
 
     public AssistantTools(DishRepository dishRepository, DishAliasRepository dishAliasRepository,
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
-                          AppGuide appGuide, JsonMapper jsonMapper) {
+                          PrepListService prepListService, AppGuide appGuide, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
         this.proposalValidator = proposalValidator;
+        this.prepListService = prepListService;
         this.appGuide = appGuide;
         this.jsonMapper = jsonMapper;
         this.specs = List.of(
@@ -149,6 +155,15 @@ public class AssistantTools {
                                      "additionalProperties": false}}},
                                  "required": ["task_id", "steps"],
                                  "additionalProperties": false}
+                                """)),
+                new ToolSpec(GET_PREP_LIST,
+                        "Get the prep list for a day from today up to 7 days ahead: portions of each dish to prepare "
+                                + "(the top of its forecast range) and the total of each ingredient, from the user's recipes.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {"date": {"type": "string", "description": "YYYY-MM-DD"}},
+                                 "required": ["date"],
+                                 "additionalProperties": false}
                                 """)));
     }
 
@@ -168,10 +183,11 @@ public class AssistantTools {
                 case GET_GUIDE -> appGuide.section(call.arguments().path("id").asString())
                         .orElseGet(() -> error("No guide section " + call.arguments().path("id").asString()));
                 case GUIDE_USER -> guideUser(call.arguments(), context);
+                case GET_PREP_LIST -> getPrepList(call.arguments(), context);
                 default -> error("Unknown tool " + call.name());
             };
             return jsonMapper.writeValueAsString(result);
-        } catch (DateTimeParseException | IllegalArgumentException exception) {
+        } catch (DateTimeParseException | IllegalArgumentException | InvalidForecastDateException exception) {
             return jsonMapper.writeValueAsString(error("Invalid arguments: " + exception.getMessage()));
         }
     }
@@ -253,6 +269,33 @@ public class AssistantTools {
         output.set("entries", jsonMapper.valueToTree(result.entries()));
         output.put("note", "Shown to the user as a confirm card. Not saved until they confirm. "
                 + "Mention any entry that replaces an existing quantity (previousQuantity).");
+        return output;
+    }
+
+    // Only what a spoken answer needs, to keep the model's input short.
+    private JsonNode getPrepList(JsonNode arguments, TurnContext context) {
+        PrepListResponse prepList = prepListService.prepList(context.ownerId,
+                LocalDate.parse(arguments.path("date").asString()), null);
+        ObjectNode output = jsonMapper.createObjectNode();
+        output.put("date", prepList.date().toString());
+        if (prepList.closed() != null) {
+            output.put("closed", prepList.closed());
+            return output;
+        }
+
+        ArrayNode dishes = output.putArray("dishes");
+        List<String> withoutRecipe = new ArrayList<>();
+        for (PrepListResponse.Dish dish : prepList.dishes()) {
+            dishes.addObject().put("dish", dish.dish()).put("portions", dish.portions()).put("forecast", dish.expected());
+            if (!dish.hasRecipe()) withoutRecipe.add(dish.dish());
+        }
+        ArrayNode ingredients = output.putArray("ingredients");
+        prepList.ingredients().forEach(ingredient -> ingredients.addObject()
+                .put("ingredient", ingredient.ingredient())
+                .put("quantity", ingredient.quantity())
+                .put("unit", ingredient.unit()));
+        output.set("dishes_without_recipe", jsonMapper.valueToTree(withoutRecipe));
+        output.set("not_forecast", jsonMapper.valueToTree(prepList.skipped()));
         return output;
     }
 
