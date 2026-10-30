@@ -3,8 +3,11 @@ package app.controller;
 import app.dto.AddDailySalesRequest;
 import app.dto.AddDailySalesResponse;
 import app.dto.DailySaleResponse;
+import app.dto.UpdateDailySaleRequest;
+import app.dto.UpdateDailySaleResponse;
 import app.service.DailySaleService;
 import app.user.AuthenticatedUser;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +20,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import jakarta.validation.Valid;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Tag(name = "Sales", description = "Daily sales data operations")
@@ -100,6 +104,24 @@ public class DailySaleController {
     ) {
         int added = dailySaleService.addSales(dishId, user.id(), request);
         return new AddDailySalesResponse(added);
+    }
+
+    @Operation(summary = "Set one day's sales",
+            description = "Records the quantity sold on one date, replacing any quantity already recorded for that date. "
+                    + "The response includes the previous quantity so a correction can be shown as \"40 → 45\".")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Sales recorded or replaced"),
+            @ApiResponse(responseCode = "400", description = "Invalid quantity or dish not found", content = @Content),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @PutMapping("/{date}")
+    public UpdateDailySaleResponse setSale(
+            @PathVariable Long dishId,
+            @Parameter(description = "Sales date", example = "2026-10-28") @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @Valid @RequestBody UpdateDailySaleRequest request
+    ) {
+        return dailySaleService.setSale(dishId, user.id(), date, request.quantitySold());
     }
 
 }

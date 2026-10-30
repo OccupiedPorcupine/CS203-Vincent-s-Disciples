@@ -61,4 +61,8 @@ public class DailySale {
     public int getQuantitySold() {
         return quantitySold;
     }
+
+    public void setQuantitySold(int quantitySold) {
+        this.quantitySold = quantitySold;
+    }
 }

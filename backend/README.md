@@ -59,6 +59,10 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `POST /api/auth/google` — public authentication exchange; requires the CSRF header
 - `POST /api/auth/logout` — invalidates the application session
 - `GET /api/profile` — returns the authenticated application user
+- `GET /api/dishes`, `POST /api/dishes` — lists or creates the signed-in user's dishes
+- `GET /api/dishes/{dishId}/sales`, `POST /api/dishes/{dishId}/sales` — lists sales, or adds new days (rejects days that already have a record)
+- `PUT /api/dishes/{dishId}/sales/{date}` — sets one day's quantity, replacing any existing record; returns `previousQuantity`
+- `GET /api/dishes/{dishId}/aliases`, `POST /api/dishes/{dishId}/aliases` — other names for a dish (e.g. `鸡饭`); matching ignores case and spacing, and each name points to one dish per user (409 `ALIAS_IN_USE` otherwise)
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)

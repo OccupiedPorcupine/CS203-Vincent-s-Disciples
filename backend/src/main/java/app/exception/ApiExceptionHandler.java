@@ -40,6 +40,12 @@ public class ApiExceptionHandler {
                 ));
     }
 
+    @ExceptionHandler(AliasInUseException.class)
+    public ResponseEntity<ErrorResponse> aliasInUse(AliasInUseException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("ALIAS_IN_USE", exception.getMessage()));
+    }
+
     @ExceptionHandler(InvalidForecastDateException.class)
     public ResponseEntity<Map<String, String>> handleInvalidForecastDate(InvalidForecastDateException ex) {
         return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
