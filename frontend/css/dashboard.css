@@ -27,7 +27,7 @@
 .top-dishes li span:last-child { color: var(--muted); text-align: right; }
 
 .checklist { display: grid; gap: 16px; margin-top: 20px; }
-.check-field { display: flex; gap: 12px; width: fit-content; cursor: pointer; }
+.check-field { display: flex; gap: 12px; width: fit-content; min-height: 44px; cursor: pointer; }
 .check-field input { width: 16px; height: 16px; margin: 4px 0 0; accent-color: var(--teal-strong); cursor: pointer; }
 .description { display: block; color: var(--muted); font-size: var(--text-sm); }
 
@@ -78,6 +78,11 @@
 .send img { filter: brightness(0) invert(1); }
 .send:disabled { background: var(--neutral-soft); }
 .send:disabled img { filter: none; opacity: 0.5; }
+
+@media (pointer: coarse) {
+  .icon-button { width: 44px; height: 44px; }
+  .chat-box textarea { height: 44px; }
+}
 
 @media (max-width: 800px) {
   .overview { grid-template-columns: 1fr; grid-template-rows: auto 300px 300px; gap: 24px; }

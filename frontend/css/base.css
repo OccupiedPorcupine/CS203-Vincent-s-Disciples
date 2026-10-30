@@ -80,7 +80,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   align-items: center;
   gap: 16px;
   min-height: 64px;
-  padding: 12px 24px;
+  padding: max(12px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 12px max(24px, env(safe-area-inset-left));
   background: var(--header-gradient);
 }
 .brand { color: var(--teal-strong); font-size: 24px; text-decoration: none; }
@@ -145,7 +145,8 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 .page {
   width: min(1120px, 100% - 48px);
   margin: 0 auto;
-  padding: 40px 0 96px; /* bottom room so the assistant button never covers content */
+  /* Bottom room so the assistant button never covers content, plus the iPhone home bar. */
+  padding: 40px 0 calc(96px + env(safe-area-inset-bottom));
 }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .page-heading h1 { font-size: var(--text-xl); }
@@ -292,8 +293,19 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
+/* Touch screens: 44px tap targets, and 16px text in fields because iOS zooms the page in when you
+   tap a field with smaller text. */
+@media (pointer: coarse) {
+  :root { --control-height: 44px; }
+  .input, select, textarea { font-size: var(--text-md); }
+  .navigation summary, .avatar { width: 44px; height: 44px; }
+  .brand { padding-block: 4px; }
+  .segmented button { min-height: 44px; }
+  .text-button { min-height: 44px; }
+}
+
 @media (max-width: 760px) {
-  .topbar { padding: 12px 16px; }
+  .topbar { padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); }
   .page { width: min(100% - 32px, 1120px); padding-top: 28px; }
   .page-heading { display: block; }
   .page-heading h1 { font-size: 28px; }

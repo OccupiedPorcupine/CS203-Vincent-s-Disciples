@@ -2,13 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
   <style>@view-transition { navigation: auto; }</style>
   <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
        follows it), so the page never shows undimmed between steps. Chrome; other browsers ignore it. -->
   <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
   <title>Dashboard · Chicky</title>
+  <!-- Home-screen app (see DESIGN.md, "Phones"). -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./images/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./images/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Chicky">
+  <meta name="theme-color" content="#a9dcd6">
   <!-- Read by js/api.js to reach the backend. -->
   <meta name="api-base-url" content="http://localhost:8080">
   <link rel="preconnect" href="https://fonts.googleapis.com">

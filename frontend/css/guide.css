@@ -115,6 +115,9 @@
 .guide-actions .guide-next:hover { background: var(--teal-hover, #0b6a65); }
 .guide-actions button[hidden] { display: none; }
 .guide-actions button:focus-visible { outline: 2px solid var(--teal, #1ba098); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .guide-actions button { min-height: 44px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .guide-shade, .guide-ring, .guide-bubble, .guide-meter span { transition: none; }

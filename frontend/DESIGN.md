@@ -338,6 +338,32 @@ between steps, even across pages. Three pieces make that work, and each page nee
 collapses to an instant change, page cross-fades are off, and the tour jumps straight to each step.
 Any new animation must do the same.
 
+## Phones
+
+Stall owners use Chicky on a phone at the stall, often one-handed. Every page must work at 375px
+wide in Safari, and `frontend/tests/phone-check.cjs` checks that the main flow does (see
+[README.md](README.md)).
+
+- **No sideways scrolling.** Layouts go to one column at 760px.
+- **Tap targets are at least 44px.** On touch screens (`@media (pointer: coarse)`)
+  `--control-height` becomes 44px, and the menu, avatar, segmented buttons and assistant buttons
+  grow to match. When you add a control, check it under that media query.
+- **Text in fields is at least 16px on touch screens.** iOS zooms the whole page in when you tap a
+  field with smaller text. `.input`, `select` and `textarea` get this from `base.css`; a field with
+  its own font size needs its own rule.
+- **Respect the iPhone's notch and home bar.** Pages use `viewport-fit=cover`, and anything
+  pinned to an edge (the header, the assistant button and panel, the page's bottom padding) adds
+  `env(safe-area-inset-*)`.
+- **Nothing pinned may cover a control at the bottom of the page.** The page's bottom padding keeps
+  the last controls clear of the assistant button.
+- **Tables reflow.** Below 600px the assistant's confirm card puts each dish on its own line, with
+  its date, portions and remove button beneath, instead of squeezing four columns.
+
+**Home-screen app.** `manifest.webmanifest`, the icons in `images/icons/` (from `icon.svg`, rendered
+by `design/render-icons.cjs`) and the `apple-touch-icon` link let people add Chicky to their home
+screen, where it opens full screen. Every page links them; copy the block under "Home-screen app" in
+a page's `<head>` into new pages. The icon is a placeholder until there's a logo.
+
 ## Interaction states
 
 | State | Treatment |
@@ -370,9 +396,10 @@ extra classes, so the look and the accessibility tree can't drift apart.
 
 ## Checklist for new UI
 
-1. Link `css/base.css` before the page stylesheet, load both fonts, and copy the inline
-   `@view-transition` style and the tour paint-hold script into the `<head>`, plus
-   `<span id="guide-ready" hidden></span>` right after the `js/guide.js` script tag.
+1. Link `css/base.css` before the page stylesheet, load both fonts, and copy into the `<head>`: the
+   viewport meta (with `viewport-fit=cover`), the inline `@view-transition` style, the tour
+   paint-hold script and the home-screen app block. Put `<span id="guide-ready" hidden></span>`
+   right after the `js/guide.js` script tag.
 2. Use the page skeleton: shared `.topbar` (page menu, wordmark, account menu), `main.page`,
    `.page-heading`, and load `js/api.js` then `js/app-shell.js`.
 3. Make it reachable: a top-level page goes in the menu on **every** page, in the same order; a
@@ -385,7 +412,8 @@ extra classes, so the look and the accessibility tree can't drift apart.
 7. Charts: load `js/chart-theme.js` and use its presets.
 8. Add `data-guide-id` to anything the assistant should be able to point at, and describe it in
    `backend/src/main/resources/assistant/app-guide.json` (`AppGuideConsistencyTest` checks both).
-9. Check it at 1280px and 390px wide, then regenerate the screenshots if the page appears here.
+9. Check it at 1280px and 375px wide, run `frontend/tests/phone-check.cjs` (add the page to it if
+   it's part of a main flow), then regenerate the screenshots if the page appears here.
 
 ### Regenerating screenshots
 
