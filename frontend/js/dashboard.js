@@ -72,6 +72,14 @@ function drawChart(canvasId, type, label, labels, values) {
   });
 }
 
+const WEEKDAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+
+// Whether the stall is closed that day: a weekly rest day or a one-off closed day.
+function isClosed(isoDate, { restDays, closedDates }) {
+  const weekday = WEEKDAYS[new Date(`${isoDate}T00:00:00Z`).getUTCDay()];
+  return restDays.includes(weekday) || closedDates.some(closed => closed.date === isoDate);
+}
+
 function showEmpty(message) {
   document.getElementById("demand-note").textContent = message;
   document.getElementById("dish-note").textContent = message;
@@ -96,9 +104,10 @@ async function loadDashboard() {
     return;
   }
 
-  const salesByDish = await Promise.all(
-    dishes.map(dish => apiRequest(`/api/dishes/${dish.id}/sales`))
-  );
+  const [closures, ...salesByDish] = await Promise.all([
+    apiRequest("/api/closures"),
+    ...dishes.map(dish => apiRequest(`/api/dishes/${dish.id}/sales`))
+  ]);
 
   const latestDate = salesByDish
     .flat()
@@ -115,8 +124,16 @@ async function loadDashboard() {
   const days = Array.from({ length: 7 }, (_, index) => addDays(latestDate, index - 6));
   const firstDay = days[0];
 
+  // A closed day with no sales is a gap, not a day with zero sales. Sales recorded on a closed
+  // day mean the stall opened after all, so that day counts as open.
+  const closedDays = days.filter(day =>
+    isClosed(day, closures) && !salesByDish.flat().some(sale => sale.date === day)
+  );
+
   const dailyTotals = days.map(day =>
-    sum(salesByDish.flat().filter(sale => sale.date === day).map(sale => sale.quantitySold))
+    closedDays.includes(day)
+      ? null
+      : sum(salesByDish.flat().filter(sale => sale.date === day).map(sale => sale.quantitySold))
   );
 
   const dishTotals = salesByDish.map(sales =>
@@ -126,14 +143,18 @@ async function loadDashboard() {
   const range = `${formatDay(firstDay, { day: "numeric", month: "short" })} to ${formatDay(latestDate, { day: "numeric", month: "short" })}`;
 
   document.getElementById("demand-total").textContent = sum(dailyTotals);
-  document.getElementById("demand-note").textContent = `All dishes · ${range}`;
+  document.getElementById("demand-note").textContent = closedDays.length
+    ? `All dishes · ${range} · closed days left out`
+    : `All dishes · ${range}`;
   document.getElementById("dish-note").textContent = range;
 
   drawChart(
     "demand-chart",
     "line",
     "Portions sold",
-    days.map(day => formatDay(day, { weekday: "short" })),
+    days.map(day => closedDays.includes(day)
+      ? `${formatDay(day, { weekday: "short" })} (closed)`
+      : formatDay(day, { weekday: "short" })),
     dailyTotals
   );
 

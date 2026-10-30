@@ -7,6 +7,7 @@ import app.dto.ForecastResponse.Method;
 import app.dto.MlPredictionRequest;
 import app.dto.MlPredictionResponse;
 import app.exception.InvalidForecastDateException;
+import app.exception.StallClosedException;
 import app.sale.DailySale;
 import app.user.AppUser;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +45,7 @@ class ForecastServiceTest {
     private final NeaWeatherForecastService weather = mock(NeaWeatherForecastService.class);
     private final PublicHolidayService holidays = mock(PublicHolidayService.class);
     private final MlForecastClient ml = mock(MlForecastClient.class);
+    private final StallClosureService closures = mock(StallClosureService.class);
     private final Dish dish = new Dish("Chicken rice", AppUser.localUser("owner@example.com", "{pbkdf2}hash", "Owner"));
 
     private ForecastService service;
@@ -51,7 +53,7 @@ class ForecastServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(TODAY.atTime(9, 0).atZone(SINGAPORE).toInstant(), SINGAPORE);
-        service = new ForecastService(data, weather, holidays, ml, clock);
+        service = new ForecastService(data, weather, holidays, ml, closures, clock);
         when(data.getOwnedDish(1L, 7L)).thenReturn(dish);
     }
 
@@ -59,6 +61,16 @@ class ForecastServiceTest {
     void rejectsPastDatesAndDatesMoreThanAWeekAhead() {
         assertThrows(InvalidForecastDateException.class, () -> service.forecast(1L, TODAY.minusDays(1), 7L));
         assertThrows(InvalidForecastDateException.class, () -> service.forecast(1L, TODAY.plusDays(8), 7L));
+    }
+
+    @Test
+    void closedDaysAreNotForecast() {
+        when(closures.closureMessage(7L, TOMORROW)).thenReturn(Optional.of("Your stall is closed on Sundays."));
+
+        StallClosedException error = assertThrows(StallClosedException.class, () -> service.forecast(1L, TOMORROW, 7L));
+
+        assertEquals("Your stall is closed on Sundays.", error.getMessage());
+        verify(data, never()).getSalesHistory(any(), any());
     }
 
     @Test
