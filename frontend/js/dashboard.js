@@ -213,3 +213,4 @@ refreshDashboard();
 
 // Sent by js/assistant.js when the user confirms sales.
 window.addEventListener("chicky:sales-saved", refreshDashboard);
+window.addEventListener("chicky:prices-saved", refreshDashboard);

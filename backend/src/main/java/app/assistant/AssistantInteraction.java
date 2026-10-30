@@ -51,6 +51,10 @@ public class AssistantInteraction {
     @Column(nullable = false, length = 16)
     private Outcome outcome;
 
+    // SALES or PRICE when there is a proposal; see V13.
+    @Column(length = 16)
+    private String proposalType;
+
     @Column(length = 20000)
     private String proposalJson;
 
@@ -64,7 +68,7 @@ public class AssistantInteraction {
 
     public AssistantInteraction(AppUser owner, String conversationId, String page, String inputMode, String userText,
                                 String detectedLanguages, String reply, String model, int latencyMs,
-                                String proposalJson, Instant createdAt) {
+                                String proposalType, String proposalJson, Instant createdAt) {
         this.owner = owner;
         this.conversationId = conversationId;
         this.page = page;
@@ -74,6 +78,7 @@ public class AssistantInteraction {
         this.reply = reply;
         this.model = model;
         this.latencyMs = latencyMs;
+        this.proposalType = proposalType;
         this.proposalJson = proposalJson;
         this.outcome = proposalJson == null ? Outcome.NONE : Outcome.PENDING;
         this.createdAt = createdAt;
@@ -95,6 +100,11 @@ public class AssistantInteraction {
 
     public Outcome getOutcome() {
         return outcome;
+    }
+
+    // Proposals saved before V13 have no type and are sales.
+    public boolean isPriceProposal() {
+        return "PRICE".equals(proposalType);
     }
 
     public String getProposalJson() {

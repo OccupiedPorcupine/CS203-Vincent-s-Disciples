@@ -9,6 +9,8 @@ import app.dish.DishAlias;
 import app.dish.DishAliasRepository;
 import app.dish.DishRepository;
 import app.dto.ProposalEntryInput;
+import app.price.DishPriceService;
+import app.price.PriceBook;
 import app.sale.DailySaleRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
@@ -35,6 +38,8 @@ public class AssistantTools {
     static final String PROPOSE_SALES_ENTRY = "propose_sales_entry";
     static final String GET_GUIDE = "get_guide";
     static final String GUIDE_USER = "guide_user";
+    static final String PROPOSE_PRICE_CHANGE = "propose_price_change";
+    private static final BigDecimal MAX_PRICE = new BigDecimal("10000");
     private static final int MAX_SALES_DAYS = 120;
     private static final int MAX_GUIDE_STEPS = 8;
     private static final int MAX_STEP_MESSAGE = 240;
@@ -43,12 +48,13 @@ public class AssistantTools {
     private final DishAliasRepository dishAliasRepository;
     private final DailySaleRepository dailySaleRepository;
     private final ProposalValidator proposalValidator;
+    private final DishPriceService priceService;
     private final AppGuide appGuide;
     private final JsonMapper jsonMapper;
     private final List<ToolSpec> specs;
 
     // What a turn's tool calls have produced so far. The last valid proposal and guide in a turn
-    // are the ones shown. liveElementIds are elements on the user's current page that the app
+    // are the ones shown; a proposal is either sales or a price change, never both. liveElementIds are elements on the user's current page that the app
     // guide doesn't describe yet, which guide_user may also point at.
     public static class TurnContext {
         final Long ownerId;
@@ -56,6 +62,7 @@ public class AssistantTools {
         final String page;
         final Set<String> liveElementIds;
         List<ProposedEntry> proposal;
+        ProposedPrice priceChange;
         List<GuideStep> guide;
 
         public TurnContext(Long ownerId, LocalDate today, String page, Set<String> liveElementIds) {
@@ -69,6 +76,10 @@ public class AssistantTools {
             return proposal;
         }
 
+        public ProposedPrice priceChange() {
+            return priceChange;
+        }
+
         public List<GuideStep> guide() {
             return guide;
         }
@@ -76,16 +87,18 @@ public class AssistantTools {
 
     public AssistantTools(DishRepository dishRepository, DishAliasRepository dishAliasRepository,
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
-                          AppGuide appGuide, JsonMapper jsonMapper) {
+                          DishPriceService priceService, AppGuide appGuide, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
         this.proposalValidator = proposalValidator;
+        this.priceService = priceService;
         this.appGuide = appGuide;
         this.jsonMapper = jsonMapper;
         this.specs = List.of(
                 new ToolSpec(LIST_DISHES,
-                        "List the user's dishes with their IDs and the other names the user calls them.",
+                        "List the user's dishes with their IDs, the other names the user calls them, and today's "
+                                + "price and unit cost in S$ (null if not set).",
                         schema("""
                                 {"type": "object", "properties": {}, "required": [], "additionalProperties": false}
                                 """)),
@@ -120,6 +133,21 @@ public class AssistantTools {
                                      "required": ["dish_id", "new_dish_name", "spoken_name", "date", "quantity"],
                                      "additionalProperties": false}}},
                                  "required": ["entries"],
+                                 "additionalProperties": false}
+                                """)),
+                new ToolSpec(PROPOSE_PRICE_CHANGE,
+                        "Show the user a confirm card with a new price (and optionally a new unit cost) for one of "
+                                + "their existing dishes. This does NOT change anything; the user confirms the card. "
+                                + "Amounts are S$ per portion. effective_from is the first day of the new price "
+                                + "(null for today); earlier sales keep their old price.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {
+                                   "dish_id": {"type": "integer"},
+                                   "price": {"type": "number", "description": "New selling price per portion in S$"},
+                                   "unit_cost": {"type": ["number", "null"], "description": "New cost per portion in S$; null to keep the current cost"},
+                                   "effective_from": {"type": ["string", "null"], "description": "YYYY-MM-DD, or null for today"}},
+                                 "required": ["dish_id", "price", "unit_cost", "effective_from"],
                                  "additionalProperties": false}
                                 """)),
                 new ToolSpec(GET_GUIDE,
@@ -165,6 +193,7 @@ public class AssistantTools {
                 case LIST_DISHES -> listDishes(context);
                 case GET_SALES -> getSales(call.arguments(), context);
                 case PROPOSE_SALES_ENTRY -> proposeSalesEntry(call.arguments(), context);
+                case PROPOSE_PRICE_CHANGE -> proposePriceChange(call.arguments(), context);
                 case GET_GUIDE -> appGuide.section(call.arguments().path("id").asString())
                         .orElseGet(() -> error("No guide section " + call.arguments().path("id").asString()));
                 case GUIDE_USER -> guideUser(call.arguments(), context);
@@ -178,7 +207,8 @@ public class AssistantTools {
 
     // Also used to put the dish list in the instructions, saving the model a call.
     @Transactional(readOnly = true)
-    public ArrayNode listDishes(Long ownerId) {
+    public ArrayNode listDishes(Long ownerId, LocalDate today) {
+        PriceBook prices = priceService.priceBook(ownerId);
         ArrayNode dishes = jsonMapper.createArrayNode();
         for (Dish dish : dishRepository.findByOwnerIdOrderByNameAsc(ownerId)) {
             ObjectNode node = dishes.addObject();
@@ -186,6 +216,9 @@ public class AssistantTools {
             node.put("name", dish.getName());
             ArrayNode aliases = node.putArray("other_names");
             dishAliasRepository.findByDishIdOrderByAliasAsc(dish.getId()).forEach(alias -> aliases.add(alias.getAlias()));
+            PriceBook.Price price = prices.on(dish.getId(), today).orElse(null);
+            node.put("price", price == null ? null : price.price());
+            node.put("unit_cost", price == null ? null : price.unitCost());
         }
         return dishes;
     }
@@ -202,7 +235,7 @@ public class AssistantTools {
     }
 
     private JsonNode listDishes(TurnContext context) {
-        return listDishes(context.ownerId);
+        return listDishes(context.ownerId, context.today);
     }
 
     private JsonNode getSales(JsonNode arguments, TurnContext context) {
@@ -249,11 +282,56 @@ public class AssistantTools {
         }
 
         context.proposal = result.entries();
+        context.priceChange = null;
         output.put("ok", true);
         output.set("entries", jsonMapper.valueToTree(result.entries()));
         output.put("note", "Shown to the user as a confirm card. Not saved until they confirm. "
                 + "Mention any entry that replaces an existing quantity (previousQuantity).");
         return output;
+    }
+
+    private JsonNode proposePriceChange(JsonNode arguments, TurnContext context) {
+        long dishId = arguments.path("dish_id").asLong();
+        Dish dish = dishRepository.findByIdAndOwnerId(dishId, context.ownerId).orElse(null);
+        if (dish == null) {
+            return error("Dish " + dishId + " not found. Prices can only be set for existing dishes.");
+        }
+        BigDecimal price = amount(arguments.path("price"));
+        BigDecimal unitCost = arguments.path("unit_cost").isNumber() ? amount(arguments.path("unit_cost")) : null;
+        if (price == null || (arguments.path("unit_cost").isNumber() && unitCost == null)) {
+            return error("Amounts must be from 0 to " + MAX_PRICE + " S$ with at most 2 decimals.");
+        }
+        String from = textOrNull(arguments.path("effective_from"));
+        LocalDate effectiveFrom = from == null ? context.today : LocalDate.parse(from);
+        if (effectiveFrom.isBefore(context.today.minusYears(1)) || effectiveFrom.isAfter(context.today.plusYears(1))) {
+            return error("effective_from must be within a year of today.");
+        }
+
+        PriceBook.Price current = priceService.priceBook(context.ownerId).on(dishId, context.today).orElse(null);
+        BigDecimal currentPrice = current == null ? null : current.price();
+        BigDecimal currentCost = current == null ? null : current.unitCost();
+        if (currentPrice != null && currentPrice.compareTo(price) == 0
+                && (unitCost == null || (currentCost != null && currentCost.compareTo(unitCost) == 0))
+                && effectiveFrom.equals(context.today)) {
+            return error(dish.getName() + " is already " + price + ". Nothing to change.");
+        }
+
+        context.priceChange = new ProposedPrice(dishId, dish.getName(), price, unitCost, effectiveFrom, currentPrice, currentCost);
+        context.proposal = null;
+        ObjectNode output = jsonMapper.createObjectNode();
+        output.put("ok", true);
+        output.set("price_change", jsonMapper.valueToTree(context.priceChange));
+        output.put("note", "Shown to the user as a confirm card. Nothing changes until they confirm. "
+                + "Only one card shows at a time, so handle one price change per message.");
+        return output;
+    }
+
+    // An amount in S$ from 0 to MAX_PRICE with at most 2 decimals, or null.
+    private static BigDecimal amount(JsonNode node) {
+        if (!node.isNumber()) return null;
+        BigDecimal value = node.decimalValue().stripTrailingZeros();
+        if (value.signum() < 0 || value.compareTo(MAX_PRICE) > 0 || value.scale() > 2) return null;
+        return value.setScale(2);
     }
 
     private JsonNode guideUser(JsonNode arguments, TurnContext context) {

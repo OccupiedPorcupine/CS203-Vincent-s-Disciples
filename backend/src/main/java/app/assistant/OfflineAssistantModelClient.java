@@ -34,6 +34,9 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     private static final Pattern QUESTION = Pattern.compile(
             "\\b(how|where|show me|help|guide)\\b|\\?|怎么|哪里|如何", Pattern.CASE_INSENSITIVE);
     private static final Pattern WORD = Pattern.compile("[a-z]{3,}");
+    // "char siew rice is now $5", "chicken rice $4.80": a dish, then an amount in dollars.
+    private static final Pattern PRICE = Pattern.compile("^(.*?)\\s*(?:S\\$|\\$)\\s*(\\d+(?:\\.\\d{1,2})?)\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PRICE_WORDS = Pattern.compile("\\b(is|now|price|the|of|to|change|set)\\b", Pattern.CASE_INSENSITIVE);
     private static final Set<String> STOP_WORDS = Set.of(
             "the", "how", "can", "where", "what", "and", "for", "you", "your", "with", "from", "this", "that",
             "show", "help", "guide", "into", "use", "get", "want", "page", "one", "day");
@@ -96,6 +99,19 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         JsonNode output = jsonMapper.readTree(last.path("output").asString());
 
         if (AssistantTools.LIST_DISHES.equals(toolName)) {
+            Matcher price = PRICE.matcher(lastUserText(input).strip());
+            if (price.find()) {
+                JsonNode dish = matchDish(PRICE_WORDS.matcher(price.group(1)).replaceAll(" ").strip(), output);
+                if (dish == null) {
+                    return message("Which dish is that price for?");
+                }
+                ObjectNode arguments = jsonMapper.createObjectNode();
+                arguments.put("dish_id", dish.path("id").asLong());
+                arguments.put("price", new java.math.BigDecimal(price.group(2)));
+                arguments.putNull("unit_cost");
+                arguments.putNull("effective_from");
+                return call(AssistantTools.PROPOSE_PRICE_CHANGE, arguments);
+            }
             ArrayNode entries = parseSales(lastUserText(input), output, instructions);
             if (entries.isEmpty()) {
                 return message(HELP);
@@ -106,12 +122,13 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         }
 
         if (output.path("ok").asBoolean()) {
-            return message(AssistantTools.GUIDE_USER.equals(toolName)
-                    ? "Let me show you."
+            return message(AssistantTools.GUIDE_USER.equals(toolName) ? "Let me show you."
+                    : AssistantTools.PROPOSE_PRICE_CHANGE.equals(toolName) ? "Please check the new price and press Confirm to save it."
                     : "Please check these and press Confirm to save them.");
         }
         List<String> problems = new ArrayList<>();
         output.path("problems").forEach(problem -> problems.add(problem.asString()));
+        if (output.has("error")) problems.add(output.path("error").asString());
         return message("I couldn't use that: " + String.join(" ", problems));
     }
 

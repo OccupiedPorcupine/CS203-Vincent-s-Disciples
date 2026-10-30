@@ -109,3 +109,6 @@ async function loadPrices() {
 }
 
 loadPrices();
+
+// Sent by js/assistant.js when the user confirms a price change.
+window.addEventListener("chicky:prices-saved", loadPrices);

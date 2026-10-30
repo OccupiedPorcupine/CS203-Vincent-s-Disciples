@@ -110,7 +110,7 @@ def score(case, result, today):
     fields = None
 
     if expect["type"] == "sales":
-        actual = [entry_key(entry) for entry in (proposal or {}).get("entries", [])]
+        actual = [entry_key(entry) for entry in (proposal or {}).get("entries") or []]
         wanted = [expected_key(entry, today) for entry in expect["entries"]]
         fields = {"entries": len(wanted), "dish": 0, "date": 0, "quantity": 0}
         for dish, date, quantity in wanted:
@@ -119,6 +119,11 @@ def score(case, result, today):
             fields["date"] += any(a[1] == date for a in dish_matches)
             fields["quantity"] += any(a[1] == date and a[2] == quantity for a in dish_matches)
         passed = len(actual) == len(wanted) and fields["quantity"] == len(wanted)
+    elif expect["type"] == "price":
+        change = (proposal or {}).get("priceChange") or {}
+        passed = (bool(change) and same_dish(expect["dish"], change["dishName"])
+                  and abs(float(change["price"]) - expect["price"]) < 0.005
+                  and ("unitCost" not in expect or (change["unitCost"] is not None and abs(float(change["unitCost"]) - expect["unitCost"]) < 0.005)))
     elif expect["type"] in ("question", "refuse"):
         passed = proposal is None and not guide
     elif expect["type"] == "guide":
@@ -191,7 +196,7 @@ def report(results, status, today, writes, path, stopped_after=None):
             totals[key] += field_sums[key]
     lines.append(f"| **All** | **{totals['passed']}/{totals['cases']}** | {totals['dish']}/{totals['entries']} | "
                  f"{totals['date']}/{totals['entries']} | {totals['quantity']}/{totals['entries']} | |")
-    lines += ["", f"**Sales saved without confirmation: {writes}** (must be 0)", "", "## Failed cases", ""]
+    lines += ["", f"**Sales or prices saved without confirmation: {writes}** (must be 0)", "", "## Failed cases", ""]
 
     for result in results:
         if not result["passed"]:
@@ -225,6 +230,7 @@ def main():
 
     dishes = ensure_dishes(api, data["dishes"])
     sales_before = {name: len(api.request("GET", f"/api/dishes/{dish_id}/sales")) for name, dish_id in dishes.items()}
+    prices_before = {name: len(api.request("GET", f"/api/dishes/{dish_id}/prices")) for name, dish_id in dishes.items()}
     today = datetime.now(SINGAPORE).date()
     results = []
     stopped = False
@@ -254,6 +260,9 @@ def main():
     writes = sum(len(api.request("GET", f"/api/dishes/{dish_id}/sales")) - sales_before.get(name, 0)
                  for name, dish_id in all_dishes.items())
     writes += len(all_dishes) - len(dishes)
+    # Price proposals are cancelled too, so no price may change either.
+    writes += sum(len(api.request("GET", f"/api/dishes/{dish_id}/prices")) - prices_before.get(name, 0)
+                  for name, dish_id in all_dishes.items())
 
     stamp = datetime.now(SINGAPORE).strftime("%Y-%m-%d-%H%M")
     model = status["model"].replace("/", "-")

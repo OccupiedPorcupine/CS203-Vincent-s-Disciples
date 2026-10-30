@@ -7,6 +7,10 @@ import app.dto.AssistantMessageRequest;
 import app.dto.AssistantMessageResponse;
 import app.dto.ConfirmProposalRequest;
 import app.dto.ProposalEntryInput;
+import app.dto.SetDishPriceRequest;
+import app.price.DishPriceRepository;
+import app.price.DishPriceService;
+import app.price.PriceBook;
 import app.sale.DailySaleRepository;
 import app.service.DailySaleService;
 import app.service.DishService;
@@ -25,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.math.BigDecimal;
 import java.time.*;
 import java.util.List;
 import java.util.UUID;
@@ -77,6 +82,8 @@ class AssistantServiceTest {
     @Autowired DishAliasRepository aliasRepository;
     @Autowired DailySaleRepository saleRepository;
     @Autowired AssistantInteractionRepository interactionRepository;
+    @Autowired DishPriceService priceService;
+    @Autowired DishPriceRepository priceRepository;
     @Autowired MutableClock clock;
 
     static final LocalDate TODAY = LocalDate.of(2026, 10, 29);
@@ -96,9 +103,67 @@ class AssistantServiceTest {
     @AfterEach
     void cleanUp() {
         interactionRepository.deleteAll();
+        priceRepository.deleteAll();
         aliasRepository.deleteAll();
         saleRepository.deleteAll();
         dishRepository.deleteAll();
+    }
+
+    private BigDecimal priceOn(Dish dish, LocalDate date) {
+        return priceService.priceBook(owner).on(dish.getId(), date).map(PriceBook.Price::price).orElse(null);
+    }
+
+    @Test
+    void aNewPriceIsProposedAndOnlySavedWhenConfirmed() {
+        var response = say(owner, "char siew rice is now $5");
+
+        assertEquals("PRICE", response.proposal().type());
+        assertNull(response.proposal().entries());
+        var change = response.proposal().priceChange();
+        assertEquals(charSiewRice.getId(), change.dishId());
+        assertEquals(new BigDecimal("5.00"), change.price());
+        assertEquals(TODAY, change.effectiveFrom());
+        assertNull(change.currentPrice());
+        assertNull(priceOn(charSiewRice, TODAY));
+
+        var result = assistant.confirmProposal(owner, response.proposal().id(), null);
+
+        assertEquals("CONFIRMED", result.outcome());
+        assertNull(result.saved());
+        assertEquals(new BigDecimal("5.00"), priceOn(charSiewRice, TODAY));
+        assertTrue(interactionRepository.findById(response.proposal().id()).orElseThrow().isPriceProposal());
+    }
+
+    @Test
+    void anEditedPriceIsSavedKeepsTheCostAndEarlierSalesKeepTheOldPrice() {
+        priceService.setPrice(owner, chickenRice.getId(),
+                new SetDishPriceRequest(new BigDecimal("4.50"), new BigDecimal("1.80"), TODAY.minusDays(30)));
+
+        var response = say(owner, "chicken rice $4.80");
+        assertEquals(new BigDecimal("4.50"), response.proposal().priceChange().currentPrice());
+
+        var result = assistant.confirmProposal(owner, response.proposal().id(), new ConfirmProposalRequest(null, new BigDecimal("4.90"), null));
+
+        assertEquals("EDITED", result.outcome());
+        assertEquals(new BigDecimal("4.90"), result.priceChange().price());
+        assertEquals(new BigDecimal("1.80"), result.priceChange().unitCost());
+        assertEquals(new BigDecimal("4.90"), priceOn(chickenRice, TODAY));
+        assertEquals(new BigDecimal("4.50"), priceOn(chickenRice, TODAY.minusDays(1)));
+        // Confirming again returns the same result without saving twice.
+        assertEquals(result.priceChange(), assistant.confirmProposal(owner, response.proposal().id(), null).priceChange());
+    }
+
+    @Test
+    void aCancelledPriceChangesNothingAndAnUnknownDishIsAskedAbout() {
+        var response = say(owner, "char siew rice is now $5");
+        assistant.cancelProposal(owner, response.proposal().id());
+        assertNull(priceOn(charSiewRice, TODAY));
+
+        var unknown = say(owner, "laksa is now $6");
+        assertNull(unknown.proposal());
+        assertTrue(unknown.reply().contains("Which dish"));
+
+        assertEquals("SALES", say(owner, "chicken rice 42").proposal().type());
     }
 
     private Long newUser() {
@@ -177,7 +242,7 @@ class AssistantServiceTest {
     void editingBeforeConfirmingSavesTheEditAndRecordsIt() {
         var proposal = say(owner, "chicken rice 42").proposal();
         var edited = new ConfirmProposalRequest(List.of(
-                new ProposalEntryInput(chickenRice.getId(), null, "chicken rice", TODAY, 44)));
+                new ProposalEntryInput(chickenRice.getId(), null, "chicken rice", TODAY, 44)), null, null);
 
         var result = assistant.confirmProposal(owner, proposal.id(), edited);
 
@@ -191,8 +256,8 @@ class AssistantServiceTest {
         Long otherUser = newUser();
         Dish othersDish = dishService.createDish("Laksa", otherUser);
 
-        var future = new ConfirmProposalRequest(List.of(new ProposalEntryInput(chickenRice.getId(), null, null, TODAY.plusDays(1), 5)));
-        var notMine = new ConfirmProposalRequest(List.of(new ProposalEntryInput(othersDish.getId(), null, null, TODAY, 5)));
+        var future = new ConfirmProposalRequest(List.of(new ProposalEntryInput(chickenRice.getId(), null, null, TODAY.plusDays(1), 5)), null, null);
+        var notMine = new ConfirmProposalRequest(List.of(new ProposalEntryInput(othersDish.getId(), null, null, TODAY, 5)), null, null);
 
         assertEquals("INVALID_PROPOSAL", assertThrows(AssistantException.class, () -> assistant.confirmProposal(owner, proposal.id(), future)).getCode());
         assertEquals("INVALID_PROPOSAL", assertThrows(AssistantException.class, () -> assistant.confirmProposal(owner, proposal.id(), notMine)).getCode());
