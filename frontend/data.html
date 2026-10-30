@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="api-base-url" content="http://localhost:8080">
+  <title>Data ingestion · Chicky</title>
+  <link rel="stylesheet" href="css/data.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="dashboard.html">Chicky</a>
+    <nav aria-label="Primary navigation">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="forecast.html">Forecast</a>
+      <a class="active" href="data.html">Data ingestion</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="page-heading">
+      <div>
+        <p class="eyebrow">MODEL INPUTS</p>
+        <h1>Data ingestion</h1>
+        <p>Upload sales or accounting data and review the sources available to the forecasting model.</p>
+      </div>
+      <span id="active-count" class="count-label">0 active</span>
+    </section>
+
+    <section class="upload-section" aria-labelledby="upload-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="upload-heading">Upload training data</h2>
+          <p>CSV or Excel workbook · maximum 25 MB</p>
+        </div>
+      </div>
+
+      <form id="upload-form">
+        <label id="drop-zone" class="drop-zone" for="source-file">
+          <input id="source-file" name="file" type="file" accept=".csv,.xlsx" required>
+          <span class="upload-mark" aria-hidden="true">↑</span>
+          <strong id="file-label">Choose a file or drop it here</strong>
+          <span>Sales history, order exports or accounting data</span>
+        </label>
+        <div class="upload-actions">
+          <button id="remove-file" class="text-button" type="button" hidden>Remove</button>
+          <button id="upload-button" class="primary-button" type="submit" disabled>Upload source</button>
+        </div>
+      </form>
+      <p id="upload-status" class="status-message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="source-section" aria-labelledby="source-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="source-heading">Model data sources</h2>
+          <p id="source-summary">Loading sources…</p>
+        </div>
+      </div>
+
+      <div class="source-table" role="table" aria-label="Model data sources">
+        <div class="source-row source-header" role="row">
+          <span role="columnheader">Source</span>
+          <span role="columnheader">Uploaded</span>
+          <span role="columnheader">Size</span>
+          <span role="columnheader">Model use</span>
+        </div>
+        <div id="source-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/data.js"></script>
+</body>
+</html>

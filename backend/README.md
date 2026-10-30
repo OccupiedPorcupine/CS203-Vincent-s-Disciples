@@ -59,7 +59,29 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `POST /api/auth/google` — public authentication exchange; requires the CSRF header
 - `POST /api/auth/logout` — invalidates the application session
 - `GET /api/profile` — returns the authenticated application user
+- `GET /api/data-sources` — lists the signed-in user's registered training sources
+- `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)
+
+The frontend data-ingestion page is available at `/data.html`. Uploaded files are stored under
+`../.local-data/training-data` by default and are identified by SHA-256 so duplicate uploads are
+not registered twice for the same user. Override the location with `TRAINING_DATA_STORAGE_PATH`.
+Uploads are currently marked `AVAILABLE_FOR_TRAINING`; connecting them to a training job and an
+active model version is a separate pipeline step.
+
+### Demo data
+
+An empty account shows nothing on the dashboard. With the backend running, fill a demo account
+with 120 days of fake chicken rice stall sales (safe to run again; it only adds missing days):
+
+```bash
+python3 scripts/seed_demo_data.py            # signs in as demo@chicky.test / chicky-demo-password
+python3 scripts/seed_demo_data.py --help     # other account, period, or backend URL
+```
+
+The script writes to whichever database the backend uses, so check `backend/.env` before running
+it against Supabase. `scripts/sample-data/demo_sales.csv` holds the same kind of data
+(`date,dish,quantity_sold`) for trying the Data ingestion upload.
 
 For cookie-based browser calls, use `credentials: "include"`. Fetch `/api/csrf` first, then send its `token` value in the header named by `headerName` on POST/PUT/PATCH/DELETE requests.
 

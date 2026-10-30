@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Chicky Dashboard</title>
-  <!-- Read by js/api.js; without it the login check below the graphs never ran. -->
+  <!-- Read by js/api.js to reach the backend. -->
   <meta name="api-base-url" content="http://localhost:8080">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,6 +18,7 @@
       <nav aria-label="Main navigation">
         <a href="dashboard.html" aria-current="page">Dashboard</a>
         <a href="forecast.html">Demand Forecast</a>
+        <a href="data.html">Data ingestion</a>
       </nav>
     </details>
     <img class="avatar" src="images/dashboard/avatar.png" width="40" height="40" alt="User profile">
@@ -29,25 +30,24 @@
         <h1 id="welcome-heading">Welcome, USER</h1>
         <p>Review this week’s performance</p>
       </section>
-      <!-- Graphs show sample data (js/dashboard.js) until the dashboard reads sales from the backend. -->
+      <!-- Filled from the signed-in user's daily sales by js/dashboard.js. -->
       <section class="graph demand" aria-labelledby="demand-heading">
         <div class="headline">
-          <h2 id="demand-heading">Demand this week</h2>
+          <h2 id="demand-heading">Demand, latest 7 days</h2>
           <span class="number"><span id="demand-total">--</span><span class="unit"> portions</span></span>
-          <span class="note">Sample data &middot; Mon to Sun</span>
+          <span class="note" id="demand-note">Loading sales&hellip;</span>
         </div>
         <div class="chart">
-          <canvas id="demand-chart" role="img" aria-label="Line chart of portions sold each day this week"></canvas>
+          <canvas id="demand-chart" role="img" aria-label="Line chart of portions sold each day, all dishes combined"></canvas>
         </div>
       </section>
-      <section class="graph revenue" aria-labelledby="revenue-heading">
+      <section class="graph by-dish" aria-labelledby="dish-heading">
         <div class="headline">
-          <h2 id="revenue-heading">Revenue this week</h2>
-          <span class="number"><span id="revenue-total">--</span></span>
-          <span class="note">Sample data &middot; Mon to Sun</span>
+          <h2 id="dish-heading">Demand by dish</h2>
+          <span class="note" id="dish-note">Same 7 days</span>
         </div>
         <div class="chart">
-          <canvas id="revenue-chart" role="img" aria-label="Line chart of revenue each day this week"></canvas>
+          <canvas id="dish-chart" role="img" aria-label="Bar chart of portions sold per dish over the same 7 days"></canvas>
         </div>
       </section>
     </div>

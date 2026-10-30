@@ -31,4 +31,16 @@ class DishControllerTest {
         assertEquals(List.of("id", "name"),
                 Arrays.stream(DishResponse.class.getRecordComponents()).map(c -> c.getName()).toList());
     }
+
+    @Test
+    void getDishesListsOnlyTheSignedInUsersDishes() {
+        DishService dishService = mock(DishService.class);
+        AppUser owner = AppUser.localUser("person@example.com", "{pbkdf2}secret-hash", "Person");
+        when(dishService.getDishes(7L)).thenReturn(List.of(new Dish("Chicken rice", owner), new Dish("Laksa", owner)));
+        AuthenticatedUser user = new AuthenticatedUser(7L, null, "person@example.com", "Person", null, "ROLE_USER");
+
+        List<DishResponse> response = new DishController(dishService).getDishes(user);
+
+        assertEquals(List.of("Chicken rice", "Laksa"), response.stream().map(DishResponse::name).toList());
+    }
 }

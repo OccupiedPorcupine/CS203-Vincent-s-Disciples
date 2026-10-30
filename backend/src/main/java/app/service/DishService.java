@@ -6,6 +6,8 @@ import app.user.AppUser;
 import app.user.AppUserRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class DishService {
 
@@ -29,5 +31,9 @@ public class DishService {
         Dish dish = new Dish(name, owner);
 
         return dishRepository.save(dish);
+    }
+
+    public List<Dish> getDishes(Long ownerId) {
+        return dishRepository.findByOwnerIdOrderByNameAsc(ownerId);
     }
 }

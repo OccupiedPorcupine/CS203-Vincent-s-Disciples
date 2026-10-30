@@ -124,6 +124,21 @@ body {
 
 .scrim { position: fixed; inset: 0; z-index: 10; background: rgb(0 0 0 / 20%); }
 
+.topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.topbar-nav a {
+  color: var(--ink);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.topbar-nav a:hover { text-decoration: underline; }
+.topbar-nav .avatar { color: #fff; }
+
 /* Page */
 .page {
   width: min(960px, 100%);
@@ -262,6 +277,12 @@ select:focus-visible, input:focus-visible, a:focus-visible, button:focus-visible
   align-items: center;
   gap: 10px 16px;
   margin: 14px 0 4px;
+}
+
+.history-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .view-toggle {

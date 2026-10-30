@@ -13,5 +13,7 @@ public interface DailySaleRepository extends JpaRepository<DailySale, Long> {
             LocalDate forecastDate
     );
     
+    List<DailySale> findByDishIdOrderBySaleDateAsc(Long dishId);
+
     boolean existsByDishIdAndSaleDate(Long dishId, LocalDate saleDate);
 }
