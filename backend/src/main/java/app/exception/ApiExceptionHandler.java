@@ -1,6 +1,7 @@
 package app.exception;
 
 import java.util.Map;
+import app.assistant.AssistantException;
 import app.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,6 +39,12 @@ public class ApiExceptionHandler {
                         "ACCOUNT_LINKING_REQUIRED",
                         "Sign in to the existing account before linking Google"
                 ));
+    }
+
+    @ExceptionHandler(AssistantException.class)
+    public ResponseEntity<ErrorResponse> assistantError(AssistantException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
     }
 
     @ExceptionHandler(AliasInUseException.class)

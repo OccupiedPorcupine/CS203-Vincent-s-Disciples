@@ -51,6 +51,25 @@ public class DishAliasService {
         return dishAliasRepository.save(new DishAlias(dish, alias));
     }
 
+    // For names picked up along the way, e.g. what the user called a dish when confirming sales
+    // with the voice assistant. Unlike addAlias it never fails: a name that is already an alias,
+    // or that another dish uses, is skipped.
+    @Transactional
+    public void rememberAlias(Dish dish, String alias) {
+        String normalized = DishAlias.normalize(alias);
+        if (normalized.isEmpty() || normalized.length() > MAX_ALIAS_LENGTH) {
+            return;
+        }
+
+        Long ownerId = dish.getOwner().getId();
+        boolean isADishName = dishRepository.findByOwnerIdOrderByNameAsc(ownerId).stream()
+                .anyMatch(existing -> DishAlias.normalize(existing.getName()).equals(normalized));
+
+        if (!isADishName && dishAliasRepository.findByOwnerIdAndNormalizedAlias(ownerId, normalized).isEmpty()) {
+            dishAliasRepository.save(new DishAlias(dish, alias));
+        }
+    }
+
     private Dish findOwnedDish(Long dishId, Long ownerId) {
         return dishRepository
                 .findByIdAndOwnerId(dishId, ownerId)
