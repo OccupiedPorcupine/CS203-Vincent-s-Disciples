@@ -27,6 +27,7 @@
         <a href="dashboard.html" aria-current="page">Dashboard</a>
         <a href="forecast.html" data-guide-id="nav-forecast">Demand forecast</a>
         <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
+        <a href="dishes.html" data-guide-id="nav-dishes">Dishes</a>
       </nav>
     </details>
     <a class="brand" href="dashboard.html">Chicky</a>
@@ -68,6 +69,23 @@
         <div class="chart">
           <canvas id="dish-chart" role="img" aria-label="Bar chart of portions sold per dish over the same 7 days"></canvas>
         </div>
+      </section>
+    </div>
+
+    <!-- Revenue and margin from dish prices (GET /api/revenue), same 7 days as the charts. -->
+    <div class="money">
+      <section class="card" aria-labelledby="revenue-heading" data-guide-id="revenue-card">
+        <div class="headline">
+          <h2 id="revenue-heading" class="card-title">Revenue, same 7 days</h2>
+          <span class="number" id="revenue-total">--</span>
+          <span class="note" id="revenue-note">Loading prices&hellip;</span>
+        </div>
+        <p class="money-warning" id="revenue-missing" hidden></p>
+      </section>
+      <section class="card" aria-labelledby="top-dishes-heading" data-guide-id="top-dishes">
+        <h2 id="top-dishes-heading" class="card-title">Top dishes by gross profit</h2>
+        <ol class="top-dishes" id="top-dishes"></ol>
+        <p class="note" id="top-dishes-note"></p>
       </section>
     </div>
 

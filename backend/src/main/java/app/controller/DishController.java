@@ -1,5 +1,9 @@
 package app.controller;
 
+import app.price.DishPriceService;
+import app.price.PriceBook;
+import java.time.Clock;
+import java.time.LocalDate;
 import app.dto.CreateDishRequest;
 import app.dto.DishResponse;
 import app.service.DishService;
@@ -22,19 +26,27 @@ import java.util.List;
 public class DishController {
 
     private final DishService dishService;
+    private final DishPriceService priceService;
+    private final Clock clock;
 
-    public DishController(DishService dishService) {
+    public DishController(DishService dishService, DishPriceService priceService, Clock clock) {
         this.dishService = dishService;
+        this.priceService = priceService;
+        this.clock = clock;
     }
 
-    @Operation(summary = "List dishes", description = "Lists the authenticated user's dishes, sorted by name.")
+    @Operation(summary = "List dishes", description = "Lists the authenticated user's dishes, sorted by name, with today's price and cost.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Dishes listed successfully"),
             @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
     })
     @GetMapping
     public List<DishResponse> getDishes(@AuthenticationPrincipal AuthenticatedUser user) {
-        return dishService.getDishes(user.id()).stream().map(DishResponse::from).toList();
+        PriceBook prices = priceService.priceBook(user.id());
+        LocalDate today = LocalDate.now(clock);
+        return dishService.getDishes(user.id()).stream()
+                .map(dish -> DishResponse.from(dish, prices.on(dish.getId(), today).orElse(null)))
+                .toList();
     }
 
     @Operation(summary = "Create dish", description = "Creates a new dish for the authenticated user.")

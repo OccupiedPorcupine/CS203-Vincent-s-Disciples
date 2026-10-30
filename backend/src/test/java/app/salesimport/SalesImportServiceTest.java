@@ -6,6 +6,9 @@ import app.dish.DishAlias;
 import app.dish.DishAliasRepository;
 import app.dish.DishRepository;
 import app.dto.SalesImportPreviewResponse;
+import app.dto.SetDishPriceRequest;
+import app.price.DishPriceRepository;
+import app.price.DishPriceService;
 import app.dto.SalesImportRequest;
 import app.dto.SalesImportRequest.Action;
 import app.dto.SalesImportRequest.DishChoice;
@@ -26,6 +29,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -51,6 +55,8 @@ class SalesImportServiceTest {
     @Autowired DishAliasRepository aliasRepository;
     @Autowired DailySaleRepository saleRepository;
     @Autowired DailySaleService dailySaleService;
+    @Autowired DishPriceService priceService;
+    @Autowired DishPriceRepository priceRepository;
 
     Long owner;
 
@@ -62,6 +68,7 @@ class SalesImportServiceTest {
     // Other tests share this database and delete users, so remove everything that points at them.
     @AfterEach
     void cleanUp() {
+        priceRepository.deleteAll();
         sourceRepository.deleteAll();
         aliasRepository.deleteAll();
         saleRepository.deleteAll();
@@ -203,6 +210,26 @@ class SalesImportServiceTest {
 
         importService.importSales(owner, source, request(ExistingSales.SKIP));
         assertEquals(60, sales(dish).get(0).getQuantitySold());
+    }
+
+    @Test
+    void pricesInTheFileAreSetOnlyForDishesWithoutAPrice() {
+        Dish chickenRice = dishService.createDish("Chicken rice", owner);
+        Dish charSiew = dishService.createDish("Char siew rice", owner);
+        priceService.setPrice(owner, charSiew.getId(), new SetDishPriceRequest(new BigDecimal("5.00"), null, null));
+        Long source = upload("date,dish,quantity_sold,unit price,unit cost\n"
+                + "2026-07-01,Chicken rice,40,4.50,1.70\n"
+                + "2026-07-01,Char siew rice,30,9.99,\n");
+
+        var preview = importService.preview(owner, source);
+        assertEquals(new BigDecimal("4.50"), preview.dishes().get(0).price());
+
+        var result = importService.importSales(owner, source, request(ExistingSales.SKIP));
+        assertEquals(1, result.pricesSet());
+        var prices = priceService.priceBook(owner);
+        assertEquals(new BigDecimal("4.50"), prices.on(chickenRice.getId(), LocalDate.of(2026, 7, 1)).orElseThrow().price());
+        assertEquals(new BigDecimal("1.70"), prices.on(chickenRice.getId(), LocalDate.of(2026, 7, 1)).orElseThrow().unitCost());
+        assertEquals(new BigDecimal("5.00"), prices.on(charSiew.getId(), LocalDate.of(2026, 7, 1)).orElseThrow().price());
     }
 
     @Test

@@ -12,14 +12,17 @@
       "id": "dashboard",
       "title": "Dashboard",
       "url": "dashboard.html",
-      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, and a box to talk to the assistant.",
+      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, revenue and gross profit for those days, the dishes that earn the most, and a box to talk to the assistant.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast and Data ingestion pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Data ingestion and Dishes pages." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "demand-chart", "description": "Line chart and total of portions sold per day, all dishes combined, for the 7 days ending on the latest recorded sale." },
         { "guideId": "dish-chart", "description": "Bar chart of portions sold per dish over the same 7 days." },
+        { "guideId": "revenue-card", "description": "Revenue for the same 7 days as the charts, with gross profit and margin. Dishes without a price are named here and not counted as $0; the Set prices link goes to the Dishes page." },
+        { "guideId": "top-dishes", "description": "The dishes that made the most gross profit in those 7 days, with the margin per plate." },
         { "guideId": "actions-needed", "description": "Checklist of things to do (placeholder items for now)." },
         { "guideId": "assistant-chat", "description": "Large text box for typing or speaking to the assistant, e.g. to record today's sales." }
       ]
@@ -30,9 +33,10 @@
       "url": "forecast.html",
       "summary": "Predicts how many portions of a dish will sell on a date, using past sales, weather and public holidays.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard and Data ingestion pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Data ingestion and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link back to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "dish-select", "description": "Drop-down to choose which dish to forecast." },
         { "guideId": "forecast-date", "description": "Date to forecast, from today up to 7 days ahead. Dates beyond the NEA weather forecast use the dish's past sales only." },
@@ -46,17 +50,32 @@
       "id": "data",
       "title": "Data ingestion",
       "url": "data.html",
-      "summary": "Upload CSV or Excel files of past sales for the forecasting model, and see the files uploaded so far.",
+      "summary": "Upload CSV or Excel files of past sales and import them into daily sales, and see the files uploaded so far.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard and Demand forecast pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "upload-dropzone", "description": "Area to drop a CSV or XLSX file onto, or click to choose one (maximum 25 MB)." },
         { "guideId": "upload-button", "description": "Uploads the chosen file. Disabled until a file is chosen." },
         { "guideId": "source-list", "description": "Table of uploaded files, when they were uploaded, their size, whether the model uses them, and an Import sales button that turns a file's rows into daily sales." },
         { "guideId": "import-panel", "description": "Shown after an upload or after pressing Import sales: what is in the file (rows, dates, problems by row) and, for each dish name in the file, which dish to record it as, a new dish, or leave it out. Days that already have sales can be kept or replaced." },
         { "guideId": "import-button", "description": "Imports the file's rows into daily sales, inside the import panel. Nothing is saved before this is pressed." }
+      ]
+    },
+    {
+      "id": "dishes",
+      "title": "Dishes",
+      "url": "dishes.html",
+      "summary": "Each dish's selling price and cost per portion, used for revenue and gross profit on the Dashboard.",
+      "elements": [
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast and Data ingestion pages." },
+        { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
+        { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
+        { "guideId": "price-list", "description": "Each dish's price and cost per portion in S$, the margin per plate, and a Save button per dish. A new price applies from today; earlier sales keep their price." }
       ]
     }
   ],
@@ -84,6 +103,21 @@
         { "page": "forecast", "guideId": "forecast-date", "message": "Then pick the day. Today or tomorrow works best, because the weather forecast only covers the next 24 hours." },
         { "page": "forecast", "guideId": "forecast-button", "message": "Press this to get the forecast." },
         { "page": "forecast", "guideId": "forecast-result", "message": "The predicted portions appear here, with your past sales for comparison." }
+      ]
+    },
+    {
+      "id": "set-prices",
+      "summary": "Set or change what a dish sells for and costs to make, so revenue and gross profit can be shown.",
+      "steps": [
+        { "page": "dishes", "guideId": "price-list", "message": "Type the price and cost of one portion next to the dish, then press Save. A change applies from today." }
+      ]
+    },
+    {
+      "id": "see-revenue",
+      "summary": "See how much was made recently and which dishes earn the most.",
+      "steps": [
+        { "page": "dashboard", "guideId": "revenue-card", "message": "This is your revenue for the latest 7 days, with gross profit once your dish costs are set." },
+        { "page": "dashboard", "guideId": "top-dishes", "message": "And these dishes made the most profit, with what you keep on each plate." }
       ]
     },
     {
