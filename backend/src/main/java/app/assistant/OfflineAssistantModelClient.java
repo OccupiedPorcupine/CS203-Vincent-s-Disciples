@@ -7,6 +7,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -17,9 +18,10 @@ import java.util.regex.Pattern;
 
 // A rule-based stand-in for the language model (ASSISTANT_PROVIDER=offline), for demos,
 // development and tests without an OpenAI key. It is not AI: it only understands typed sales
-// like "yesterday chicken rice 42, char siew 30", "what do I prep for tomorrow?", and "how do I ..."
-// questions that share words with a task in the app guide. It drives the same tools a real model
-// would (list_dishes then propose_sales_entry, get_prep_list, or guide_user), so the rest of the
+// like "yesterday chicken rice 42, char siew 30", closures like "closed tomorrow" (today,
+// tomorrow or yesterday only), "what do I prep for tomorrow?", and "how do I ..." questions that
+// share words with a task in the app guide. It drives the same tools a real model would (list_dishes
+// then propose_sales_entry and/or propose_closure, get_prep_list, or guide_user), so the rest of the
 // pipeline is real.
 public class OfflineAssistantModelClient implements AssistantModelClient {
 
@@ -29,6 +31,15 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     private static final Pattern SEGMENT_SEPARATOR = Pattern.compile("[,，;；、\\n]|\\band\\b|\\bthen\\b");
     private static final Pattern NUMBER = Pattern.compile("\\d+");
     private static final Pattern YESTERDAY_WORD = Pattern.compile("yesterday|ytd|昨天|昨日", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TOMORROW_WORD = Pattern.compile("tomorrow|tmr|明天|明日", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CLOSED = Pattern.compile(
+            "\\b(closed?|closing|not open|no business)\\b|休息|不开|关门|没开|清洗", Pattern.CASE_INSENSITIVE);
+    private static final Pattern OPEN_AGAIN = Pattern.compile(
+            "\\bopen\\b.*\\b(after all|again)\\b|\\breopen|照常开|还是开", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CLEANING = Pattern.compile("clean|清洗", Pattern.CASE_INSENSITIVE);
+    // "every Tuesday", 每个星期二: a weekly rest day, which is set on the Data page, not proposed.
+    private static final Pattern EVERY_WEEKDAY = Pattern.compile(
+            "\\bevery (mon|tues|wednes|thurs|fri|satur|sun)day|每个?(星期|礼拜)|每周", Pattern.CASE_INSENSITIVE);
     private static final Pattern FILLER = Pattern.compile(
             "\\b(today|yesterday|ytd|sold|sell|sells|selling|plates?|portions?|packets?|bowls?|lor|leh|lah|ah)\\b|今天|今日|昨天|昨日|卖了|卖|份|碗|盘",
             Pattern.CASE_INSENSITIVE);
@@ -38,13 +49,16 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     private static final Pattern QUESTION = Pattern.compile(
             "\\b(how|where|show me|help|guide)\\b|\\?|怎么|哪里|如何", Pattern.CASE_INSENSITIVE);
     private static final Pattern WORD = Pattern.compile("[a-z]{3,}");
+    // "char siew rice is now $5", "chicken rice $4.80": a dish, then an amount in dollars.
+    private static final Pattern PRICE = Pattern.compile("^(.*?)\\s*(?:S\\$|\\$)\\s*(\\d+(?:\\.\\d{1,2})?)\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PRICE_WORDS = Pattern.compile("\\b(is|now|price|the|of|to|change|set)\\b", Pattern.CASE_INSENSITIVE);
     private static final Set<String> STOP_WORDS = Set.of(
             "the", "how", "can", "where", "what", "and", "for", "you", "your", "with", "from", "this", "that",
             "show", "help", "guide", "into", "use", "get", "want", "page", "one", "day");
     private static final String GUIDE_MARKER = "App guide index, with the current page in full under current_page (JSON):";
 
     private static final String HELP = "Offline demo mode: I only understand typed sales such as \"chicken rice 42, char siew rice 30\", "
-            + "\"what do I prep for tomorrow?\", or questions like \"how do I upload data?\".";
+            + "closures such as \"closed tomorrow\", \"what do I prep for tomorrow?\", or questions like \"how do I upload data?\".";
 
     private final JsonMapper jsonMapper;
     private final AtomicLong callIds = new AtomicLong();
@@ -91,7 +105,8 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
                 arguments.put("date", find(TODAY_WORD.matcher(text).find() ? TODAY : TOMORROW, instructions));
                 return call(AssistantTools.GET_PREP_LIST, arguments);
             }
-            String taskId = QUESTION.matcher(text).find() ? matchTask(text, instructions) : null;
+            String taskId = EVERY_WEEKDAY.matcher(text).find() && CLOSED.matcher(text).find() ? "set-opening-days"
+                    : QUESTION.matcher(text).find() ? matchTask(text, instructions) : null;
             if (taskId != null) {
                 ObjectNode arguments = jsonMapper.createObjectNode();
                 arguments.put("task_id", taskId);
@@ -105,13 +120,35 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         JsonNode output = jsonMapper.readTree(last.path("output").asString());
 
         if (AssistantTools.LIST_DISHES.equals(toolName)) {
-            ArrayNode entries = parseSales(lastUserText(input), output, instructions);
-            if (entries.isEmpty()) {
-                return message(HELP);
+            Matcher price = PRICE.matcher(lastUserText(input).strip());
+            if (price.find()) {
+                JsonNode dish = matchDish(PRICE_WORDS.matcher(price.group(1)).replaceAll(" ").strip(), output);
+                if (dish == null) {
+                    return message("Which dish is that price for?");
+                }
+                ObjectNode arguments = jsonMapper.createObjectNode();
+                arguments.put("dish_id", dish.path("id").asLong());
+                arguments.put("price", new java.math.BigDecimal(price.group(2)));
+                arguments.putNull("unit_cost");
+                arguments.putNull("effective_from");
+                return call(AssistantTools.PROPOSE_PRICE_CHANGE, arguments);
             }
-            ObjectNode arguments = jsonMapper.createObjectNode();
-            arguments.set("entries", entries);
-            return call(AssistantTools.PROPOSE_SALES_ENTRY, arguments);
+            ArrayNode entries = parseSales(lastUserText(input), output, instructions);
+            if (!entries.isEmpty()) {
+                ObjectNode arguments = jsonMapper.createObjectNode();
+                arguments.set("entries", entries);
+                return call(AssistantTools.PROPOSE_SALES_ENTRY, arguments);
+            }
+            ObjectNode closure = parseClosure(lastUserText(input), instructions);
+            return closure == null ? message(HELP) : proposeClosure(closure);
+        }
+
+        // Sales and a closure in one message: the closure goes on the same card.
+        if (AssistantTools.PROPOSE_SALES_ENTRY.equals(toolName) && output.path("ok").asBoolean()) {
+            ObjectNode closure = parseClosure(lastUserText(input), instructions);
+            if (closure != null) {
+                return proposeClosure(closure);
+            }
         }
 
         if (AssistantTools.GET_PREP_LIST.equals(toolName)) {
@@ -119,12 +156,13 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         }
 
         if (output.path("ok").asBoolean()) {
-            return message(AssistantTools.GUIDE_USER.equals(toolName)
-                    ? "Let me show you."
+            return message(AssistantTools.GUIDE_USER.equals(toolName) ? "Let me show you."
+                    : AssistantTools.PROPOSE_PRICE_CHANGE.equals(toolName) ? "Please check the new price and press Confirm to save it."
                     : "Please check these and press Confirm to save them.");
         }
         List<String> problems = new ArrayList<>();
         output.path("problems").forEach(problem -> problems.add(problem.asString()));
+        if (output.has("error")) problems.add(output.path("error").asString());
         return message("I couldn't use that: " + String.join(" ", problems));
     }
 
@@ -153,7 +191,7 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
                 quantity = number.group();
             }
             String phrase = FILLER.matcher(NUMBER.matcher(segment).replaceAll(" ")).replaceAll(" ").strip().replaceAll("\\s+", " ");
-            if (quantity == null || phrase.isEmpty()) {
+            if (quantity == null || phrase.isEmpty() || CLOSED.matcher(segment).find() || OPEN_AGAIN.matcher(segment).find()) {
                 continue;
             }
 
@@ -171,6 +209,35 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             entry.put("quantity", Integer.parseInt(quantity));
         }
         return entries;
+    }
+
+    // "closed tomorrow", "today closed for centre cleaning", "open tomorrow after all"; null if the
+    // message says nothing about being closed or open.
+    private ObjectNode parseClosure(String text, String instructions) {
+        boolean openAgain = OPEN_AGAIN.matcher(text).find();
+        if (!openAgain && !CLOSED.matcher(text).find()) {
+            return null;
+        }
+        LocalDate today = LocalDate.parse(find(TODAY, instructions));
+        LocalDate date = TOMORROW_WORD.matcher(text).find() ? today.plusDays(1)
+                : YESTERDAY_WORD.matcher(text).find() ? today.minusDays(1)
+                : today;
+
+        ObjectNode closure = jsonMapper.createObjectNode();
+        closure.put("date", date.toString());
+        closure.put("closed", !openAgain);
+        if (!openAgain && CLEANING.matcher(text).find()) {
+            closure.put("reason", "Centre cleaning");
+        } else {
+            closure.putNull("reason");
+        }
+        return closure;
+    }
+
+    private ModelResponse proposeClosure(ObjectNode closure) {
+        ObjectNode arguments = jsonMapper.createObjectNode();
+        arguments.putArray("closures").add(closure);
+        return call(AssistantTools.PROPOSE_CLOSURE, arguments);
     }
 
     // The task whose ID and summary share the most words with the question, from the guide index

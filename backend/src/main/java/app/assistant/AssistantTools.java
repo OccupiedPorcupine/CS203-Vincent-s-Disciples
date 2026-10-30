@@ -11,8 +11,12 @@ import app.dish.DishRepository;
 import app.dto.PrepListResponse;
 import app.dto.ProposalEntryInput;
 import app.exception.InvalidForecastDateException;
+import app.price.DishPriceService;
+import app.price.PriceBook;
 import app.sale.DailySaleRepository;
 import app.service.PrepListService;
+import app.service.StallClosureService;
+import app.service.StallClosureService.StallClosures;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -20,15 +24,19 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 // The functions the language model may call. None of them write to the database: the most the
-// model can do is propose sales, which the user then confirms. The user's ID comes from the
+// model can do is propose sales and closed days, which the user then confirms. The user's ID comes from the
 // session (TurnContext), never from the model.
 @Component
 public class AssistantTools {
@@ -38,6 +46,13 @@ public class AssistantTools {
     static final String PROPOSE_SALES_ENTRY = "propose_sales_entry";
     static final String GET_GUIDE = "get_guide";
     static final String GUIDE_USER = "guide_user";
+    static final String PROPOSE_PRICE_CHANGE = "propose_price_change";
+    private static final BigDecimal MAX_PRICE = new BigDecimal("10000");
+    static final String PROPOSE_CLOSURE = "propose_closure";
+    // Closed days can be proposed from this many days ago up to a year ahead.
+    static final int MAX_CLOSURE_DAYS_BACK = 60;
+    static final int MAX_CLOSURE_DAYS_AHEAD = 365;
+    private static final int MAX_CLOSURES = 31;
     static final String GET_PREP_LIST = "get_prep_list";
     private static final int MAX_SALES_DAYS = 120;
     private static final int MAX_GUIDE_STEPS = 8;
@@ -47,13 +62,15 @@ public class AssistantTools {
     private final DishAliasRepository dishAliasRepository;
     private final DailySaleRepository dailySaleRepository;
     private final ProposalValidator proposalValidator;
+    private final DishPriceService priceService;
+    private final StallClosureService stallClosureService;
     private final PrepListService prepListService;
     private final AppGuide appGuide;
     private final JsonMapper jsonMapper;
     private final List<ToolSpec> specs;
 
     // What a turn's tool calls have produced so far. The last valid proposal and guide in a turn
-    // are the ones shown. liveElementIds are elements on the user's current page that the app
+    // are the ones shown; a proposal is either sales or a price change, never both. liveElementIds are elements on the user's current page that the app
     // guide doesn't describe yet, which guide_user may also point at.
     public static class TurnContext {
         final Long ownerId;
@@ -61,6 +78,8 @@ public class AssistantTools {
         final String page;
         final Set<String> liveElementIds;
         List<ProposedEntry> proposal;
+        ProposedPrice priceChange;
+        List<ProposedClosure> closures;
         List<GuideStep> guide;
 
         public TurnContext(Long ownerId, LocalDate today, String page, Set<String> liveElementIds) {
@@ -74,6 +93,14 @@ public class AssistantTools {
             return proposal;
         }
 
+        public ProposedPrice priceChange() {
+            return priceChange;
+        }
+
+        public List<ProposedClosure> closures() {
+            return closures;
+        }
+
         public List<GuideStep> guide() {
             return guide;
         }
@@ -81,17 +108,21 @@ public class AssistantTools {
 
     public AssistantTools(DishRepository dishRepository, DishAliasRepository dishAliasRepository,
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
+                          DishPriceService priceService, StallClosureService stallClosureService,
                           PrepListService prepListService, AppGuide appGuide, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
         this.proposalValidator = proposalValidator;
+        this.priceService = priceService;
+        this.stallClosureService = stallClosureService;
         this.prepListService = prepListService;
         this.appGuide = appGuide;
         this.jsonMapper = jsonMapper;
         this.specs = List.of(
                 new ToolSpec(LIST_DISHES,
-                        "List the user's dishes with their IDs and the other names the user calls them.",
+                        "List the user's dishes with their IDs, the other names the user calls them, and today's "
+                                + "price and unit cost in S$ (null if not set).",
                         schema("""
                                 {"type": "object", "properties": {}, "required": [], "additionalProperties": false}
                                 """)),
@@ -126,6 +157,41 @@ public class AssistantTools {
                                      "required": ["dish_id", "new_dish_name", "spoken_name", "date", "quantity"],
                                      "additionalProperties": false}}},
                                  "required": ["entries"],
+                                 "additionalProperties": false}
+                                """)),
+                new ToolSpec(PROPOSE_PRICE_CHANGE,
+                        "Show the user a confirm card with a new price (and optionally a new unit cost) for one of "
+                                + "their existing dishes. This does NOT change anything; the user confirms the card. "
+                                + "Amounts are S$ per portion. effective_from is the first day of the new price "
+                                + "(null for today); earlier sales keep their old price.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {
+                                   "dish_id": {"type": "integer"},
+                                   "price": {"type": "number", "description": "New selling price per portion in S$"},
+                                   "unit_cost": {"type": ["number", "null"], "description": "New cost per portion in S$; null to keep the current cost"},
+                                   "effective_from": {"type": ["string", "null"], "description": "YYYY-MM-DD, or null for today"}},
+                                 "required": ["dish_id", "price", "unit_cost", "effective_from"],
+                                 "additionalProperties": false}
+                                """)),
+                new ToolSpec(PROPOSE_CLOSURE,
+                        "Show the user a confirm card that marks specific days as closed (the stall doesn't trade, "
+                                + "e.g. a holiday or hawker centre cleaning) or open again. This does NOT save anything; "
+                                + "the user confirms. Not for weekly rest days (\"closed every Tuesday\"): guide the user "
+                                + "with task set-opening-days instead. If the message also has sales, call "
+                                + "propose_sales_entry as well; both go on one card.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {
+                                   "closures": {"type": "array", "items": {
+                                     "type": "object",
+                                     "properties": {
+                                       "date": {"type": "string", "description": "YYYY-MM-DD"},
+                                       "closed": {"type": "boolean", "description": "true to mark closed, false to open again"},
+                                       "reason": {"type": ["string", "null"], "description": "Why, if the user said, in a few words"}},
+                                     "required": ["date", "closed", "reason"],
+                                     "additionalProperties": false}}},
+                                 "required": ["closures"],
                                  "additionalProperties": false}
                                 """)),
                 new ToolSpec(GET_GUIDE,
@@ -180,6 +246,8 @@ public class AssistantTools {
                 case LIST_DISHES -> listDishes(context);
                 case GET_SALES -> getSales(call.arguments(), context);
                 case PROPOSE_SALES_ENTRY -> proposeSalesEntry(call.arguments(), context);
+                case PROPOSE_PRICE_CHANGE -> proposePriceChange(call.arguments(), context);
+                case PROPOSE_CLOSURE -> proposeClosure(call.arguments(), context);
                 case GET_GUIDE -> appGuide.section(call.arguments().path("id").asString())
                         .orElseGet(() -> error("No guide section " + call.arguments().path("id").asString()));
                 case GUIDE_USER -> guideUser(call.arguments(), context);
@@ -194,7 +262,8 @@ public class AssistantTools {
 
     // Also used to put the dish list in the instructions, saving the model a call.
     @Transactional(readOnly = true)
-    public ArrayNode listDishes(Long ownerId) {
+    public ArrayNode listDishes(Long ownerId, LocalDate today) {
+        PriceBook prices = priceService.priceBook(ownerId);
         ArrayNode dishes = jsonMapper.createArrayNode();
         for (Dish dish : dishRepository.findByOwnerIdOrderByNameAsc(ownerId)) {
             ObjectNode node = dishes.addObject();
@@ -202,6 +271,9 @@ public class AssistantTools {
             node.put("name", dish.getName());
             ArrayNode aliases = node.putArray("other_names");
             dishAliasRepository.findByDishIdOrderByAliasAsc(dish.getId()).forEach(alias -> aliases.add(alias.getAlias()));
+            PriceBook.Price price = prices.on(dish.getId(), today).orElse(null);
+            node.put("price", price == null ? null : price.price());
+            node.put("unit_cost", price == null ? null : price.unitCost());
         }
         return dishes;
     }
@@ -218,7 +290,7 @@ public class AssistantTools {
     }
 
     private JsonNode listDishes(TurnContext context) {
-        return listDishes(context.ownerId);
+        return listDishes(context.ownerId, context.today);
     }
 
     private JsonNode getSales(JsonNode arguments, TurnContext context) {
@@ -265,6 +337,7 @@ public class AssistantTools {
         }
 
         context.proposal = result.entries();
+        context.priceChange = null;
         output.put("ok", true);
         output.set("entries", jsonMapper.valueToTree(result.entries()));
         output.put("note", "Shown to the user as a confirm card. Not saved until they confirm. "
@@ -297,6 +370,120 @@ public class AssistantTools {
         output.set("dishes_without_recipe", jsonMapper.valueToTree(withoutRecipe));
         output.set("not_forecast", jsonMapper.valueToTree(prepList.skipped()));
         return output;
+    }
+
+    private JsonNode proposePriceChange(JsonNode arguments, TurnContext context) {
+        long dishId = arguments.path("dish_id").asLong();
+        Dish dish = dishRepository.findByIdAndOwnerId(dishId, context.ownerId).orElse(null);
+        if (dish == null) {
+            return error("Dish " + dishId + " not found. Prices can only be set for existing dishes.");
+        }
+        BigDecimal price = amount(arguments.path("price"));
+        BigDecimal unitCost = arguments.path("unit_cost").isNumber() ? amount(arguments.path("unit_cost")) : null;
+        if (price == null || (arguments.path("unit_cost").isNumber() && unitCost == null)) {
+            return error("Amounts must be from 0 to " + MAX_PRICE + " S$ with at most 2 decimals.");
+        }
+        String from = textOrNull(arguments.path("effective_from"));
+        LocalDate effectiveFrom = from == null ? context.today : LocalDate.parse(from);
+        if (effectiveFrom.isBefore(context.today.minusYears(1)) || effectiveFrom.isAfter(context.today.plusYears(1))) {
+            return error("effective_from must be within a year of today.");
+        }
+
+        PriceBook.Price current = priceService.priceBook(context.ownerId).on(dishId, context.today).orElse(null);
+        BigDecimal currentPrice = current == null ? null : current.price();
+        BigDecimal currentCost = current == null ? null : current.unitCost();
+        if (currentPrice != null && currentPrice.compareTo(price) == 0
+                && (unitCost == null || (currentCost != null && currentCost.compareTo(unitCost) == 0))
+                && effectiveFrom.equals(context.today)) {
+            return error(dish.getName() + " is already " + price + ". Nothing to change.");
+        }
+
+        context.priceChange = new ProposedPrice(dishId, dish.getName(), price, unitCost, effectiveFrom, currentPrice, currentCost);
+        // A price change has its own card, so it replaces any sales or closed days from this turn.
+        context.proposal = null;
+        context.closures = null;
+        ObjectNode output = jsonMapper.createObjectNode();
+        output.put("ok", true);
+        output.set("price_change", jsonMapper.valueToTree(context.priceChange));
+        output.put("note", "Shown to the user as a confirm card. Nothing changes until they confirm. "
+                + "Only one card shows at a time, so handle one price change per message.");
+        return output;
+    }
+
+    // An amount in S$ from 0 to MAX_PRICE with at most 2 decimals, or null.
+    private static BigDecimal amount(JsonNode node) {
+        if (!node.isNumber()) return null;
+        BigDecimal value = node.decimalValue().stripTrailingZeros();
+        if (value.signum() < 0 || value.compareTo(MAX_PRICE) > 0 || value.scale() > 2) return null;
+        return value.setScale(2);
+    }
+
+    private JsonNode proposeClosure(JsonNode arguments, TurnContext context) {
+        StallClosures current = stallClosureService.getClosures(context.ownerId);
+        Set<LocalDate> closedDates = new HashSet<>();
+        current.closedDates().forEach(closedDate -> closedDates.add(closedDate.getClosedDate()));
+
+        List<ProposedClosure> closures = new ArrayList<>();
+        List<String> problems = new ArrayList<>();
+        Set<LocalDate> seen = new HashSet<>();
+
+        for (JsonNode item : arguments.path("closures")) {
+            LocalDate date = LocalDate.parse(item.path("date").asString());
+            boolean closed = item.path("closed").asBoolean();
+            String reason = textOrNull(item.path("reason"));
+            String weekday = date.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+
+            if (!seen.add(date)) {
+                problems.add(date + " is listed twice.");
+            } else if (date.isBefore(context.today.minusDays(MAX_CLOSURE_DAYS_BACK))
+                    || date.isAfter(context.today.plusDays(MAX_CLOSURE_DAYS_AHEAD))) {
+                problems.add(date + " is out of range: use a date from " + MAX_CLOSURE_DAYS_BACK
+                        + " days ago to a year ahead.");
+            } else if (current.restDays().contains(date.getDayOfWeek())) {
+                problems.add(date + " is a " + weekday + ", a weekly rest day. Rest days are changed on the Data page "
+                        + "(task set-opening-days), not here.");
+            } else if (!closed && !closedDates.contains(date)) {
+                problems.add(date + " isn't marked as closed, so there is nothing to open again.");
+            } else if (reason != null && reason.strip().length() > 100) {
+                problems.add("Keep the reason for " + date + " under 100 characters.");
+            } else {
+                closures.add(new ProposedClosure(date, closed, closed && reason != null ? reason.strip() : null));
+            }
+        }
+        if (closures.isEmpty() && problems.isEmpty()) problems.add("Give at least one date.");
+        if (closures.size() > MAX_CLOSURES) problems.add("At most " + MAX_CLOSURES + " days at a time.");
+
+        ObjectNode output = jsonMapper.createObjectNode();
+        if (!problems.isEmpty()) {
+            output.put("ok", false);
+            ArrayNode list = output.putArray("problems");
+            problems.forEach(list::add);
+            output.put("note", "Nothing was shown to the user. Fix the dates, or ask the user what they meant.");
+            return output;
+        }
+
+        context.closures = closures;
+        context.priceChange = null;
+        output.put("ok", true);
+        output.set("closures", jsonMapper.valueToTree(closures));
+        output.put("note", "Shown to the user on the confirm card. Not saved until they confirm.");
+        return output;
+    }
+
+    // The stall's weekly rest days and closed days from today on, for the instructions.
+    @Transactional(readOnly = true)
+    public ObjectNode closures(Long ownerId, LocalDate today) {
+        StallClosures current = stallClosureService.getClosures(ownerId);
+        ObjectNode node = jsonMapper.createObjectNode();
+        ArrayNode restDays = node.putArray("rest_days");
+        current.restDays().stream().sorted().forEach(day -> restDays.add(day.name()));
+        ArrayNode closedDates = node.putArray("closed_dates");
+        current.closedDates().stream()
+                .filter(closedDate -> !closedDate.getClosedDate().isBefore(today))
+                .forEach(closedDate -> closedDates.addObject()
+                        .put("date", closedDate.getClosedDate().toString())
+                        .put("reason", closedDate.getReason()));
+        return node;
     }
 
     private JsonNode guideUser(JsonNode arguments, TurnContext context) {

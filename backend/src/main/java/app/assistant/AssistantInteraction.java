@@ -51,11 +51,19 @@ public class AssistantInteraction {
     @Column(nullable = false, length = 16)
     private Outcome outcome;
 
+    // SALES or PRICE when there is a proposal; see V16.
+    @Column(length = 16)
+    private String proposalType;
+
     @Column(length = 20000)
     private String proposalJson;
 
     @Column(length = 20000)
     private String finalJson;
+
+    // Proposed changes to closed days (JSON list of ProposedClosure); null when there were none.
+    @Column(length = 4000)
+    private String closuresJson;
 
     private Instant resolvedAt;
 
@@ -64,7 +72,7 @@ public class AssistantInteraction {
 
     public AssistantInteraction(AppUser owner, String conversationId, String page, String inputMode, String userText,
                                 String detectedLanguages, String reply, String model, int latencyMs,
-                                String proposalJson, Instant createdAt) {
+                                String proposalType, String proposalJson, String closuresJson, Instant createdAt) {
         this.owner = owner;
         this.conversationId = conversationId;
         this.page = page;
@@ -74,8 +82,10 @@ public class AssistantInteraction {
         this.reply = reply;
         this.model = model;
         this.latencyMs = latencyMs;
+        this.proposalType = proposalType;
         this.proposalJson = proposalJson;
-        this.outcome = proposalJson == null ? Outcome.NONE : Outcome.PENDING;
+        this.closuresJson = closuresJson;
+        this.outcome = proposalJson == null && closuresJson == null ? Outcome.NONE : Outcome.PENDING;
         this.createdAt = createdAt;
     }
 
@@ -97,8 +107,17 @@ public class AssistantInteraction {
         return outcome;
     }
 
+    // Proposals saved before V16 have no type and are sales.
+    public boolean isPriceProposal() {
+        return "PRICE".equals(proposalType);
+    }
+
     public String getProposalJson() {
         return proposalJson;
+    }
+
+    public String getClosuresJson() {
+        return closuresJson;
     }
 
     public String getFinalJson() {

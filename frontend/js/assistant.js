@@ -468,16 +468,33 @@
   // ---- Confirm card ----
 
   function addConfirmCard(proposal) {
+    if (proposal.type === "PRICE") {
+      addPriceCard(proposal);
+      return;
+    }
+    const closures = proposal.closures || [];
     const card = element("div", "assistant-card");
     const heading = element("p", "assistant-card-title");
-    heading.textContent = "Save these sales?";
+    heading.textContent = closures.length === 0 ? "Save these sales?"
+      : proposal.entries.length === 0 ? "Save these opening days?"
+      : "Save these sales and opening days?";
 
     const table = element("table", "assistant-entries");
     table.innerHTML = `<thead><tr><th scope="col">Date</th><th scope="col">Dish</th><th scope="col">Portions</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>`;
     const rows = element("tbody");
     table.append(rows);
+    table.hidden = proposal.entries.length === 0;
 
     proposal.entries.forEach(entry => rows.append(entryRow(entry)));
+
+    // Closed days aren't editable on the card: confirm them as they are, or cancel.
+    const closureList = element("ul", "assistant-closures");
+    closureList.hidden = closures.length === 0;
+    closures.forEach(closure => {
+      const item = element("li");
+      item.textContent = describeClosure(closure);
+      closureList.append(item);
+    });
 
     const actions = element("div", "assistant-card-actions");
     const cancel = element("button", "assistant-secondary", { type: "button" });
@@ -486,14 +503,14 @@
     confirm.textContent = "Confirm";
     actions.append(cancel, confirm);
 
-    card.append(heading, table, actions);
+    card.append(heading, table, closureList, actions);
     log.append(card);
     log.scrollTop = log.scrollHeight;
     confirm.focus();
 
     confirm.addEventListener("click", async () => {
       const entries = [...rows.querySelectorAll("tr")].map(readRow);
-      if (entries.length === 0) {
+      if (entries.length === 0 && closures.length === 0) {
         cancel.click();
         return;
       }
@@ -503,8 +520,15 @@
           method: "POST",
           body: JSON.stringify({ entries })
         });
-        closeCard(card, `Saved ${result.saved.length} ${result.saved.length === 1 ? "entry" : "entries"}.`);
+        const savedClosures = result.closures || [];
+        const parts = [];
+        if (result.saved.length) parts.push(`${result.saved.length} ${result.saved.length === 1 ? "entry" : "entries"}`);
+        if (savedClosures.length) parts.push(`${savedClosures.length} ${savedClosures.length === 1 ? "opening day" : "opening days"}`);
+        closeCard(card, `Saved ${parts.join(" and ")}.`);
         window.dispatchEvent(new CustomEvent("chicky:sales-saved", { detail: result.saved }));
+        if (savedClosures.length) {
+          window.dispatchEvent(new CustomEvent("chicky:closures-saved", { detail: savedClosures }));
+        }
       } catch (error) {
         addMessage("error", errorMessage(error));
         if (error.status === 409 || error.status === 404) {
@@ -524,6 +548,105 @@
       }
       closeCard(card, "Cancelled. Nothing was saved.");
     });
+  }
+
+  // A dish's new price (and maybe cost), editable before confirming. Earlier sales keep the old price.
+  function addPriceCard(proposal) {
+    const change = proposal.priceChange;
+    const money = new Intl.NumberFormat("en-SG", { style: "currency", currency: "SGD", currencyDisplay: "narrowSymbol" });
+    const shown = amount => amount === null ? "Not set" : money.format(Number(amount));
+    const when = change.effectiveFrom === localToday() ? "today"
+      : new Date(`${change.effectiveFrom}T00:00:00`).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
+
+    const card = element("div", "assistant-card");
+    const heading = element("p", "assistant-card-title");
+    heading.textContent = `Change the price of ${change.dishName}?`;
+
+    const table = element("table", "assistant-entries assistant-prices");
+    table.innerHTML = `<thead><tr><th scope="col"><span class="visually-hidden">Amount</span></th><th scope="col">Now</th><th scope="col">New (S$)</th></tr></thead>`;
+    const rows = element("tbody");
+    const priceInput = amountInput(change.price, "New price in S$");
+    const costInput = amountInput(change.unitCost, "New cost in S$", change.currentUnitCost === null ? "Not set" : "Keep");
+    rows.append(priceRow("Price", shown(change.currentPrice), priceInput), priceRow("Cost", shown(change.currentUnitCost), costInput));
+    table.append(rows);
+
+    const note = element("p", "assistant-previous");
+    note.textContent = `From ${when}. Earlier sales keep the price they had.`;
+
+    const actions = element("div", "assistant-card-actions");
+    const cancel = element("button", "assistant-secondary", { type: "button" });
+    cancel.textContent = "Cancel";
+    const confirm = element("button", "assistant-primary", { type: "button" });
+    confirm.textContent = "Confirm";
+    actions.append(cancel, confirm);
+
+    card.append(heading, table, note, actions);
+    log.append(card);
+    log.scrollTop = log.scrollHeight;
+    confirm.focus();
+
+    confirm.addEventListener("click", async () => {
+      if (!priceInput.reportValidity() || !costInput.reportValidity()) return;
+      setCardEnabled(card, false);
+      try {
+        const result = await apiRequest(`/api/assistant/proposals/${proposal.id}/confirm`, {
+          method: "POST",
+          body: JSON.stringify({
+            price: Number(priceInput.value),
+            unitCost: costInput.value === "" ? null : Number(costInput.value)
+          })
+        });
+        const saved = result.priceChange;
+        closeCard(card, `Saved: ${saved.dishName} is ${money.format(Number(saved.price))} from ${when}.`);
+        window.dispatchEvent(new CustomEvent("chicky:prices-saved", { detail: saved }));
+      } catch (error) {
+        addMessage("error", errorMessage(error));
+        if (error.status === 409 || error.status === 404) {
+          closeCard(card, "Not saved.");
+        } else {
+          setCardEnabled(card, true);
+        }
+      }
+    });
+
+    cancel.addEventListener("click", async () => {
+      setCardEnabled(card, false);
+      try {
+        await apiRequest(`/api/assistant/proposals/${proposal.id}/cancel`, { method: "POST" });
+      } catch (error) {
+        // Unchanged either way; an expired proposal can't be cancelled or saved.
+      }
+      closeCard(card, "Cancelled. The price is unchanged.");
+    });
+
+    function priceRow(label, current, input) {
+      const row = element("tr");
+      const name = element("td");
+      name.textContent = label;
+      const now = element("td");
+      now.textContent = current;
+      const edit = element("td");
+      edit.append(input);
+      row.append(name, now, edit);
+      return row;
+    }
+  }
+
+  function amountInput(value, label, placeholder = "") {
+    const input = element("input", "", { type: "number", min: "0", max: "10000", step: "0.01", inputmode: "decimal", "aria-label": label });
+    input.placeholder = placeholder;
+    input.value = value === null ? "" : Number(value).toFixed(2);
+    return input;
+  }
+
+  // "Closed · Thu 5 Nov · Centre cleaning" or "Open again · Thu 5 Nov".
+  function describeClosure(closure) {
+    const day = new Date(`${closure.date}T00:00:00Z`).toLocaleDateString("en-SG", {
+      weekday: "short", day: "numeric", month: "short", timeZone: "UTC"
+    });
+    return closure.closed
+      ? ["Closed", day, closure.reason].filter(Boolean).join(" · ")
+      : `Open again · ${day}`;
   }
 
   function entryRow(entry) {

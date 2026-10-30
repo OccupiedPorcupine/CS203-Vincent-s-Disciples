@@ -9,8 +9,11 @@ import app.dish.Dish;
 import app.dish.DishAlias;
 import app.dish.DishRepository;
 import app.dto.*;
+import app.price.DishPriceService;
+import app.price.PriceBook;
 import app.service.DailySaleService;
 import app.service.DishAliasService;
+import app.service.StallClosureService;
 import app.service.DishService;
 import app.user.AppUserRepository;
 import org.slf4j.Logger;
@@ -25,6 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -57,8 +61,10 @@ public class AssistantService {
     private final DishService dishService;
     private final DailySaleService dailySaleService;
     private final DishAliasService dishAliasService;
+    private final StallClosureService stallClosureService;
     private final GuideRetriever guideRetriever;
     private final SpeechCache speechCache;
+    private final DishPriceService priceService;
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
@@ -66,8 +72,9 @@ public class AssistantService {
                             AssistantRateLimiter rateLimiter, AssistantInteractionRepository interactions,
                             AppUserRepository users, ProposalValidator proposalValidator, DishRepository dishRepository,
                             DishService dishService, DailySaleService dailySaleService,
-                            DishAliasService dishAliasService, GuideRetriever guideRetriever,
-                            SpeechCache speechCache, JsonMapper jsonMapper, Clock clock) {
+                            DishAliasService dishAliasService, StallClosureService stallClosureService,
+                            GuideRetriever guideRetriever,
+                            SpeechCache speechCache, DishPriceService priceService, JsonMapper jsonMapper, Clock clock) {
         this.modelClient = modelClient;
         this.tools = tools;
         this.conversations = conversations;
@@ -79,8 +86,10 @@ public class AssistantService {
         this.dishService = dishService;
         this.dailySaleService = dailySaleService;
         this.dishAliasService = dishAliasService;
+        this.stallClosureService = stallClosureService;
         this.guideRetriever = guideRetriever;
         this.speechCache = speechCache;
+        this.priceService = priceService;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
     }
@@ -156,8 +165,9 @@ public class AssistantService {
         Set<String> liveElementIds = new HashSet<>();
         pageElements.forEach(element -> liveElementIds.add(element.id()));
 
-        String instructions = AssistantPrompt.build(today, request.page(), tools.listDishes(ownerId).toString(),
-                guideRetriever.context(request.text(), request.page()), jsonMapper.writeValueAsString(pageElements));
+        String instructions = AssistantPrompt.build(today, request.page(), tools.listDishes(ownerId, today).toString(),
+                guideRetriever.context(request.text(), request.page()), jsonMapper.writeValueAsString(pageElements),
+                tools.closures(ownerId, today).toString());
         AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
         String reply = null;
         List<String> toolsCalled = new ArrayList<>();
@@ -182,12 +192,16 @@ public class AssistantService {
         }
 
         List<ProposedEntry> proposal = context.proposal();
+        ProposedPrice priceChange = context.priceChange();
+        List<ProposedClosure> closures = context.closures();
         List<GuideStep> guide = context.guide();
         if (reply == null || reply.isBlank()) {
-            reply = proposal != null ? "Please check these and press Confirm to save them."
+            reply = proposal != null || closures != null ? "Please check these and press Confirm to save them."
+                    : priceChange != null ? "Please check the new price and press Confirm to save it."
                     : guide != null ? "Let me show you."
                     : "Sorry, I couldn't work that out. Please try again.";
         }
+        String proposalType = proposal != null || closures != null ? "SALES" : priceChange != null ? "PRICE" : null;
         conversations.save(ownerId, conversationId, items);
 
         AssistantInteraction interaction = interactions.save(new AssistantInteraction(
@@ -200,29 +214,43 @@ public class AssistantService {
                 truncate(reply, 4000),
                 modelClient.modelName(),
                 (int) Duration.ofNanos(System.nanoTime() - started).toMillis(),
-                proposal == null ? null : jsonMapper.writeValueAsString(proposal),
+                proposalType,
+                "PRICE".equals(proposalType) ? jsonMapper.writeValueAsString(priceChange)
+                        : proposal == null ? null : jsonMapper.writeValueAsString(proposal),
+                closures == null ? null : jsonMapper.writeValueAsString(closures),
                 clock.instant()));
 
         log.info("Message from user {} ({}, page {}, {} characters, {}): {} model calls, tools {}, proposal {}, guide {} steps, {} ms",
                 ownerId, request.inputMode() == null ? "text" : request.inputMode(), request.page(), request.text().strip().length(), interaction.getDetectedLanguages(),
-                modelCalls, toolsCalled, proposal == null ? "none" : "#" + interaction.getId() + " with " + proposal.size() + " entries",
+                modelCalls, toolsCalled, proposalType == null ? "none"
+                        : "PRICE".equals(proposalType) ? "#" + interaction.getId() + " price of dish " + priceChange.dishId()
+                        : "#" + interaction.getId() + " with " + (proposal == null ? 0 : proposal.size()) + " entries and "
+                                + (closures == null ? 0 : closures.size()) + " closures",
                 guide == null ? 0 : guide.size(), millisSince(started));
         log.debug("Message from user {}: {} -> {}", ownerId, request.text().strip(), reply);
 
-        AssistantMessageResponse.Proposal proposalView = proposal == null ? null : new AssistantMessageResponse.Proposal(
-                interaction.getId(), proposal, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
+        boolean sales = "SALES".equals(proposalType);
+        AssistantMessageResponse.Proposal proposalView = proposalType == null ? null : new AssistantMessageResponse.Proposal(
+                interaction.getId(), proposalType,
+                sales ? (proposal == null ? List.of() : proposal) : null,
+                sales ? (closures == null ? List.of() : closures) : null,
+                priceChange, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
         return new AssistantMessageResponse(conversationId, reply, proposalView, guide);
     }
 
     // Saves a proposal, as proposed or as the user edited it. Confirming again returns the same
     // result without saving twice. Entries are checked again because the user may have edited them.
+    // Closed-day changes can't be edited on the card; they are saved as proposed.
     @Transactional(noRollbackFor = AssistantException.class)
     public ConfirmProposalResponse confirmProposal(Long ownerId, Long proposalId, ConfirmProposalRequest request) {
         AssistantInteraction interaction = findProposal(ownerId, proposalId);
 
         switch (interaction.getOutcome()) {
             case CONFIRMED, EDITED -> {
-                return new ConfirmProposalResponse(interaction.getOutcome().name(), readEntries(interaction.getFinalJson()));
+                return interaction.isPriceProposal()
+                        ? new ConfirmProposalResponse(interaction.getOutcome().name(), null, null, readPrice(interaction.getFinalJson()))
+                        : new ConfirmProposalResponse(interaction.getOutcome().name(),
+                                readEntries(interaction.getFinalJson()), readClosures(interaction.getClosuresJson()), null);
             }
             case CANCELLED, EXPIRED -> throw closed(interaction);
             default -> {
@@ -234,13 +262,23 @@ public class AssistantService {
             interaction.resolve(Outcome.EXPIRED, null, now);
             throw closed(interaction);
         }
+        if (interaction.isPriceProposal()) {
+            return confirmPrice(ownerId, interaction, request, now);
+        }
 
         List<ProposedEntry> proposed = readEntries(interaction.getProposalJson());
+        List<ProposedClosure> closures = readClosures(interaction.getClosuresJson());
         List<ProposalEntryInput> inputs = request == null || request.entries() == null
                 ? proposed.stream().map(AssistantService::toInput).toList()
                 : request.entries();
 
-        ProposalValidator.Result result = proposalValidator.validate(ownerId, inputs, LocalDate.now(clock));
+        if (inputs.isEmpty() && closures.isEmpty()) {
+            throw new AssistantException(HttpStatus.BAD_REQUEST, "INVALID_PROPOSAL", "There is nothing to save.");
+        }
+        // A card with only closed days has no sales to check.
+        ProposalValidator.Result result = inputs.isEmpty()
+                ? new ProposalValidator.Result(List.of(), List.of())
+                : proposalValidator.validate(ownerId, inputs, LocalDate.now(clock));
         if (!result.isValid()) {
             throw new AssistantException(HttpStatus.BAD_REQUEST, "INVALID_PROPOSAL", String.join(" ", result.problems()));
         }
@@ -265,10 +303,56 @@ public class AssistantService {
                     entry.date(), entry.quantity(), sale.previousQuantity()));
         }
 
+        Set<LocalDate> alreadyClosed = new HashSet<>();
+        stallClosureService.getClosures(ownerId).closedDates().forEach(closed -> alreadyClosed.add(closed.getClosedDate()));
+        for (ProposedClosure closure : closures) {
+            if (closure.closed()) {
+                // "Closed tomorrow" again shouldn't wipe a reason given before, e.g. "Centre cleaning".
+                if (closure.reason() != null || !alreadyClosed.contains(closure.date())) {
+                    stallClosureService.closeDate(ownerId, closure.date(), closure.reason());
+                }
+            } else {
+                stallClosureService.reopenDate(ownerId, closure.date());
+            }
+        }
+
         Outcome outcome = sameSales(proposed, result.entries()) ? Outcome.CONFIRMED : Outcome.EDITED;
         interaction.resolve(outcome, jsonMapper.writeValueAsString(saved), now);
-        log.info("Proposal #{} for user {}: {}, {} entries saved", proposalId, ownerId, outcome, saved.size());
-        return new ConfirmProposalResponse(outcome.name(), saved);
+        log.info("Proposal #{} for user {}: {}, {} entries and {} closures saved", proposalId, ownerId, outcome,
+                saved.size(), closures.size());
+        return new ConfirmProposalResponse(outcome.name(), saved, closures, null);
+    }
+
+    // The price as proposed or as the user edited it on the card. A cost the user didn't give
+    // keeps the dish's current cost. Saved through DishPriceService, so earlier sales keep their price.
+    private ConfirmProposalResponse confirmPrice(Long ownerId, AssistantInteraction interaction,
+                                                 ConfirmProposalRequest request, Instant now) {
+        ProposedPrice proposed = readPrice(interaction.getProposalJson());
+        BigDecimal proposedCost = proposed.unitCost() != null ? proposed.unitCost()
+                : priceService.priceBook(ownerId).on(proposed.dishId(), proposed.effectiveFrom()).map(PriceBook.Price::unitCost).orElse(null);
+        BigDecimal price = request != null && request.price() != null ? request.price() : proposed.price();
+        BigDecimal unitCost = request != null && request.unitCost() != null ? request.unitCost() : proposedCost;
+
+        DishPriceResponse saved = priceService.setPrice(ownerId, proposed.dishId(),
+                new SetDishPriceRequest(price, unitCost, proposed.effectiveFrom()));
+        ProposedPrice result = new ProposedPrice(proposed.dishId(), proposed.dishName(), saved.price(), saved.unitCost(),
+                saved.effectiveFrom(), proposed.currentPrice(), proposed.currentUnitCost());
+
+        boolean asProposed = sameAmount(price, proposed.price()) && sameAmount(unitCost, proposedCost);
+        Outcome outcome = asProposed ? Outcome.CONFIRMED : Outcome.EDITED;
+        interaction.resolve(outcome, jsonMapper.writeValueAsString(result), now);
+        log.info("Proposal #{} for user {}: {}, price of dish {} set to {} from {}",
+                interaction.getId(), ownerId, outcome, proposed.dishId(), saved.price(), saved.effectiveFrom());
+        return new ConfirmProposalResponse(outcome.name(), null, null, result);
+    }
+
+    // 5 and 5.00 are the same amount; null only equals null.
+    private static boolean sameAmount(BigDecimal a, BigDecimal b) {
+        return a == null ? b == null : b != null && a.compareTo(b) == 0;
+    }
+
+    private ProposedPrice readPrice(String json) {
+        return jsonMapper.readValue(json, ProposedPrice.class);
     }
 
     @Transactional(noRollbackFor = AssistantException.class)
@@ -318,8 +402,13 @@ public class AssistantService {
         return new ProposalEntryInput(entry.dishId(), entry.newDishName(), entry.spokenName(), entry.date(), entry.quantity());
     }
 
+    // A card with only closed days has no sales (null JSON).
     private List<ProposedEntry> readEntries(String json) {
-        return jsonMapper.readValue(json, new TypeReference<List<ProposedEntry>>() {});
+        return json == null ? List.of() : jsonMapper.readValue(json, new TypeReference<List<ProposedEntry>>() {});
+    }
+
+    private List<ProposedClosure> readClosures(String json) {
+        return json == null ? List.of() : jsonMapper.readValue(json, new TypeReference<List<ProposedClosure>>() {});
     }
 
     private static String truncate(String text, int length) {

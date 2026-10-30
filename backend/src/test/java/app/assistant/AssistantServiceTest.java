@@ -1,5 +1,8 @@
 package app.assistant;
 
+import app.closure.ClosedDate;
+import app.closure.ClosedDateRepository;
+import app.closure.RestDayRepository;
 import app.dish.Dish;
 import app.dish.DishAliasRepository;
 import app.dish.DishRepository;
@@ -7,10 +10,15 @@ import app.dto.AssistantMessageRequest;
 import app.dto.AssistantMessageResponse;
 import app.dto.ConfirmProposalRequest;
 import app.dto.ProposalEntryInput;
+import app.dto.SetDishPriceRequest;
+import app.price.DishPriceRepository;
+import app.price.DishPriceService;
+import app.price.PriceBook;
 import app.sale.DailySaleRepository;
 import app.service.DailySaleService;
 import app.service.DishService;
 import app.service.PublicHolidaySyncService;
+import app.service.StallClosureService;
 import app.user.AppUser;
 import app.user.AppUserRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +33,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.math.BigDecimal;
 import java.time.*;
 import java.util.List;
 import java.util.UUID;
@@ -77,7 +86,12 @@ class AssistantServiceTest {
     @Autowired DishAliasRepository aliasRepository;
     @Autowired DailySaleRepository saleRepository;
     @Autowired AssistantInteractionRepository interactionRepository;
+    @Autowired DishPriceService priceService;
+    @Autowired DishPriceRepository priceRepository;
     @Autowired MutableClock clock;
+    @Autowired StallClosureService closureService;
+    @Autowired ClosedDateRepository closedDateRepository;
+    @Autowired RestDayRepository restDayRepository;
 
     static final LocalDate TODAY = LocalDate.of(2026, 10, 29);
     Long owner;
@@ -96,9 +110,69 @@ class AssistantServiceTest {
     @AfterEach
     void cleanUp() {
         interactionRepository.deleteAll();
+        priceRepository.deleteAll();
+        closedDateRepository.deleteAll();
+        restDayRepository.deleteAll();
         aliasRepository.deleteAll();
         saleRepository.deleteAll();
         dishRepository.deleteAll();
+    }
+
+    private BigDecimal priceOn(Dish dish, LocalDate date) {
+        return priceService.priceBook(owner).on(dish.getId(), date).map(PriceBook.Price::price).orElse(null);
+    }
+
+    @Test
+    void aNewPriceIsProposedAndOnlySavedWhenConfirmed() {
+        var response = say(owner, "char siew rice is now $5");
+
+        assertEquals("PRICE", response.proposal().type());
+        assertNull(response.proposal().entries());
+        var change = response.proposal().priceChange();
+        assertEquals(charSiewRice.getId(), change.dishId());
+        assertEquals(new BigDecimal("5.00"), change.price());
+        assertEquals(TODAY, change.effectiveFrom());
+        assertNull(change.currentPrice());
+        assertNull(priceOn(charSiewRice, TODAY));
+
+        var result = assistant.confirmProposal(owner, response.proposal().id(), null);
+
+        assertEquals("CONFIRMED", result.outcome());
+        assertNull(result.saved());
+        assertEquals(new BigDecimal("5.00"), priceOn(charSiewRice, TODAY));
+        assertTrue(interactionRepository.findById(response.proposal().id()).orElseThrow().isPriceProposal());
+    }
+
+    @Test
+    void anEditedPriceIsSavedKeepsTheCostAndEarlierSalesKeepTheOldPrice() {
+        priceService.setPrice(owner, chickenRice.getId(),
+                new SetDishPriceRequest(new BigDecimal("4.50"), new BigDecimal("1.80"), TODAY.minusDays(30)));
+
+        var response = say(owner, "chicken rice $4.80");
+        assertEquals(new BigDecimal("4.50"), response.proposal().priceChange().currentPrice());
+
+        var result = assistant.confirmProposal(owner, response.proposal().id(), new ConfirmProposalRequest(null, new BigDecimal("4.90"), null));
+
+        assertEquals("EDITED", result.outcome());
+        assertEquals(new BigDecimal("4.90"), result.priceChange().price());
+        assertEquals(new BigDecimal("1.80"), result.priceChange().unitCost());
+        assertEquals(new BigDecimal("4.90"), priceOn(chickenRice, TODAY));
+        assertEquals(new BigDecimal("4.50"), priceOn(chickenRice, TODAY.minusDays(1)));
+        // Confirming again returns the same result without saving twice.
+        assertEquals(result.priceChange(), assistant.confirmProposal(owner, response.proposal().id(), null).priceChange());
+    }
+
+    @Test
+    void aCancelledPriceChangesNothingAndAnUnknownDishIsAskedAbout() {
+        var response = say(owner, "char siew rice is now $5");
+        assistant.cancelProposal(owner, response.proposal().id());
+        assertNull(priceOn(charSiewRice, TODAY));
+
+        var unknown = say(owner, "laksa is now $6");
+        assertNull(unknown.proposal());
+        assertTrue(unknown.reply().contains("Which dish"));
+
+        assertEquals("SALES", say(owner, "chicken rice 42").proposal().type());
     }
 
     private Long newUser() {
@@ -177,7 +251,7 @@ class AssistantServiceTest {
     void editingBeforeConfirmingSavesTheEditAndRecordsIt() {
         var proposal = say(owner, "chicken rice 42").proposal();
         var edited = new ConfirmProposalRequest(List.of(
-                new ProposalEntryInput(chickenRice.getId(), null, "chicken rice", TODAY, 44)));
+                new ProposalEntryInput(chickenRice.getId(), null, "chicken rice", TODAY, 44)), null, null);
 
         var result = assistant.confirmProposal(owner, proposal.id(), edited);
 
@@ -191,8 +265,8 @@ class AssistantServiceTest {
         Long otherUser = newUser();
         Dish othersDish = dishService.createDish("Laksa", otherUser);
 
-        var future = new ConfirmProposalRequest(List.of(new ProposalEntryInput(chickenRice.getId(), null, null, TODAY.plusDays(1), 5)));
-        var notMine = new ConfirmProposalRequest(List.of(new ProposalEntryInput(othersDish.getId(), null, null, TODAY, 5)));
+        var future = new ConfirmProposalRequest(List.of(new ProposalEntryInput(chickenRice.getId(), null, null, TODAY.plusDays(1), 5)), null, null);
+        var notMine = new ConfirmProposalRequest(List.of(new ProposalEntryInput(othersDish.getId(), null, null, TODAY, 5)), null, null);
 
         assertEquals("INVALID_PROPOSAL", assertThrows(AssistantException.class, () -> assistant.confirmProposal(owner, proposal.id(), future)).getCode());
         assertEquals("INVALID_PROPOSAL", assertThrows(AssistantException.class, () -> assistant.confirmProposal(owner, proposal.id(), notMine)).getCode());
@@ -231,6 +305,88 @@ class AssistantServiceTest {
         assertEquals(HttpStatus.CONFLICT, assertThrows(AssistantException.class,
                 () -> assistant.confirmProposal(owner, proposal.id(), null)).getStatus());
         assertTrue(saleRepository.findByDishIdOrderBySaleDateAsc(chickenRice.getId()).isEmpty());
+    }
+
+    @Test
+    void aClosureIsProposedWithoutSavingAnything() {
+        var response = say(owner, "closed tomorrow for centre cleaning");
+
+        assertEquals("Please check these and press Confirm to save them.", response.reply());
+        assertTrue(response.proposal().entries().isEmpty());
+        assertEquals(List.of(new ProposedClosure(TODAY.plusDays(1), true, "Centre cleaning")), response.proposal().closures());
+        assertTrue(closedDateRepository.findByOwnerIdOrderByClosedDateAsc(owner).isEmpty());
+    }
+
+    @Test
+    void salesAndAClosureShareOneCardAndAreSavedTogether() {
+        var proposal = say(owner, "today chicken rice 42, closed tomorrow").proposal();
+        assertEquals(1, proposal.entries().size());
+        assertEquals(1, proposal.closures().size());
+
+        var result = assistant.confirmProposal(owner, proposal.id(), null);
+
+        assertEquals("CONFIRMED", result.outcome());
+        assertEquals(42, saleRepository.findByDishIdAndSaleDate(chickenRice.getId(), TODAY).orElseThrow().getQuantitySold());
+        assertEquals(List.of(TODAY.plusDays(1)), closedDates());
+        assertEquals(result.closures(), assistant.confirmProposal(owner, proposal.id(), null).closures());
+    }
+
+    @Test
+    void removingEverySaleFromTheCardStillSavesTheClosure() {
+        var proposal = say(owner, "today chicken rice 42, closed tomorrow").proposal();
+
+        var result = assistant.confirmProposal(owner, proposal.id(), new ConfirmProposalRequest(List.of(), null, null));
+
+        assertEquals("EDITED", result.outcome());
+        assertTrue(saleRepository.findByDishIdOrderBySaleDateAsc(chickenRice.getId()).isEmpty());
+        assertEquals(List.of(TODAY.plusDays(1)), closedDates());
+    }
+
+    @Test
+    void closingADayAgainWithoutAReasonKeepsTheEarlierReason() {
+        closureService.closeDate(owner, TODAY.plusDays(1), "Centre cleaning");
+
+        assistant.confirmProposal(owner, say(owner, "closed tomorrow").proposal().id(), null);
+
+        assertEquals("Centre cleaning", closedDateRepository.findByOwnerIdAndClosedDate(owner, TODAY.plusDays(1)).orElseThrow().getReason());
+    }
+
+    @Test
+    void openingAgainNeedsADayThatIsMarkedClosed() {
+        var nothingToOpen = say(owner, "we will open tomorrow after all");
+        assertNull(nothingToOpen.proposal());
+        assertTrue(nothingToOpen.reply().contains("isn't marked as closed"), nothingToOpen.reply());
+
+        closureService.closeDate(owner, TODAY.plusDays(1), "Holiday");
+        var proposal = say(owner, "we will open tomorrow after all").proposal();
+        assertEquals(List.of(new ProposedClosure(TODAY.plusDays(1), false, null)), proposal.closures());
+
+        assistant.confirmProposal(owner, proposal.id(), null);
+        assertTrue(closedDates().isEmpty());
+    }
+
+    @Test
+    void weeklyRestDaysAreNotChangedThroughTheAssistant() {
+        closureService.setRestDays(owner, List.of(TODAY.plusDays(1).getDayOfWeek()));
+
+        var response = say(owner, "closed tomorrow");
+
+        assertNull(response.proposal());
+        assertTrue(response.reply().contains("weekly rest day"), response.reply());
+    }
+
+    @Test
+    void anotherUserCannotSeeOrConfirmAClosure() {
+        var proposal = say(owner, "closed tomorrow").proposal();
+
+        var error = assertThrows(AssistantException.class, () -> assistant.confirmProposal(newUser(), proposal.id(), null));
+
+        assertEquals("PROPOSAL_NOT_FOUND", error.getCode());
+        assertTrue(closedDates().isEmpty());
+    }
+
+    private List<LocalDate> closedDates() {
+        return closedDateRepository.findByOwnerIdOrderByClosedDateAsc(owner).stream().map(ClosedDate::getClosedDate).toList();
     }
 
     @Test
