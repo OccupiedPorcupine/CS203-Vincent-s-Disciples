@@ -13,7 +13,6 @@ public record AssistantMessageRequest(
         @NotBlank @Size(max = 1000) @Schema(description = "What the user said or typed", example = "today chicken rice 42, char siew 30") String text,
         @Size(max = 64) @Schema(description = "Page the user is on", example = "dashboard") String page,
         @Pattern(regexp = "voice|text") @Schema(description = "How the text was entered", example = "voice") String inputMode,
-        @Size(max = 5) @Schema(description = "Languages detected by transcription", example = "[\"en\", \"zh\"]") List<@Size(max = 8) String> languages,
         @Valid @Size(max = 60) @Schema(description = "Visible elements on the current page, so the assistant can point at them") List<PageElement> pageContext
 ) {
     // id is a data-guide-id, or a temporary "live-N" ID the widget gave an element the app guide doesn't describe.

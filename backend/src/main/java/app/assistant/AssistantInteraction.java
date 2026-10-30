@@ -104,4 +104,8 @@ public class AssistantInteraction {
     public String getFinalJson() {
         return finalJson;
     }
+
+    public String getDetectedLanguages() {
+        return detectedLanguages;
+    }
 }
