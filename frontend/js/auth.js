@@ -17,9 +17,11 @@ function showPanel(panelName) {
   });
 }
 
-function setStatus(element, message, success = false) {
+// tone: "" for progress, "success" or "error".
+function setStatus(element, message, tone = "") {
   element.textContent = message;
-  element.classList.toggle("is-success", success);
+  element.classList.toggle("is-success", tone === "success");
+  element.classList.toggle("is-error", tone === "error");
 }
 
 function setFormBusy(form, busy) {
@@ -79,7 +81,7 @@ async function restoreSession() {
     showAccount(user);
   } catch (error) {
     if (error.status !== 401) {
-      setStatus(document.querySelector("#login-status"), "The backend could not be reached.");
+      setStatus(document.querySelector("#login-status"), "The backend could not be reached.", "error");
     }
   }
 }
@@ -103,7 +105,7 @@ document.querySelector("#login-form").addEventListener("submit", async (event) =
     form.reset();
     showAccount(user);
   } catch (error) {
-    setStatus(status, error.message);
+    setStatus(status, error.message, "error");
   } finally {
     setFormBusy(form, false);
   }
@@ -116,7 +118,7 @@ document.querySelector("#signup-form").addEventListener("submit", async (event) 
   const data = new FormData(form);
 
   if (data.get("password") !== data.get("confirmPassword")) {
-    setStatus(status, "Passwords do not match.");
+    setStatus(status, "Passwords do not match.", "error");
     return;
   }
 
@@ -134,7 +136,7 @@ document.querySelector("#signup-form").addEventListener("submit", async (event) 
     form.reset();
     showAccount(user);
   } catch (error) {
-    setStatus(status, error.message);
+    setStatus(status, error.message, "error");
   } finally {
     setFormBusy(form, false);
   }
@@ -151,9 +153,9 @@ document.querySelector("#logout-button").addEventListener("click", async () => {
     csrf = null;
     await refreshCsrf();
     showPanel("login");
-    setStatus(document.querySelector("#login-status"), "You have been signed out.", true);
+    setStatus(document.querySelector("#login-status"), "You have been signed out.", "success");
   } catch (error) {
-    setStatus(status, error.message);
+    setStatus(status, error.message, "error");
   }
 });
 
@@ -179,7 +181,7 @@ function initializeGoogleSignIn() {
           });
           showAccount(user);
         } catch (error) {
-          setStatus(status, error.message);
+          setStatus(status, error.message, "error");
         }
       }
     });
@@ -193,7 +195,7 @@ function initializeGoogleSignIn() {
     });
   };
   script.onerror = () => {
-    setStatus(document.querySelector("#login-status"), "Google sign-in could not be loaded.");
+    setStatus(document.querySelector("#login-status"), "Google sign-in could not be loaded.", "error");
   };
   document.head.appendChild(script);
 }
@@ -206,7 +208,7 @@ async function startApplication() {
     initializeGoogleSignIn();
     await restoreSession();
   } catch {
-    setStatus(document.querySelector("#login-status"), "The backend could not be reached.");
+    setStatus(document.querySelector("#login-status"), "The backend could not be reached.", "error");
   }
 }
 

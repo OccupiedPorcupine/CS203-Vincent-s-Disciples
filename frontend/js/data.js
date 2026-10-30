@@ -48,7 +48,7 @@ function clearFile() {
 
 function showStatus(message, type = "", element = uploadStatus) {
   element.textContent = message;
-  element.className = `status-message ${type}`.trim();
+  element.className = `status-text${type ? ` is-${type}` : ""}`;
 }
 
 function formatBytes(bytes) {
@@ -91,7 +91,7 @@ function renderSources(sources) {
     const size = document.createElement("span");
     size.textContent = formatBytes(source.sizeBytes);
     const usage = document.createElement("span");
-    usage.className = `usage${source.usedByModel ? " active" : ""}`;
+    usage.className = `tag${source.usedByModel ? " is-active" : ""}`;
     usage.textContent = source.usedByModel ? "Used by active model" : "Available for training";
 
     const sales = document.createElement("div");
@@ -279,19 +279,23 @@ function dishRow(dish, dishes) {
 
   const choice = document.createElement("div");
   choice.className = "import-choice";
+  const selectWrap = document.createElement("div");
+  selectWrap.className = "select-wrap";
   const select = document.createElement("select");
+  select.className = "input";
   select.setAttribute("aria-label", `Record “${dish.name}” as`);
+  selectWrap.append(select);
   select.append(new Option("Add as a new dish", NEW_DISH));
   dishes.forEach(existing => select.append(new Option(existing.name, String(existing.id))));
   select.append(new Option("Leave out", LEAVE_OUT));
   select.value = dish.match ? String(dish.match.dishId) : NEW_DISH;
   const tag = document.createElement("span");
-  tag.className = "usage new-dish";
+  tag.className = "tag is-warning";
   tag.textContent = "New dish";
   const updateTag = () => { tag.hidden = select.value !== NEW_DISH; };
   select.addEventListener("change", updateTag);
   updateTag();
-  choice.append(select, tag);
+  choice.append(selectWrap, tag);
 
   row.append(name, days, choice);
   return row;
