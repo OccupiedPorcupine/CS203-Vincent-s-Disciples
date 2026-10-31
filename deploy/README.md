@@ -37,12 +37,20 @@ Set these in the Vercel project under **Settings → Environment Variables**, or
 | `GOOGLE_CLIENT_ID` | Real ID. Add the preview address to the OAuth client's authorized JavaScript origins. | Real ID. Add the production address too. |
 | `ASSISTANT_PROVIDER` | `offline`, or leave unset to use OpenAI | Unset, to use OpenAI |
 | `OPENAI_API_KEY` | Optional, as a sensitive variable | Required, as a sensitive variable |
-| `SPRING_PROFILES_ACTIVE` | `supabase` | `supabase` |
+| `SPRING_PROFILES_ACTIVE` | `supabase,prod` (`supabase` until the variables below are set) | `supabase,prod` (`supabase` until the variables below are set) |
+| `APP_BASE_URL` | The preview address, `https://…` | The production address, `https://…` |
+| `APP_CORS_ALLOWED_ORIGINS` | The same address | The same address |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | An SMTP account (see below); the password as a sensitive variable | The same |
+| `SWAGGER_ENABLED` | Optional: `true` to serve the API docs at `/swagger-ui.html` | Unset (the docs stay private) |
 | `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project (Seoul, `ap-northeast-2`) | The **Production** Supabase project (Singapore, `ap-southeast-1`) |
 
 Use each project's **Session pooler** address from Supabase's **Connect** panel, as `jdbc:postgresql://<host>:5432/postgres?sslmode=require`. The direct address is IPv6-only, and Vercel can't reach it. Put any new Supabase project in an Asian region, because of the startup limit above.
 
 Only the live site uses the Production project. Don't point a local `backend/.env` at it: running a branch locally applies that branch's migrations, which would change the live site's tables before the code is merged. For local work, use the built-in H2 database, or Staging.
+
+**The `prod` profile checks the settings.** With it, the backend refuses to start, and lists what's wrong, if the H2 console is on, the login cookie isn't HTTPS-only, `FORWARD_HEADERS_STRATEGY` is `none`, the database is H2, `MAIL_HOST` isn't set, or `APP_BASE_URL` or a CORS origin isn't `https://`. It also turns the Swagger UI off unless `SWAGGER_ENABLED=true`.
+
+**Email.** Password reset and email verification links are sent over SMTP. Without a domain of your own, Brevo's free plan (300 emails a day) sends from a single verified address; Resend needs a verified domain to send to anyone but you. Locally, without `MAIL_HOST`, the emails are written to the backend log instead.
 
 Without the `SPRING_PROFILES_ACTIVE` and database variables, the backend uses an in-memory H2 database. It's wiped every time the container stops, which is fine for a quick check of a preview and nothing else.
 
@@ -55,6 +63,9 @@ Previews are protected by Vercel login. To call a protected preview from a scrip
 
 ## Things to know
 
+- **The ML service is private.** On Vercel only the backend can reach it, through the binding. On a host where it would be public (e.g. Render), set the same `ML_SHARED_SECRET` on both services: the backend sends it and the ML service refuses requests without it.
+- **HTTPS.** Vercel and Render redirect HTTP to HTTPS before requests reach the backend. On a host that doesn't, set `REQUIRE_HTTPS=true`.
+- **Rate limits** on login, signup and password reset are kept in memory, so each running backend counts separately and a restart clears them.
 - **Uploaded training files** are saved to `/tmp` inside the backend container. They disappear when it stops; only their metadata stays in the database.
 - **Request size:** Vercel functions accept at most 4.5 MB per request, so training uploads are effectively limited to that, even though the backend allows 25 MB.
 - **Hobby plan limits:** 4 hours of active CPU and 360 GB-hours of memory a month, and non-commercial use only. Going over pauses the project instead of charging.

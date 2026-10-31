@@ -10,8 +10,25 @@ const config = {
 const panels = {
   login: document.querySelector("#login-panel"),
   signup: document.querySelector("#signup-panel"),
+  forgot: document.querySelector("#forgot-panel"),
+  reset: document.querySelector("#reset-panel"),
+  verify: document.querySelector("#verify-panel"),
   account: document.querySelector("#account-panel")
 };
+
+// Token from an emailed link: index.html#reset=… or #verify=…. It is in the fragment so it is
+// never sent to a server or written to a log. Read once, then removed from the address bar.
+const emailedLink = (() => {
+  const match = location.hash.match(/^#(reset|verify)=([A-Za-z0-9_-]+)$/);
+  if (match) history.replaceState(null, "", location.pathname + location.search);
+  return match ? { kind: match[1], token: match[2] } : null;
+})();
+
+// A link opened in a tab that already shows this page only changes the fragment; start over so
+// it is handled like a fresh visit.
+window.addEventListener("hashchange", () => {
+  if (/^#(reset|verify)=/.test(location.hash)) location.reload();
+});
 
 let csrf = null;
 
@@ -148,6 +165,71 @@ document.querySelector("#signup-form").addEventListener("submit", async (event) 
 
 document.querySelector("#show-signup").addEventListener("click", () => showPanel("signup"));
 document.querySelector("#show-login").addEventListener("click", () => showPanel("login"));
+document.querySelector("#show-forgot").addEventListener("click", () => {
+  document.querySelector("#forgot-email").value = document.querySelector("#email").value;
+  showPanel("forgot");
+});
+document.querySelectorAll("[data-show]").forEach((button) => {
+  button.addEventListener("click", () => showPanel(button.dataset.show));
+});
+
+document.querySelector("#forgot-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("#forgot-status");
+  const email = new FormData(form).get("email");
+  setStatus(status, "Sending…");
+  setFormBusy(form, true);
+  try {
+    await apiRequest("/api/auth/password-reset", {
+      method: "POST",
+      body: JSON.stringify({ email })
+    });
+    setStatus(status, "If an account uses that email, a reset link is on its way. It works for 30 minutes.", "success");
+  } catch (error) {
+    setStatus(status, error.message, "error");
+  } finally {
+    setFormBusy(form, false);
+  }
+});
+
+document.querySelector("#reset-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector("#reset-status");
+  const data = new FormData(form);
+  if (data.get("password") !== data.get("confirmPassword")) {
+    setStatus(status, "Passwords do not match.", "error");
+    return;
+  }
+
+  setStatus(status, "Changing your password…");
+  setFormBusy(form, true);
+  try {
+    await apiRequest("/api/auth/password-reset/confirm", {
+      method: "POST",
+      body: JSON.stringify({ token: emailedLink.token, password: data.get("password") })
+    });
+    form.reset();
+    showPanel("login");
+    setStatus(document.querySelector("#login-status"), "Password changed. Log in with your new password.", "success");
+  } catch (error) {
+    setStatus(status, error.message, "error");
+  } finally {
+    setFormBusy(form, false);
+  }
+});
+
+async function confirmEmail(token) {
+  showPanel("verify");
+  const status = document.querySelector("#verify-status");
+  try {
+    await apiRequest("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) });
+    setStatus(status, "Thanks, your email is confirmed.", "success");
+  } catch (error) {
+    setStatus(status, error.message, "error");
+  }
+}
 
 document.querySelector("#logout-button").addEventListener("click", async () => {
   const status = document.querySelector("#account-status");
@@ -210,6 +292,14 @@ async function startApplication() {
     const publicConfig = await apiRequest("/api/config");
     config.googleClientId = publicConfig.googleClientId || "";
     initializeGoogleSignIn();
+    if (emailedLink?.kind === "reset") {
+      showPanel("reset");
+      return;
+    }
+    if (emailedLink?.kind === "verify") {
+      await confirmEmail(emailedLink.token);
+      return;
+    }
     await restoreSession();
   } catch {
     setStatus(document.querySelector("#login-status"), "The backend could not be reached.", "error");

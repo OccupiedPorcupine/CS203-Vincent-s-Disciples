@@ -42,6 +42,9 @@ h1 span { display: block; color: var(--teal-strong); }
   .forgot-password { display: inline-flex; align-items: center; min-height: 44px; margin: -13px 0; }
 }
 .sign-in-form .primary-button { margin-top: 8px; }
+.forgot-password { color: var(--muted); font-size: var(--text-xs); text-decoration: none; }
+.panel-lede { margin: -8px 0 24px; color: var(--muted); font-size: var(--text-sm); }
+.verify-continue { margin-top: 16px; }
 
 .separator {
   display: flex;

@@ -55,8 +55,9 @@ async function apiRequest(path, options = {}) {
         return response.blob();
     }
 
-    // 204 No Content, e.g. cancelling an assistant proposal.
-    if (response.status === 204) {
+    // No body: 204 No Content (e.g. cancelling an assistant proposal) or 202 Accepted (e.g.
+    // asking for the verification email again).
+    if (response.status === 204 || !(response.headers.get("content-type") || "").includes("application/json")) {
         return null;
     }
 

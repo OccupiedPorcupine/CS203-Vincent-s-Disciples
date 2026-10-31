@@ -40,7 +40,7 @@
         <div class="field password-field">
           <label for="password">Password</label>
           <input class="input" id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" required>
-          <a class="forgot-password" href="#">Forgot password?</a>
+          <button id="show-forgot" class="text-button forgot-password" type="button">Forgot password?</button>
         </div>
 
         <button class="primary-button login-button" type="submit">Log in</button>
@@ -98,6 +98,54 @@
         <span>Already have an account?</span>
         <button id="show-login" class="text-button" type="button">Log in</button>
       </div>
+    </section>
+
+    <section id="forgot-panel" class="sign-in-panel" aria-labelledby="forgot-heading" hidden>
+      <h1 id="forgot-heading">Reset your <span>password</span></h1>
+      <p class="panel-lede">Enter your account’s email and we’ll send you a link to choose a new password.</p>
+
+      <form id="forgot-form" class="sign-in-form">
+        <div class="field">
+          <label for="forgot-email">Email</label>
+          <input class="input" id="forgot-email" name="email" type="email" placeholder="Email address" autocomplete="email" maxlength="254" required>
+        </div>
+        <button class="primary-button form-submit-button" type="submit">Send reset link</button>
+      </form>
+
+      <p id="forgot-status" class="status-text" role="status" aria-live="polite"></p>
+
+      <div class="sign-up-row">
+        <span>Remembered it?</span>
+        <button class="text-button" type="button" data-show="login">Log in</button>
+      </div>
+    </section>
+
+    <section id="reset-panel" class="sign-in-panel" aria-labelledby="reset-heading" hidden>
+      <h1 id="reset-heading">Choose a new <span>password</span></h1>
+
+      <form id="reset-form" class="sign-in-form">
+        <div class="field">
+          <label for="reset-password">New password</label>
+          <input class="input" id="reset-password" name="password" type="password" placeholder="At least 12 characters" autocomplete="new-password" minlength="12" maxlength="256" required>
+        </div>
+        <div class="field">
+          <label for="reset-confirm-password">Confirm password</label>
+          <input class="input" id="reset-confirm-password" name="confirmPassword" type="password" placeholder="Repeat password" autocomplete="new-password" minlength="12" maxlength="256" required>
+        </div>
+        <button class="primary-button form-submit-button" type="submit">Change password</button>
+      </form>
+
+      <p id="reset-status" class="status-text" role="status" aria-live="polite"></p>
+
+      <div class="sign-up-row">
+        <button class="text-button" type="button" data-show="login">Back to log in</button>
+      </div>
+    </section>
+
+    <section id="verify-panel" class="sign-in-panel" aria-labelledby="verify-heading" hidden>
+      <h1 id="verify-heading">Confirming your <span>email</span></h1>
+      <p id="verify-status" class="status-text" role="status" aria-live="polite">Checking the link…</p>
+      <a class="primary-button verify-continue" href="dashboard.html">Continue</a>
     </section>
 
     <section id="account-panel" class="sign-in-panel account-panel" aria-labelledby="account-heading" hidden>
