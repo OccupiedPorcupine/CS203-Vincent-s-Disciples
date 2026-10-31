@@ -43,7 +43,9 @@
   color: var(--muted);
 }
 .heatmap-month { grid-row: 1; white-space: nowrap; }
-.heatmap-weekday { grid-column: 1; align-self: center; }
+/* Zero height, so the labels never make their row taller than a square (which would leave
+   gaps around the Mon, Wed and Fri rows when the squares are small); the text still shows. */
+.heatmap-weekday { grid-column: 1; align-self: center; height: 0; line-height: 0; overflow: visible; }
 .heat-cell { aspect-ratio: 1; border-radius: 3px; background: var(--neutral-soft); }
 .heat-cell.level-1 { background: var(--heat-1); }
 .heat-cell.level-2 { background: var(--heat-2); }
