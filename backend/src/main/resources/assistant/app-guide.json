@@ -24,7 +24,7 @@
         { "guideId": "dish-chart", "description": "Bar chart of portions sold per dish over the same 7 days." },
         { "guideId": "revenue-card", "description": "Revenue for the same 7 days as the charts, with gross profit and margin. Dishes without a price are named here and not counted as $0; the Set prices link goes to the Dishes page." },
         { "guideId": "top-dishes", "description": "The dishes that made the most gross profit in those 7 days, with the margin per plate." },
-        { "guideId": "actions-needed", "description": "Checklist of things to do (placeholder items for now)." },
+        { "guideId": "actions-needed", "description": "Things to do now, worked out from the stall's data: days with no sales logged (Add sales opens a form for that day), uploaded files not imported yet, dishes without a price, and a public holiday coming up, with how the same holiday went last year. Each card can be dismissed." },
         { "guideId": "assistant-chat", "description": "Large text box for typing or speaking to the assistant, e.g. to record today's sales." }
       ]
     },

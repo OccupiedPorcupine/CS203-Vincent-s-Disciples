@@ -98,18 +98,29 @@
 
     <section class="section actions" aria-labelledby="actions-heading" data-guide-id="actions-needed">
       <div class="section-heading"><h2 id="actions-heading">Actions needed</h2></div>
-      <div class="checklist">
-        <label class="check-field"><input type="checkbox" checked aria-describedby="action-one-description"><span>Label<span class="description" id="action-one-description">Description</span></span></label>
-        <label class="check-field"><input type="checkbox" checked aria-describedby="action-two-description"><span>Label<span class="description" id="action-two-description">Description</span></span></label>
-      </div>
+      <!-- Filled from GET /api/actions by js/dashboard.js. -->
+      <ul class="action-list" id="action-list" aria-labelledby="actions-heading"></ul>
+      <p class="status-text" id="actions-note" role="status" aria-live="polite">Loading&hellip;</p>
     </section>
+
+    <!-- Opened by a "You haven't logged sales" card. -->
+    <dialog class="record-dialog" id="record-dialog" aria-labelledby="record-heading">
+      <form method="dialog" id="record-form">
+        <h2 id="record-heading">Sales for the day</h2>
+        <p class="lede">Portions sold of each dish. Leave a dish empty if you didn’t sell it.</p>
+        <div class="record-list" id="record-list"></div>
+        <p class="status-text" id="record-status" role="status" aria-live="polite"></p>
+        <div class="record-actions">
+          <button class="secondary-button" type="button" id="record-cancel">Cancel</button>
+          <button class="primary-button" type="submit" id="record-save">Save</button>
+        </div>
+      </form>
+    </dialog>
 
     <!-- Sends to the voice assistant (js/assistant.js), which opens its panel to reply. -->
     <section class="chat-box" aria-label="AI assistant" data-guide-id="assistant-chat">
       <textarea aria-label="Message to AI assistant" placeholder="What would you like to know?"></textarea>
       <div class="chat-toolbar">
-        <label class="icon-button attachment" title="Attach an image"><input type="file" accept="image/*" aria-label="Attach an image"><img src="images/dashboard/icon4.svg" alt=""></label>
-        <button class="icon-button" type="button" disabled title="Code input is not connected" aria-label="Code input"><img src="images/dashboard/icon1.svg" alt=""></button>
         <button class="icon-button" type="button" disabled title="Voice input" aria-label="Voice input"><img src="images/dashboard/icon7.svg" alt=""></button>
         <button class="icon-button send" type="button" disabled title="Send message" aria-label="Send message"><img src="images/dashboard/icon3.svg" alt=""></button>
       </div>
