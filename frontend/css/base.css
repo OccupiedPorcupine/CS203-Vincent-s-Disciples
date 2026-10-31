@@ -20,6 +20,12 @@
   --error-soft: #fdecea;
   --warning: #7a4b00;
   --warning-soft: #fff1d6;
+  /* Sequential teal for magnitude (the dashboard's revenue heatmap), light to dark. Validated
+     as an ordinal ramp on --surface: one hue, even steps, the lightest at 2.09:1. */
+  --heat-1: #74c1b8;
+  --heat-2: #36a499;
+  --heat-3: #12827a;
+  --heat-4: #0a5c57;
   --header-gradient: linear-gradient(90deg, #a9dcd6 0%, #dfe5dc 55%, #f5e3d2 100%);
 
   /* Type */

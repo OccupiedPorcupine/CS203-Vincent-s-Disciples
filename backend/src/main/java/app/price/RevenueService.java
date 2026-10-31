@@ -2,10 +2,12 @@ package app.price;
 
 import app.dish.Dish;
 import app.dish.DishRepository;
+import app.dto.DailyRevenueResponse;
 import app.dto.RevenueResponse;
 import app.dto.RevenueResponse.DishRevenue;
 import app.sale.DailySale;
 import app.sale.DailySaleRepository;
+import app.service.StallClosureService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,15 +21,48 @@ import java.util.*;
 public class RevenueService {
 
     static final int MAX_DAYS = 366;
+    // 53 weeks, so a heatmap can start on a Monday and still reach today.
+    static final int MAX_DAILY_DAYS = 371;
 
     private final DishRepository dishRepository;
     private final DailySaleRepository saleRepository;
     private final DishPriceService priceService;
+    private final StallClosureService closureService;
 
-    public RevenueService(DishRepository dishRepository, DailySaleRepository saleRepository, DishPriceService priceService) {
+    public RevenueService(DishRepository dishRepository, DailySaleRepository saleRepository, DishPriceService priceService,
+                          StallClosureService closureService) {
         this.dishRepository = dishRepository;
         this.saleRepository = saleRepository;
         this.priceService = priceService;
+        this.closureService = closureService;
+    }
+
+    // Each day's revenue at the prices that applied that day, as in summary().
+    @Transactional(readOnly = true)
+    public DailyRevenueResponse daily(Long ownerId, LocalDate from, LocalDate to) {
+        if (to.isBefore(from)) throw new IllegalArgumentException("The end date is before the start date.");
+        if (ChronoUnit.DAYS.between(from, to) >= MAX_DAILY_DAYS) throw new IllegalArgumentException("Choose at most 53 weeks.");
+
+        PriceBook book = priceService.priceBook(ownerId);
+        Map<LocalDate, Integer> portions = new HashMap<>();
+        Map<LocalDate, BigDecimal> revenue = new HashMap<>();
+        for (DailySale sale : saleRepository.findByDishOwnerIdAndSaleDateBetween(ownerId, from, to)) {
+            portions.merge(sale.getSaleDate(), sale.getQuantitySold(), Integer::sum);
+            book.on(sale.getDish().getId(), sale.getSaleDate()).ifPresent(price -> revenue.merge(sale.getSaleDate(),
+                    price.price().multiply(BigDecimal.valueOf(sale.getQuantitySold())), BigDecimal::add));
+        }
+
+        StallClosureService.StallClosures closures = closureService.getClosures(ownerId);
+        Set<LocalDate> closedDates = new HashSet<>();
+        closures.closedDates().forEach(closedDate -> closedDates.add(closedDate.getClosedDate()));
+
+        List<DailyRevenueResponse.Day> days = new ArrayList<>();
+        for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
+            days.add(new DailyRevenueResponse.Day(day, portions.getOrDefault(day, 0), revenue.get(day),
+                    closedDates.contains(day) || closures.restDays().contains(day.getDayOfWeek())));
+        }
+        boolean anyPrices = dishRepository.findByOwnerIdOrderByNameAsc(ownerId).stream().anyMatch(dish -> book.hasPrice(dish.getId()));
+        return new DailyRevenueResponse(from, to, anyPrices, days);
     }
 
     @Transactional(readOnly = true)

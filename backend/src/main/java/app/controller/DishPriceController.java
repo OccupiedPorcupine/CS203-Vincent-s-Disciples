@@ -1,5 +1,6 @@
 package app.controller;
 
+import app.dto.DailyRevenueResponse;
 import app.dto.DishPriceResponse;
 import app.dto.RevenueResponse;
 import app.dto.SetDishPriceRequest;
@@ -42,6 +43,15 @@ public class DishPriceController {
     @GetMapping("/dishes/{dishId}/prices")
     public List<DishPriceResponse> history(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long dishId) {
         return priceService.history(user.id(), dishId);
+    }
+
+    @Operation(summary = "Revenue for each day", description = "Each day from 'from' to 'to' inclusive (at most 53 weeks): "
+            + "portions, revenue at the prices that applied that day, and whether the stall was closed. For the dashboard's heatmap.")
+    @GetMapping("/revenue/daily")
+    public DailyRevenueResponse dailyRevenue(@AuthenticationPrincipal AuthenticatedUser user,
+                                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return revenueService.daily(user.id(), from, to);
     }
 
     @Operation(summary = "Revenue and gross profit", description = "For sales from 'from' to 'to' inclusive, at most a year.")
