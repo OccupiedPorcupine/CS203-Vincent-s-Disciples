@@ -1,7 +1,8 @@
-// Phone check for issue #47: signs in, records sales through the assistant and gets a forecast in
-// WebKit (Safari's engine) at iPhone sizes, with a mocked API (no backend or login needed).
-// On every page it fails if the page scrolls sideways, a field would make iOS zoom in (text under
-// 16px), a control is smaller than 44px, or the floating assistant button covers a control.
+// Phone check for issue #47: signs in, records sales through the assistant, gets a forecast and
+// prices a dish in WebKit (Safari's engine) at iPhone sizes, with a mocked API (no backend or login
+// needed). On every page it fails if the home-screen app tags are missing, the page scrolls
+// sideways, a field would make iOS zoom in (text under 16px), a control is smaller than 44px, or
+// the floating assistant button covers a control.
 //
 // Start the frontend (node frontend/server.mjs), then from the repo root:
 //   npm install --prefix /tmp/chicky-pw playwright && npx --prefix /tmp/chicky-pw playwright install webkit
@@ -26,6 +27,10 @@ function checkPage() {
       && !el.closest(".visually-hidden") && !el.closest("details:not([open]) > :not(summary)");
   };
   const label = el => (el.getAttribute("aria-label") || el.textContent || el.id || el.tagName).trim().replace(/\s+/g, " ").slice(0, 32);
+
+  // The home-screen app tags and notch-aware viewport every page needs (DESIGN.md, "Phones").
+  if (!document.querySelector('meta[name=viewport][content*="viewport-fit=cover"]')) problems.push("viewport tag lacks viewport-fit=cover");
+  if (!document.querySelector("link[rel=manifest]") || !document.querySelector("link[rel=apple-touch-icon]")) problems.push("no home-screen app tags");
 
   const overflow = document.scrollingElement.scrollWidth - width;
   if (overflow > 0) problems.push(`scrolls sideways by ${overflow}px`);
@@ -80,7 +85,14 @@ async function mockApi(context) {
     if (path === "/api/config") return json(route, { googleClientId: "" });
     if (path === "/api/auth/login") { signedIn = true; return json(route, { name: "Mei Ling", email: "mei@example.com" }); }
     if (path === "/api/profile") return signedIn ? json(route, { name: "Mei Ling", email: "mei@example.com" }) : json(route, {}, 401);
-    if (path === "/api/dishes") return json(route, [{ id: 1, name: "Chicken rice" }, { id: 2, name: "Char siew rice" }]);
+    if (path === "/api/dishes") return json(route, [
+      { id: 1, name: "Chicken rice", price: 4.5, unitCost: 1.7 },
+      { id: 2, name: "Char siew rice", price: null, unitCost: null }
+    ]);
+    if (path.endsWith("/price")) {
+      const { price, unitCost } = route.request().postDataJSON();
+      return json(route, { price, unitCost });
+    }
     if (path.endsWith("/sales")) return json(route, Array.from({ length: 35 }, (_, i) => ({ date: day(i - 34), quantitySold: 30 + (i * 7) % 15 })));
     if (path === "/api/data-sources") return json(route, []);
     if (path === "/api/assistant/status") return json(route, { available: true, voice: false });
@@ -93,7 +105,11 @@ async function mockApi(context) {
       ] }
     });
     if (path === "/api/assistant/proposals/p1/confirm") return json(route, { saved: [{}, {}] });
-    if (path === "/api/forecast") return json(route, { predicted_demand: 47.2 });
+    if (path === "/api/forecast") return json(route, {
+      dish: "Chicken rice", forecastDate: "2026-10-31", predictedDemand: 47.2, low: 41, high: 53,
+      roughRange: false, method: "MODEL", fallbackReason: null, basis: "the forecast model", note: null
+    });
+    if (path === "/api/closures") return json(route, { restDays: ["TUESDAY"], closedDates: [{ date: day(14), reason: "Centre cleaning" }] });
     return route.fulfill({ status: 404, body: "" });
   });
 }
@@ -148,6 +164,16 @@ async function mockApi(context) {
     await page.tap('.navigation a[href="data.html"]');
     await page.waitForURL("**/data.html");
     await check("data ingestion page");
+
+    // Dishes: price a dish
+    await page.tap(".navigation summary");
+    await page.tap('.navigation a[href="dishes.html"]');
+    await page.waitForURL("**/dishes.html");
+    await page.getByLabel("Price of Char siew rice in S$").fill("5.00");
+    await page.getByLabel("Cost of one Char siew rice in S$").fill("2.00");
+    await page.tap('[aria-label="Save the price of Char siew rice"]');
+    await page.getByText("Saved Char siew rice").waitFor();
+    await check("dishes page");
 
     await context.close();
   }
