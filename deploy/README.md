@@ -37,14 +37,16 @@ Set these in the Vercel project under **Settings → Environment Variables**, or
 | `GOOGLE_CLIENT_ID` | Real ID. Add the preview address to the OAuth client's authorized JavaScript origins. | Real ID. Add the production address too. |
 | `ASSISTANT_PROVIDER` | `offline`, or leave unset to use OpenAI | Unset, to use OpenAI |
 | `OPENAI_API_KEY` | Optional, as a sensitive variable | Required, as a sensitive variable |
-| `SPRING_PROFILES_ACTIVE` | `supabase,prod` | `supabase,prod` |
+| `SPRING_PROFILES_ACTIVE` | `supabase,prod` (`supabase` until the variables below are set) | `supabase,prod` (`supabase` until the variables below are set) |
 | `APP_BASE_URL` | The preview address, `https://…` | The production address, `https://…` |
 | `APP_CORS_ALLOWED_ORIGINS` | The same address | The same address |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | An SMTP account (see below); the password as a sensitive variable | The same |
 | `SWAGGER_ENABLED` | Optional: `true` to serve the API docs at `/swagger-ui.html` | Unset (the docs stay private) |
-| `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project (Seoul, `ap-northeast-2`) | **Main-database** |
+| `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project (Seoul, `ap-northeast-2`) | The **Production** Supabase project (Singapore, `ap-southeast-1`) |
 
 Use each project's **Session pooler** address from Supabase's **Connect** panel, as `jdbc:postgresql://<host>:5432/postgres?sslmode=require`. The direct address is IPv6-only, and Vercel can't reach it. Put any new Supabase project in an Asian region, because of the startup limit above.
+
+Only the live site uses the Production project. Don't point a local `backend/.env` at it: running a branch locally applies that branch's migrations, which would change the live site's tables before the code is merged. For local work, use the built-in H2 database, or Staging.
 
 **The `prod` profile checks the settings.** With it, the backend refuses to start, and lists what's wrong, if the H2 console is on, the login cookie isn't HTTPS-only, `FORWARD_HEADERS_STRATEGY` is `none`, the database is H2, `MAIL_HOST` isn't set, or `APP_BASE_URL` or a CORS origin isn't `https://`. It also turns the Swagger UI off unless `SWAGGER_ENABLED=true`.
 
