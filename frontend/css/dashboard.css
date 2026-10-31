@@ -26,10 +26,35 @@
 .top-dishes li { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--divider); }
 .top-dishes li span:last-child { color: var(--muted); text-align: right; }
 
-.checklist { display: grid; gap: 16px; margin-top: 20px; }
-.check-field { display: flex; gap: 12px; width: fit-content; min-height: 44px; cursor: pointer; }
-.check-field input { width: 16px; height: 16px; margin: 4px 0 0; accent-color: var(--teal-strong); cursor: pointer; }
-.description { display: block; color: var(--muted); font-size: var(--text-sm); }
+/* Actions needed: one row per card from GET /api/actions. */
+.action-list { display: grid; margin: 20px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--divider); }
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--divider);
+}
+.action-text { flex: 1; min-width: 0; }
+.action-text strong { display: block; font-weight: 400; }
+.action-text span { display: block; margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
+.action-buttons { display: flex; flex: none; align-items: center; gap: 8px; }
+
+.record-dialog {
+  width: min(440px, calc(100% - 32px));
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+}
+.record-dialog::backdrop { background: rgb(0 0 0 / 0.3); }
+.record-dialog h2 { font-size: var(--text-lg); }
+.record-dialog .lede { margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
+.record-list { display: grid; gap: 8px; max-height: 50vh; overflow: auto; margin-top: 16px; }
+.record-row { display: grid; grid-template-columns: 1fr 96px; gap: 12px; align-items: center; font-size: var(--text-sm); }
+.record-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 /* The assistant's large input box: an assistant surface, so it uses the UI font (see DESIGN.md). */
 .chat-box {
@@ -90,4 +115,6 @@
   .demand { grid-row: 2; }
   .by-dish { grid-row: 3; }
   .money { grid-template-columns: 1fr; gap: 24px; }
+  .action-item { flex-wrap: wrap; }
+  .action-buttons { width: 100%; justify-content: flex-end; }
 }

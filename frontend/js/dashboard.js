@@ -223,11 +223,144 @@ async function loadRevenue(from, to) {
   document.getElementById("top-dishes-note").textContent = top.children.length ? "" : "No sales in these 7 days.";
 }
 
+// ---- Actions needed (issue #53) ----
+
+const actionList = document.getElementById("action-list");
+const actionsNote = document.getElementById("actions-note");
+
+async function loadActions() {
+  try {
+    renderActions(await apiRequest("/api/actions"));
+  } catch (error) {
+    if (error.status !== 401) actionsNote.textContent = "Actions could not be loaded.";
+  }
+}
+
+function renderActions(cards) {
+  actionList.replaceChildren(...cards.map(actionItem));
+  actionsNote.textContent = cards.length ? "" : "Nothing needs your attention right now.";
+}
+
+function actionItem(card) {
+  const item = document.createElement("li");
+  item.className = "action-item";
+
+  const text = document.createElement("div");
+  text.className = "action-text";
+  const title = document.createElement("strong");
+  title.textContent = card.title;
+  const detail = document.createElement("span");
+  detail.textContent = card.detail;
+  text.append(title, detail);
+
+  const buttons = document.createElement("div");
+  buttons.className = "action-buttons";
+  const act = document.createElement("button");
+  act.type = "button";
+  act.className = "secondary-button";
+  act.textContent = card.actionLabel;
+  act.addEventListener("click", () => {
+    if (card.recordDate) openRecordDialog(card.recordDate);
+    else window.location.href = card.href;
+  });
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "text-button";
+  dismiss.textContent = "Dismiss";
+  dismiss.setAttribute("aria-label", `Dismiss: ${card.title}`);
+  dismiss.addEventListener("click", async () => {
+    dismiss.disabled = true;
+    try {
+      await apiRequest("/api/actions/dismiss", { method: "POST", body: JSON.stringify({ key: card.key }) });
+      item.remove();
+      if (!actionList.children.length) actionsNote.textContent = "Nothing needs your attention right now.";
+    } catch (error) {
+      dismiss.disabled = false;
+      actionsNote.textContent = error.message || "That card could not be dismissed.";
+    }
+  });
+  buttons.append(act, dismiss);
+
+  item.append(text, buttons);
+  return item;
+}
+
+// ---- Recording a missed day ----
+
+const recordDialog = document.getElementById("record-dialog");
+const recordForm = document.getElementById("record-form");
+const recordList = document.getElementById("record-list");
+const recordStatus = document.getElementById("record-status");
+const recordSave = document.getElementById("record-save");
+let recordDate = null;
+
+async function openRecordDialog(date) {
+  recordDate = date;
+  document.getElementById("record-heading").textContent =
+    `Sales for ${formatDay(date, { weekday: "short", day: "numeric", month: "short" })}`;
+  recordStatus.textContent = "";
+  recordStatus.className = "status-text";
+  recordList.replaceChildren();
+  recordSave.disabled = false;
+  recordDialog.showModal();
+
+  const dishes = await apiRequest("/api/dishes");
+  recordList.replaceChildren(...dishes.map(dish => {
+    const row = document.createElement("label");
+    row.className = "record-row";
+    const name = document.createElement("span");
+    name.textContent = dish.name;
+    const input = document.createElement("input");
+    input.className = "input";
+    input.type = "number";
+    input.min = "0";
+    input.max = "9999";
+    input.step = "1";
+    input.inputMode = "numeric";
+    input.placeholder = "0";
+    input.dataset.dishId = dish.id;
+    input.setAttribute("aria-label", `Portions of ${dish.name} sold`);
+    row.append(name, input);
+    return row;
+  }));
+  recordList.querySelector("input")?.focus();
+}
+
+recordForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const filled = [...recordList.querySelectorAll("input")].filter(input => input.value !== "");
+  if (!filled.length) {
+    recordStatus.textContent = "Enter the portions of at least one dish.";
+    recordStatus.className = "status-text is-error";
+    return;
+  }
+  if (!filled.every(input => input.reportValidity())) return;
+
+  recordSave.disabled = true;
+  try {
+    for (const input of filled) {
+      await apiRequest(`/api/dishes/${input.dataset.dishId}/sales/${recordDate}`, {
+        method: "PUT",
+        body: JSON.stringify({ quantitySold: Number(input.value) })
+      });
+    }
+    recordDialog.close();
+    refreshDashboard();
+  } catch (error) {
+    recordStatus.textContent = error.message || "The sales could not be saved.";
+    recordStatus.className = "status-text is-error";
+    recordSave.disabled = false;
+  }
+});
+
+document.getElementById("record-cancel").addEventListener("click", () => recordDialog.close());
+
 function refreshDashboard() {
   loadDashboard().catch(error => {
     console.error(error);
     showEmpty("Could not load sales. Is the backend running?");
   });
+  loadActions();
 }
 
 refreshDashboard();
