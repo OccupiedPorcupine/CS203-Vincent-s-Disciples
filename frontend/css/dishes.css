@@ -15,6 +15,8 @@
 .price-field { display: grid; gap: 4px; }
 .price-caption { display: none; color: var(--muted); font-size: var(--text-xs); }
 .price-margin { color: var(--muted); }
+.price-margin.is-error { color: var(--error); }
+.price-row .input[aria-invalid="true"] { border-color: var(--error); }
 .price-header { min-height: 44px; color: var(--muted); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; }
 
 @media (max-width: 760px) {
