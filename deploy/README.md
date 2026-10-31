@@ -38,9 +38,11 @@ Set these in the Vercel project under **Settings → Environment Variables**, or
 | `ASSISTANT_PROVIDER` | `offline`, or leave unset to use OpenAI | Unset, to use OpenAI |
 | `OPENAI_API_KEY` | Optional, as a sensitive variable | Required, as a sensitive variable |
 | `SPRING_PROFILES_ACTIVE` | `supabase` | `supabase` |
-| `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project (Seoul, `ap-northeast-2`) | **Main-database** |
+| `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project (Seoul, `ap-northeast-2`) | The **Production** Supabase project (Singapore, `ap-southeast-1`) |
 
 Use each project's **Session pooler** address from Supabase's **Connect** panel, as `jdbc:postgresql://<host>:5432/postgres?sslmode=require`. The direct address is IPv6-only, and Vercel can't reach it. Put any new Supabase project in an Asian region, because of the startup limit above.
+
+Only the live site uses the Production project. Don't point a local `backend/.env` at it: running a branch locally applies that branch's migrations, which would change the live site's tables before the code is merged. For local work, use the built-in H2 database, or Staging.
 
 Without the `SPRING_PROFILES_ACTIVE` and database variables, the backend uses an in-memory H2 database. It's wiped every time the container stops, which is fine for a quick check of a preview and nothing else.
 
