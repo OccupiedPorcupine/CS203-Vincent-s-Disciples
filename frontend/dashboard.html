@@ -95,6 +95,32 @@
       </section>
     </div>
 
+    <!-- Each day's revenue for 53 weeks, from GET /api/revenue/daily (js/dashboard.js). -->
+    <section class="card heatmap-card" aria-labelledby="heatmap-heading" data-guide-id="revenue-heatmap">
+      <div class="heatmap-heading">
+        <h2 id="heatmap-heading" class="card-title">Revenue by day</h2>
+        <span class="note" id="heatmap-note">Loading&hellip;</span>
+      </div>
+      <div class="heatmap-scroll" id="heatmap-scroll">
+        <div class="heatmap" id="heatmap" role="img"></div>
+      </div>
+      <div class="heatmap-legend" aria-hidden="true">
+        <span>Less</span>
+        <span class="heat-cell level-1"></span><span class="heat-cell level-2"></span><span class="heat-cell level-3"></span><span class="heat-cell level-4"></span>
+        <span>More</span>
+        <span class="heat-cell level-0 legend-gap"></span><span>No sales</span>
+        <span class="heat-cell is-closed"></span><span>Closed</span>
+      </div>
+      <details class="heatmap-table">
+        <summary>Show as a table</summary>
+        <table>
+          <thead><tr><th scope="col">Month</th><th scope="col" id="heatmap-total-heading">Revenue</th><th scope="col">Days with sales</th></tr></thead>
+          <tbody id="heatmap-table-body"></tbody>
+        </table>
+      </details>
+      <div class="heatmap-tooltip" id="heatmap-tooltip" role="tooltip" hidden></div>
+    </section>
+
     <section class="section actions" aria-labelledby="actions-heading" data-guide-id="actions-needed">
       <div class="section-heading"><h2 id="actions-heading">Actions needed</h2></div>
       <!-- Filled from GET /api/actions by js/dashboard.js. -->

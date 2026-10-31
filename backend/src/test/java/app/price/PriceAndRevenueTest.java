@@ -41,6 +41,8 @@ class PriceAndRevenueTest {
     @Autowired DailySaleRepository saleRepository;
     @Autowired AppUserRepository users;
     @Autowired Clock clock;
+    @Autowired app.service.StallClosureService closureService;
+    @Autowired app.closure.RestDayRepository restDayRepository;
 
     static final LocalDate MONDAY = LocalDate.of(2026, 10, 19);
     static final LocalDate SUNDAY = MONDAY.plusDays(6);
@@ -65,6 +67,7 @@ class PriceAndRevenueTest {
     // Other tests share this database and delete users, so remove everything that points at them.
     @AfterEach
     void cleanUp() {
+        restDayRepository.deleteAll();
         priceRepository.deleteAll();
         saleRepository.deleteAll();
         dishRepository.deleteAll();
@@ -96,6 +99,29 @@ class PriceAndRevenueTest {
         assertEquals(List.of("Chicken rice", "Char siew rice", "Laksa"),
                 week.dishes().stream().map(RevenueResponse.DishRevenue::name).toList());
         assertEquals(new BigDecimal("2.80"), dish(week, "Chicken rice").marginPerPortion());
+    }
+
+    @Test
+    void dailyRevenueAddsUpToTheWeekAndMarksRestDays() {
+        price(chickenRice, "4.50", null, null);
+        price(charSiew, "5.00", null, null);
+        closureService.setRestDays(owner, List.of(java.time.DayOfWeek.SUNDAY));
+
+        var daily = revenueService.daily(owner, MONDAY, SUNDAY);
+
+        assertTrue(daily.anyPrices());
+        assertEquals(7, daily.days().size());
+        assertEquals(new BigDecimal("280.00"), daily.days().getFirst().revenue()); // 40 × 4.50 + 20 × 5.00; laksa has no price
+        assertEquals(70, daily.days().getFirst().portions());
+        assertEquals(revenueService.summary(owner, MONDAY, SUNDAY).revenue(),
+                daily.days().stream().map(day -> day.revenue()).reduce(BigDecimal.ZERO, BigDecimal::add));
+        assertFalse(daily.days().getFirst().closed());
+        assertTrue(daily.days().getLast().closed());
+
+        var before = revenueService.daily(owner, MONDAY.minusDays(3), MONDAY.minusDays(1));
+        assertEquals(0, before.days().getFirst().portions());
+        assertNull(before.days().getFirst().revenue());
+        assertThrows(IllegalArgumentException.class, () -> revenueService.daily(owner, MONDAY.minusDays(400), SUNDAY));
     }
 
     @Test

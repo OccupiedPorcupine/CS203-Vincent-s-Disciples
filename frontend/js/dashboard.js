@@ -223,6 +223,134 @@ async function loadRevenue(from, to) {
   document.getElementById("top-dishes-note").textContent = top.children.length ? "" : "No sales in these 7 days.";
 }
 
+// ---- Revenue by day: a GitHub-style heatmap ----
+
+const WEEKS = 53;
+const heatmap = document.getElementById("heatmap");
+const heatmapTooltip = document.getElementById("heatmap-tooltip");
+
+function singaporeToday() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+}
+
+// 0 for Monday … 6 for Sunday.
+function weekdayIndex(isoDate) {
+  return (new Date(`${isoDate}T00:00:00Z`).getUTCDay() + 6) % 7;
+}
+
+async function loadHeatmap() {
+  const today = singaporeToday();
+  const from = addDays(today, -weekdayIndex(today) - (WEEKS - 1) * 7);
+  const daily = await apiRequest(`/api/revenue/daily?from=${from}&to=${today}`);
+  renderHeatmap(daily, today);
+}
+
+function renderHeatmap(daily, today) {
+  // Revenue when prices are set; until then portions, so the map is still useful.
+  const byRevenue = daily.anyPrices;
+  const valueOf = day => byRevenue ? (day.revenue === null ? 0 : Number(day.revenue)) : day.portions;
+  const show = value => byRevenue ? money.format(value) : `${value} portions`;
+  const days = daily.days.filter(day => day.date <= today);
+
+  // Four levels by quartile of the stall's own days with sales, as on GitHub.
+  const values = days.map(valueOf).filter(value => value > 0).sort((a, b) => a - b);
+  const quartile = q => values[Math.min(values.length - 1, Math.floor(q * values.length))];
+  const thresholds = values.length ? [quartile(0.25), quartile(0.5), quartile(0.75)] : [];
+  const level = value => value <= 0 ? 0 : 1 + thresholds.filter(threshold => value > threshold).length;
+
+  const nodes = [];
+  let lastMonth = null;
+  for (let week = 0; week < WEEKS; week++) {
+    const monday = addDays(daily.from, week * 7);
+    const month = monday.slice(0, 7);
+    if (month !== lastMonth && Number(monday.slice(8)) <= 7) {
+      const label = document.createElement("span");
+      label.className = "heatmap-month";
+      label.style.gridColumn = String(week + 2);
+      label.textContent = formatDay(monday, { month: "short" });
+      nodes.push(label);
+    }
+    lastMonth = month;
+  }
+  ["Mon", "Wed", "Fri"].forEach((name, index) => {
+    const label = document.createElement("span");
+    label.className = "heatmap-weekday";
+    label.style.gridRow = String(index * 2 + 2);
+    label.textContent = name;
+    nodes.push(label);
+  });
+
+  days.forEach((day, index) => {
+    const value = valueOf(day);
+    const cell = document.createElement("span");
+    cell.className = `heat-cell level-${level(value)}`;
+    if (value <= 0 && day.closed) cell.classList.add("is-closed");
+    cell.style.gridColumn = String(Math.floor(index / 7) + 2);
+    cell.style.gridRow = String((index % 7) + 2);
+    cell.dataset.value = value > 0 ? show(value) : day.closed ? "Closed" : "No sales";
+    cell.dataset.day = formatDay(day.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    nodes.push(cell);
+  });
+  heatmap.replaceChildren(...nodes);
+  heatmap.style.setProperty("--weeks", WEEKS);
+
+  const best = days.reduce((top, day) => valueOf(day) > valueOf(top) ? day : top, days[0]);
+  const total = days.reduce((sum, day) => sum + valueOf(day), 0);
+  const note = document.getElementById("heatmap-note");
+  if (!values.length) {
+    note.textContent = "No sales in the last 53 weeks yet.";
+  } else if (byRevenue) {
+    note.textContent = `${wholeMoney.format(total)} in 53 weeks · best day ${wholeMoney.format(valueOf(best))} on ${formatDay(best.date, { weekday: "short", day: "numeric", month: "short" })}`;
+  } else {
+    note.textContent = "Shaded by portions until you set dish prices on the Dishes page.";
+  }
+  heatmap.setAttribute("aria-label", values.length
+    ? `Revenue by day for the last 53 weeks. ${note.textContent}. The table below lists each month.`
+    : "Revenue by day for the last 53 weeks: no sales yet.");
+  renderHeatmapTable(days, valueOf, show, byRevenue);
+
+  const scroll = document.getElementById("heatmap-scroll");
+  scroll.scrollLeft = scroll.scrollWidth; // phones: start at the latest weeks
+}
+
+function renderHeatmapTable(days, valueOf, show, byRevenue) {
+  document.getElementById("heatmap-total-heading").textContent = byRevenue ? "Revenue" : "Portions";
+  const months = new Map();
+  days.forEach(day => {
+    const month = months.get(day.date.slice(0, 7)) ?? { total: 0, days: 0, first: day.date };
+    month.total += valueOf(day);
+    if (valueOf(day) > 0) month.days++;
+    months.set(day.date.slice(0, 7), month);
+  });
+  document.getElementById("heatmap-table-body").replaceChildren(...[...months.values()].reverse().map(month => {
+    const row = document.createElement("tr");
+    [formatDay(month.first, { month: "long", year: "numeric" }), month.total ? show(month.total) : "–", String(month.days)]
+      .forEach(text => {
+        const cell = document.createElement("td");
+        cell.textContent = text;
+        row.append(cell);
+      });
+    return row;
+  }));
+}
+
+// One tooltip for the whole grid, value first: "$1,080 · Sat 24 Oct 2026".
+heatmap.addEventListener("pointerover", event => {
+  const cell = event.target.closest(".heat-cell");
+  if (!cell) return;
+  const value = document.createElement("strong");
+  value.textContent = cell.dataset.value;
+  heatmapTooltip.replaceChildren(value, ` · ${cell.dataset.day}`);
+  heatmapTooltip.hidden = false;
+  const card = heatmap.closest(".heatmap-card").getBoundingClientRect();
+  const box = cell.getBoundingClientRect();
+  const left = Math.min(Math.max(box.left - card.left + box.width / 2 - heatmapTooltip.offsetWidth / 2, 8),
+    card.width - heatmapTooltip.offsetWidth - 8);
+  heatmapTooltip.style.left = `${left}px`;
+  heatmapTooltip.style.top = `${box.top - card.top - heatmapTooltip.offsetHeight - 6}px`;
+});
+heatmap.addEventListener("pointerleave", () => { heatmapTooltip.hidden = true; });
+
 // ---- Actions needed (issue #53) ----
 
 const actionList = document.getElementById("action-list");
@@ -361,6 +489,10 @@ function refreshDashboard() {
     showEmpty("Could not load sales. Is the backend running?");
   });
   loadActions();
+  loadHeatmap().catch(error => {
+    console.error(error);
+    document.getElementById("heatmap-note").textContent = "Revenue by day could not be loaded.";
+  });
 }
 
 refreshDashboard();
