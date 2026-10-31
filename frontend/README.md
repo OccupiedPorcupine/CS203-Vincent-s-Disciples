@@ -52,7 +52,8 @@ connected to the real database.
 
 ## Checks
 
-- `frontend/tests/phone-check.cjs`: signs in, records sales and gets a forecast in WebKit at
-  iPhone sizes, and fails on sideways scrolling, fields that make iOS zoom in, tap targets under
-  44px, or the assistant button covering a control. How to run it is at the top of the file.
+- `frontend/tests/phone-check.cjs`: signs in, records sales, gets a forecast and prices a dish in
+  WebKit at iPhone sizes. It fails on missing home-screen app tags, sideways scrolling, fields that
+  make iOS zoom in, tap targets under 44px, or the assistant button covering a control. How to run
+  it is at the top of the file.
 - `frontend/design/capture-screenshots.cjs`: regenerates the screenshots in `DESIGN.md`.
