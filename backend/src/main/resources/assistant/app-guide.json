@@ -14,8 +14,9 @@
       "url": "dashboard.html",
       "summary": "Home page: total portions sold in the latest 7 days, sales by dish, revenue and gross profit for those days, the dishes that earn the most, and a box to talk to the assistant.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Data ingestion and Dishes pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Prep list, Data ingestion and Dishes pages." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
@@ -31,10 +32,11 @@
       "id": "forecast",
       "title": "Demand forecast",
       "url": "forecast.html",
-      "summary": "Predicts how many portions of a dish will sell on a date, using past sales, weather and public holidays.",
+      "summary": "Predicts how many portions of a dish will sell on a date, using past sales, weather and public holidays. For all dishes at once and the ingredients, see the Prep list.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Data ingestion and Dishes pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Prep list, Data ingestion and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link back to the Dashboard, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
@@ -47,14 +49,35 @@
       ]
     },
     {
+      "id": "prep",
+      "title": "Prep list",
+      "url": "prep.html",
+      "summary": "What to prepare for a day: portions of each dish from its forecast plus a safety margin, the total of each ingredient from the recipes, a Share button, and each dish's recipe.",
+      "elements": [
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Data ingestion and Dishes pages." },
+        { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
+        { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
+        { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
+        { "guideId": "prep-date", "description": "Day to prepare for, from today up to 7 days ahead. Starts on tomorrow." },
+        { "guideId": "prep-buffer", "description": "How many portions to prepare: the top of each dish's likely range (the default), the forecast only, or the forecast plus 10, 20 or 30%." },
+        { "guideId": "share-prep", "description": "Shares the prep list as plain text (e.g. to WhatsApp) on a phone, or copies it on a computer." },
+        { "guideId": "prep-portions", "description": "Portions to prepare of each dish sold in the last 4 weeks, with its forecast, likely range and how it was worked out." },
+        { "guideId": "prep-ingredients", "description": "Total of each ingredient for those portions, from the recipes, and which dishes use it. Dishes without a recipe are named underneath." },
+        { "guideId": "recipe-list", "description": "Recipes section: one row per dish. Opening a row shows its ingredients, each with an amount per portion and a unit (g, ml, pcs), with Add ingredient, Remove and Save recipe." }
+      ]
+    },
+    {
       "id": "data",
       "title": "Data ingestion",
       "url": "data.html",
       "summary": "Upload CSV or Excel files of past sales and import them into daily sales, see the files uploaded so far, and set the stall's opening days (weekly rest days and one-off closed days).",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast and Dishes pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "upload-dropzone", "description": "Area to drop a CSV or XLSX file onto, or click to choose one (maximum 25 MB)." },
@@ -73,9 +96,10 @@
       "url": "dishes.html",
       "summary": "Each dish's selling price and cost per portion, used for revenue and gross profit on the Dashboard.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast and Data ingestion pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list and Data ingestion pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "price-list", "description": "Each dish's price and cost per portion in S$, the margin per plate, and a Save button per dish. A new price applies from today; earlier sales keep their price." }
@@ -106,6 +130,23 @@
         { "page": "forecast", "guideId": "forecast-date", "message": "Then pick the day. Today or tomorrow works best, because the weather forecast only covers the next 24 hours." },
         { "page": "forecast", "guideId": "forecast-button", "message": "Press this to get the forecast." },
         { "page": "forecast", "guideId": "forecast-result", "message": "The predicted portions appear here, with your past sales for comparison." }
+      ]
+    },
+    {
+      "id": "plan-prep",
+      "summary": "See how many portions to prepare for tomorrow (or another day) and how much of each ingredient that needs, and share the list.",
+      "steps": [
+        { "page": "prep", "guideId": "prep-date", "message": "Pick the day you're preparing for. It starts on tomorrow." },
+        { "page": "prep", "guideId": "prep-portions", "message": "These are the portions to prepare of each dish, from its forecast with a safety margin." },
+        { "page": "prep", "guideId": "prep-ingredients", "message": "And this is how much of each ingredient they need, from your recipes." },
+        { "page": "prep", "guideId": "share-prep", "message": "Press Share list to send it to WhatsApp or copy it." }
+      ]
+    },
+    {
+      "id": "set-recipes",
+      "summary": "Enter what one portion of a dish uses (ingredients and amounts), so the prep list can add up ingredients.",
+      "steps": [
+        { "page": "prep", "guideId": "recipe-list", "message": "Open a dish, type each ingredient with its amount per portion and unit, like chicken 150 g, then press Save recipe." }
       ]
     },
     {
