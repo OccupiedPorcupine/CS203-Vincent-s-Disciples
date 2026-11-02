@@ -1,5 +1,6 @@
-// Phone check for issue #47: signs in, records sales through the assistant, gets a forecast and
-// prices a dish in WebKit (Safari's engine) at iPhone sizes, with a mocked API (no backend or login
+// Phone check for issue #47: signs in, records sales through the assistant and from an Actions
+// needed card, gets a forecast, prices a dish, opens the prep list and follows a guided tour, in
+// WebKit (Safari's engine) at phone sizes from 360px to 414px, with a mocked API (no backend or login
 // needed). On every page it fails if the home-screen app tags are missing, the page scrolls
 // sideways, a field would make iOS zoom in (text under 16px), a control is smaller than 44px, or
 // the floating assistant button covers a control.
@@ -11,9 +12,12 @@
 const { webkit } = require(process.env.PW || "playwright");
 
 const BASE = process.env.BASE || "http://127.0.0.1:5500";
+// 360px and 414px are the narrowest and widest common phones (#47 asks for 360–414px).
 const PHONES = [
+  { name: "small Android (360px)", width: 360, height: 780 },
   { name: "iPhone SE / mini (375px)", width: 375, height: 667 },
-  { name: "iPhone 16 (393px)", width: 393, height: 852 }
+  { name: "iPhone 16 (393px)", width: 393, height: 852 },
+  { name: "iPhone Plus (414px)", width: 414, height: 896 }
 ];
 const SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 
@@ -46,6 +50,17 @@ function checkPage() {
     const rect = el.getBoundingClientRect();
     if (rect.width < 44 || rect.height < 44) problems.push(`"${label(el)}" is ${Math.round(rect.width)}×${Math.round(rect.height)}px (under 44px)`);
   });
+  return problems;
+}
+
+// A guided tour's bubble must fit on screen with its buttons, and its spotlight must be on screen.
+function checkGuide() {
+  const problems = [];
+  const inside = rect => rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight;
+  const bubble = document.querySelector(".guide-bubble");
+  const ring = document.querySelector(".guide-ring");
+  if (!bubble || !inside(bubble.getBoundingClientRect())) problems.push("the tour's bubble doesn't fit on screen");
+  if (!ring || !inside(ring.getBoundingClientRect())) problems.push("the tour's spotlight is off screen");
   return problems;
 }
 
@@ -109,6 +124,36 @@ async function mockApi(context) {
       dish: "Chicken rice", forecastDate: "2026-10-31", predictedDemand: 47.2, low: 41, high: 53,
       roughRange: false, method: "MODEL", fallbackReason: null, basis: "the forecast model", note: null
     });
+    if (path === "/api/actions") return json(route, [
+      { key: "missing:" + day(-2), kind: "MISSING_SALES", title: "You haven't logged sales for yesterday", detail: "Add them so the forecast stays accurate.", actionLabel: "Add sales", href: null, recordDate: day(-2) },
+      { key: "unpriced:2", kind: "UNPRICED", title: "Set prices for Char siew rice", detail: "Revenue leaves out dishes without a price.", actionLabel: "Set prices", href: "dishes.html", recordDate: null }
+    ]);
+    if (path === "/api/revenue") return json(route, {
+      from: day(-6), to: day(0), portions: 420, revenue: 1890, grossProfit: 1176, unpricedPortions: 0, portionsWithoutCost: 0,
+      dishes: [{ dishId: 1, name: "Chicken rice", portions: 420, price: 4.5, unitCost: 1.7, marginPerPortion: 2.8, revenue: 1890, grossProfit: 1176 }]
+    });
+    if (path === "/api/revenue/daily") return json(route, {
+      from: day(-363), to: day(0), anyPrices: true,
+      days: Array.from({ length: 364 }, (_, i) => ({ date: day(i - 363), portions: 60, revenue: 270 - (i * 13) % 90, closed: i % 7 === 3 }))
+    });
+    if (path.endsWith("/sales/" + day(-2))) return json(route, { date: day(-2), quantitySold: 40 });
+    if (path === "/api/prep-list") return json(route, {
+      date: day(1), closed: null, bufferPercent: null,
+      dishes: [
+        { dishId: 1, dish: "Chicken rice", portions: 53, expected: 47.2, low: 41, high: 53, method: "MODEL", basis: "the forecast model", hasRecipe: true },
+        { dishId: 2, dish: "Char siew rice", portions: 36, expected: 31, low: 26, high: 36, method: "BASELINE", basis: "Average of your last 4 Saturdays", hasRecipe: false }
+      ],
+      ingredients: [
+        { ingredient: "Rice", unit: "g", quantity: 7950, dishes: ["Chicken rice"] },
+        { ingredient: "Roast chicken", unit: "g", quantity: 6360, dishes: ["Chicken rice"] }
+      ],
+      skipped: []
+    });
+    if (path === "/api/recipes") return json(route, [
+      { dishId: 1, dish: "Chicken rice", items: [{ ingredient: "Rice", unit: "g", quantity: 150 }, { ingredient: "Roast chicken", unit: "g", quantity: 120 }] },
+      { dishId: 2, dish: "Char siew rice", items: [] }
+    ]);
+    if (path === "/api/ingredients") return json(route, [{ name: "Rice", unit: "g" }, { name: "Roast chicken", unit: "g" }]);
     if (path === "/api/closures") return json(route, { restDays: ["TUESDAY"], closedDates: [{ date: day(14), reason: "Centre cleaning" }], hours: { opensAt: "10:00", closesAt: "15:00" } });
     if (path === "/api/waste") return json(route, { leftoverPortions: 12, leftoverCost: "20.40", leftoversWithoutCost: 0, soldOutDays: 2, daysRecorded: 3,
       dishes: [{ dishId: 1, name: "Chicken rice", leftoverPortions: 12, leftoverCost: "20.40", soldOutDays: 2, earliestSoldOutAt: "12:40" }] });
@@ -143,6 +188,14 @@ async function mockApi(context) {
     await page.waitForURL("**/dashboard.html");
     await check("dashboard");
 
+    // Log a missed day from its Actions needed card
+    await page.getByRole("button", { name: "Add sales" }).tap();
+    await page.locator("#record-dialog[open]").waitFor();
+    await check("record missed sales form");
+    await page.locator("#record-dialog .record-row input").first().fill("40");
+    await page.locator("#record-form button[type=submit]").tap();
+    await page.locator("#record-dialog").waitFor({ state: "hidden" });
+
     // Record sales through the assistant
     await page.tap(".assistant-bubble");
     await page.fill(".assistant-input textarea", "today chicken rice 42, char siew 30");
@@ -157,7 +210,10 @@ async function mockApi(context) {
     await page.tap(".navigation summary");
     await page.tap('.navigation a[href="forecast.html"]');
     await page.waitForURL("**/forecast.html");
-    await page.fill("#forecast-date", "2026-10-31");
+    // Tomorrow in Singapore: the picker allows today to 7 days ahead of the real date, and the form
+    // refuses anything else, so the mock's fixed dates don't work here.
+    const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+    await page.fill("#forecast-date", tomorrow);
     await page.tap("#forecast-button");
     await page.locator("#predicted-demand", { hasText: "47" }).waitFor();
     await check("forecast page");
@@ -176,6 +232,27 @@ async function mockApi(context) {
     await page.tap('[aria-label="Save the price of Char siew rice"]');
     await page.getByText("Saved Char siew rice").waitFor();
     await check("dishes page");
+
+    // Prep list, then a guided tour on it
+    await page.tap(".navigation summary");
+    await page.tap('.navigation a[href="prep.html"]');
+    await page.waitForURL("**/prep.html");
+    await page.getByText("Roast chicken").first().waitFor();
+    await check("prep list page");
+    await page.evaluate(() => window.chickyGuide.start([
+      { page: "prep", url: "prep.html", guideId: "prep-date", message: "Pick the day you're preparing for." },
+      { page: "prep", url: "prep.html", guideId: "recipe-list", message: "Say what one plate of each dish uses, and the prep list adds up the ingredients for you." }
+    ]));
+    for (const step of ["first step", "second step"]) {
+      if (step !== "first step") await page.tap(".guide-next");
+      await page.waitForTimeout(900);
+      const problems = await page.evaluate(checkGuide);
+      const guideButtons = await page.$$eval(".guide-actions button:not([hidden])", buttons => buttons.map(b => b.getBoundingClientRect()).filter(r => r.width < 44 || r.height < 44).length);
+      if (guideButtons) problems.push(`${guideButtons} tour button(s) under 44px`);
+      problems.forEach(problem => failures.push(`${phone.name}, guided tour ${step}: ${problem}`));
+      console.log(`${problems.length ? "✗" : "✓"} ${phone.name}: guided tour, ${step}`);
+    }
+    await page.tap(".guide-exit");
 
     await context.close();
   }

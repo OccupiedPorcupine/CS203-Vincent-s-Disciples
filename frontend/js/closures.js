@@ -10,13 +10,14 @@ const hoursForm = document.getElementById("trading-hours");
 const opensAtInput = document.getElementById("opens-at");
 const closesAtInput = document.getElementById("closes-at");
 const hoursButton = document.getElementById("trading-hours-button");
+const hoursStatus = document.getElementById("trading-hours-status");
 
 // Closed days older than this aren't listed (they still count on the dashboard).
 const PAST_DAYS_SHOWN = 30;
 
-function showClosuresStatus(message, type = "") {
-  closuresStatus.textContent = message;
-  closuresStatus.className = `status-text${type ? ` is-${type}` : ""}`;
+function showClosuresStatus(message, type = "", element = closuresStatus) {
+  element.textContent = message;
+  element.className = `status-text${type ? ` is-${type}` : ""}`;
 }
 
 function todayInSingapore() {
@@ -61,14 +62,15 @@ function renderClosures({ restDays, closedDates, hours }) {
   }));
 }
 
-async function saveClosures(path, options, success) {
+// Messages go to the opening days status line unless the form has its own (trading hours).
+async function saveClosures(path, options, success, statusElement = closuresStatus) {
   try {
     renderClosures(await apiRequest(path, options));
-    showClosuresStatus(success, "success");
+    showClosuresStatus(success, "success", statusElement);
     return true;
   } catch (error) {
     console.error(error);
-    showClosuresStatus(error.status === 400 && error.message ? error.message : "Couldn’t save. Try again in a moment.", "error");
+    showClosuresStatus(error.status === 400 && error.message ? error.message : "Couldn’t save. Try again in a moment.", "error", statusElement);
     loadClosures();
     return false;
   }
@@ -86,7 +88,7 @@ restDayBoxes.forEach(box => box.addEventListener("change", () => {
   }, "Rest days saved.");
 }));
 
-// Save hours stays disabled until both times are set.
+// As with the other forms, Save hours stays disabled until both times are filled in.
 function updateHoursButton() {
   hoursButton.disabled = !opensAtInput.value || !closesAtInput.value;
 }
@@ -98,10 +100,13 @@ hoursForm.addEventListener("submit", async event => {
   event.preventDefault();
   if (hoursButton.disabled) return;
   hoursButton.disabled = true;
+  hoursButton.textContent = "Saving…";
+  showClosuresStatus("", "", hoursStatus);
   await saveClosures("/api/closures/hours", {
     method: "PUT",
     body: JSON.stringify({ opensAt: opensAtInput.value, closesAt: closesAtInput.value })
-  }, `Trading hours saved: ${opensAtInput.value} to ${closesAtInput.value}.`);
+  }, `Trading hours saved: ${opensAtInput.value} to ${closesAtInput.value}.`, hoursStatus);
+  hoursButton.textContent = "Save hours";
   updateHoursButton();
 });
 

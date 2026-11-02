@@ -25,8 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.*;
@@ -257,12 +255,8 @@ public class SalesImportService {
     }
 
     private SalesFile read(TrainingDataSource source) {
-        Path path = Path.of(source.getStoredPath());
-        if (!Files.isRegularFile(path)) {
-            throw new IllegalArgumentException("The uploaded file is no longer on the server. Please upload it again.");
-        }
         try {
-            return SalesFileReader.read(path, source.getOriginalFilename(), LocalDate.now(clock));
+            return SalesFileReader.read(sourceService.content(source), source.getOriginalFilename(), LocalDate.now(clock));
         } catch (IOException exception) {
             throw new IllegalStateException("The uploaded file could not be read", exception);
         }

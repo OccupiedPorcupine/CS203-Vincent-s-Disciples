@@ -159,6 +159,7 @@
 @media (pointer: coarse) {
   .icon-button { width: 44px; height: 44px; }
   .chat-box textarea { height: 44px; }
+  .heatmap-table summary { display: flex; align-items: center; min-height: 44px; }
 }
 
 @media (max-width: 800px) {

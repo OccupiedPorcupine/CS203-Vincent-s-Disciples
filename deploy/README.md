@@ -33,7 +33,6 @@ Set these in the Vercel project under **Settings → Environment Variables**, or
 | `PORT` | `8080` | `8080` |
 | `FORWARD_HEADERS_STRATEGY` | `framework` | `framework` |
 | `SESSION_COOKIE_SECURE` | `true` | `true` |
-| `TRAINING_DATA_STORAGE_PATH` | `/tmp/training-data` | `/tmp/training-data` |
 | `GOOGLE_CLIENT_ID` | Real ID. Add the preview address to the OAuth client's authorized JavaScript origins. | Real ID. Add the production address too. |
 | `ASSISTANT_PROVIDER` | `offline`, or leave unset to use OpenAI | Unset, to use OpenAI |
 | `OPENAI_API_KEY` | Optional, as a sensitive variable | Required, as a sensitive variable |
@@ -66,7 +65,7 @@ Previews are protected by Vercel login. To call a protected preview from a scrip
 - **The ML service is private.** On Vercel only the backend can reach it, through the binding. On a host where it would be public (e.g. Render), set the same `ML_SHARED_SECRET` on both services: the backend sends it and the ML service refuses requests without it.
 - **HTTPS.** Vercel and Render redirect HTTP to HTTPS before requests reach the backend. On a host that doesn't, set `REQUIRE_HTTPS=true`.
 - **Rate limits** on login, signup and password reset are kept in memory, so each running backend counts separately and a restart clears them.
-- **Uploaded training files** are saved to `/tmp` inside the backend container. They disappear when it stops; only their metadata stays in the database.
+- **Uploaded sales files** are stored in the database (`training_data_files`), so they survive restarts and every backend instance can import them.
 - **Request size:** Vercel functions accept at most 4.5 MB per request, so training uploads are effectively limited to that, even though the backend allows 25 MB.
 - **Hobby plan limits:** 4 hours of active CPU and 360 GB-hours of memory a month, and non-commercial use only. Going over pauses the project instead of charging.
 - **The production model** is committed under `ml/artifacts/production/`, so deployments can serve it. To ship a newly trained model, run `python -m ml.train_production` and commit the three files.

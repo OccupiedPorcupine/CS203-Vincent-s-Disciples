@@ -51,6 +51,12 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- GET /api/health, for uptime checks (issue #48). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- Password reset and email verification links (issue #49). Only used when MAIL_HOST is set. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

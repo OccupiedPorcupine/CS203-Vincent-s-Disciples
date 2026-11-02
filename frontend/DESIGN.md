@@ -367,8 +367,8 @@ Any new animation must do the same.
 
 ## Phones
 
-Stall owners use Chicky on a phone at the stall, often one-handed. Every page must work at 375px
-wide in Safari, and `frontend/tests/phone-check.cjs` checks that the main flow does (see
+Stall owners use Chicky on a phone at the stall, often one-handed. Every page must work from 360px
+wide in Safari, and `frontend/tests/phone-check.cjs` checks that the main flows do (see
 [README.md](README.md)).
 
 - **No sideways scrolling.** Layouts go to one column at 760px.
@@ -440,7 +440,7 @@ extra classes, so the look and the accessibility tree can't drift apart.
 7. Charts: load `js/chart-theme.js` and use its presets.
 8. Add `data-guide-id` to anything the assistant should be able to point at, and describe it in
    `backend/src/main/resources/assistant/app-guide.json` (`AppGuideConsistencyTest` checks both).
-9. Check it at 1280px and 375px wide, run `frontend/tests/phone-check.cjs` (add the page to it if
+9. Check it at 1280px and 360px wide, run `frontend/tests/phone-check.cjs` (add the page to it if
    it's part of a main flow), then regenerate the screenshots if the page appears here.
 
 ### Regenerating screenshots
