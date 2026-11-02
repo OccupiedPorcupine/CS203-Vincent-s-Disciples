@@ -58,7 +58,7 @@ cp backend/.env.example backend/.env
 Open `backend/.env`, uncomment the Supabase block, and fill it in:
 
 ```
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_ID=<the team's client ID, or leave empty to turn Google sign-in off>
 
 spring.profiles.active=supabase
 DATABASE_URL=jdbc:postgresql://<pooler host>:5432/postgres?sslmode=require
@@ -186,7 +186,7 @@ Everyone whose `.env` points at the project shares one database, so:
 | Symptom | Cause and fix |
 |---|---|
 | Startup log shows `jdbc:h2:mem:appdb` | The profile was not activated. Check that `backend/.env` contains `spring.profiles.active=supabase`, not `SPRING_PROFILES_ACTIVE`, and that the line is not commented out |
-| `Could not resolve placeholder 'GOOGLE_CLIENT_ID'` | `.env` was not found. Start the app from `backend/` or the repo root, or export the variable |
+| Google sign-in shows `Error 401: invalid_client` | The backend was started with a placeholder `GOOGLE_CLIENT_ID`. Use the team's real client ID, or leave it empty to hide the Google button. Check what the backend is using at `http://localhost:8080/api/config` |
 | `Could not resolve placeholder 'DATABASE_URL'` | The Supabase profile is on but a `DATABASE_*` line is missing or commented out |
 | `password authentication failed` | Wrong password, or the username is missing the `.<project ref>` suffix |
 | `Connection refused` or a timeout | Wrong pooler host or port. Recopy it from **Connect → Direct → Session pooler** |

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
+  <style>@view-transition { navigation: auto; }</style>
+  <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
+       follows it), so the page never shows undimmed between steps. Chrome; other browsers ignore it. -->
+  <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
+  <meta name="api-base-url" content="http://localhost:8080">
+  <title>Prep list · Chicky</title>
+  <!-- Home-screen app (see DESIGN.md, "Phones"). -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./images/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./images/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Chicky">
+  <meta name="theme-color" content="#a9dcd6">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/prep.css">
+  <link rel="stylesheet" href="./css/assistant.css">
+  <link rel="stylesheet" href="./css/guide.css">
+</head>
+<body>
+  <header class="topbar">
+    <details class="navigation" data-guide-id="main-menu">
+      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""></summary>
+      <nav class="menu-panel" aria-label="Main navigation">
+        <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
+        <a href="forecast.html" data-guide-id="nav-forecast">Demand forecast</a>
+        <a href="prep.html" aria-current="page">Prep list</a>
+        <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
+        <a href="dishes.html" data-guide-id="nav-dishes">Dishes</a>
+      </nav>
+    </details>
+    <a class="brand" href="dashboard.html">Chicky</a>
+    <details class="account-menu" data-guide-id="account-menu">
+      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""></summary>
+      <div class="menu-panel">
+        <p class="account-name">Signed in</p>
+        <p class="account-email"></p>
+        <button class="secondary-button" type="button" data-action="log-out">Log out</button>
+        <p class="status-text" role="status" aria-live="polite"></p>
+      </div>
+    </details>
+  </header>
+
+  <main class="page">
+    <section class="page-heading">
+      <div>
+        <h1>Prep list</h1>
+        <p class="lede">How many portions to prepare, and the ingredients they need, from your forecasts and recipes.</p>
+      </div>
+    </section>
+
+    <section class="card controls" aria-label="Prep list options">
+      <div class="field">
+        <label for="prep-date">Day</label>
+        <input id="prep-date" class="input" type="date" data-guide-id="prep-date">
+      </div>
+      <div class="field">
+        <label for="prep-buffer">Portions to prepare</label>
+        <div class="select-wrap">
+          <select id="prep-buffer" class="input" data-guide-id="prep-buffer">
+            <option value="">Top of the likely range</option>
+            <option value="0">Forecast only</option>
+            <option value="10">Forecast + 10%</option>
+            <option value="20">Forecast + 20%</option>
+            <option value="30">Forecast + 30%</option>
+          </select>
+        </div>
+      </div>
+      <div class="field share-field">
+        <span class="visually-hidden">Share</span>
+        <button id="share-button" class="primary-button" type="button" data-guide-id="share-prep" disabled>Share list</button>
+      </div>
+      <p id="prep-status" class="status-text" role="status" aria-live="polite"></p>
+    </section>
+
+    <div class="prep-grid">
+      <section class="card" aria-labelledby="portions-heading" data-guide-id="prep-portions">
+        <h2 id="portions-heading" class="card-title">Portions</h2>
+        <div id="portion-list"><p class="empty-state">Loading…</p></div>
+      </section>
+      <section class="card" aria-labelledby="ingredients-heading" data-guide-id="prep-ingredients">
+        <h2 id="ingredients-heading" class="card-title">Ingredients</h2>
+        <div id="ingredient-list"><p class="empty-state">Loading…</p></div>
+        <p id="missing-recipes" class="prep-note"></p>
+      </section>
+    </div>
+
+    <section class="section" aria-labelledby="recipes-heading" data-guide-id="recipe-list">
+      <div class="section-heading">
+        <h2 id="recipes-heading">Recipes</h2>
+        <p>What one portion of each dish uses. Each ingredient keeps one unit (g, ml, pcs…) so amounts add up across dishes.</p>
+      </div>
+      <div id="recipe-list"><p class="empty-state">Loading recipes…</p></div>
+      <p id="recipe-status" class="status-text" role="status" aria-live="polite"></p>
+      <datalist id="ingredient-names"></datalist>
+      <datalist id="unit-names">
+        <option value="g"></option>
+        <option value="ml"></option>
+        <option value="pcs"></option>
+        <option value="kg"></option>
+        <option value="l"></option>
+      </datalist>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/app-shell.js"></script>
+  <script src="js/prep.js"></script>
+  <script src="js/guide.js"></script>
+  <span id="guide-ready" hidden></span>
+  <script src="js/assistant.js"></script>
+</body>
+</html>

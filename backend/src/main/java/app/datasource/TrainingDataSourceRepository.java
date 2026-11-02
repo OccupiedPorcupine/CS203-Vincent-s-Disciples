@@ -7,4 +7,5 @@ import java.util.Optional;
 public interface TrainingDataSourceRepository extends JpaRepository<TrainingDataSource, Long> {
     List<TrainingDataSource> findAllByOwnerIdOrderByUploadedAtDesc(Long ownerId);
     Optional<TrainingDataSource> findByOwnerIdAndSha256(Long ownerId, String sha256);
+    Optional<TrainingDataSource> findByIdAndOwnerId(Long id, Long ownerId);
 }

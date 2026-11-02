@@ -31,8 +31,33 @@
     .then(profile => {
       account.querySelector(".account-name").textContent = profile.name || "Signed in";
       account.querySelector(".account-email").textContent = profile.email || "";
+      if (profile.emailVerified === false) showUnconfirmedEmail();
     })
     .catch(() => {});
+
+  // Until the emailed link is opened: a note under the email, with a way to send it again.
+  function showUnconfirmedEmail() {
+    const note = document.createElement("p");
+    note.className = "account-unconfirmed";
+    note.textContent = "Email not confirmed yet. ";
+    const resend = document.createElement("button");
+    resend.type = "button";
+    resend.className = "text-button";
+    resend.textContent = "Send the link again";
+    resend.addEventListener("click", async () => {
+      resend.disabled = true;
+      try {
+        await apiRequest("/api/auth/verify-email/resend", { method: "POST" });
+        note.textContent = "Sent. Check your inbox for the link.";
+      } catch (error) {
+        resend.disabled = false;
+        status.textContent = error.message || "Couldn’t send it. Try again.";
+        status.classList.add("is-error");
+      }
+    });
+    note.append(resend);
+    account.querySelector(".account-email").after(note);
+  }
 
   logOut.addEventListener("click", async () => {
     logOut.disabled = true;

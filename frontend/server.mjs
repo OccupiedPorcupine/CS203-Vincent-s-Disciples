@@ -1,12 +1,16 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, request as forward } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const port = Number(process.env.FRONTEND_PORT || 5500);
 const host = "127.0.0.1";
+// Requests to /api/* are passed to the backend, so the pages and the API share one address. That
+// keeps the login cookie same-site when the app is opened from another device, e.g. an iPhone
+// through Tailscale Serve (see frontend/README.md).
+const backend = new URL(process.env.BACKEND_URL || "http://localhost:8080");
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
@@ -16,11 +20,36 @@ const contentTypes = {
   ".jpg": "image/jpeg",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml"
 };
 
+function proxyToBackend(request, response) {
+  const headers = { ...request.headers, host: backend.host };
+  // The browser sees one address, but the backend would see the page's Origin as a different
+  // site and refuse it as a cross-origin request.
+  delete headers.origin;
+  const upstream = forward(
+    { protocol: backend.protocol, hostname: backend.hostname, port: backend.port, method: request.method, path: request.url, headers },
+    backendResponse => {
+      response.writeHead(backendResponse.statusCode || 502, backendResponse.headers);
+      backendResponse.pipe(response);
+    }
+  );
+  upstream.on("error", () => {
+    if (!response.headersSent) response.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({ code: "BACKEND_UNAVAILABLE", message: "The backend isn't running." }));
+  });
+  request.pipe(upstream);
+}
+
 createServer(async (request, response) => {
+  if (request.url?.startsWith("/api/")) {
+    proxyToBackend(request, response);
+    return;
+  }
+
   if (!request.url || !["GET", "HEAD"].includes(request.method || "")) {
     response.writeHead(405, { "Content-Type": "text/plain; charset=utf-8" });
     response.end("Method not allowed");
@@ -57,6 +86,6 @@ createServer(async (request, response) => {
     response.end("Not found");
   }
 }).listen(port, host, () => {
-  console.log(`Chicky frontend: http://localhost:${port}`);
+  console.log(`Chicky frontend: http://localhost:${port} (API: ${backend.origin})`);
   console.log("Press Ctrl+C to stop.");
 });

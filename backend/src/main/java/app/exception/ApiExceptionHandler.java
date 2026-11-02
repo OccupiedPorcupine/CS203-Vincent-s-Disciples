@@ -1,11 +1,18 @@
 package app.exception;
 
-import java.util.Map;
+import app.account.InvalidAccountTokenException;
+import app.account.TooManyRequestsException;
 import app.assistant.AssistantException;
 import app.dto.ErrorResponse;
+import app.dto.SalesImportErrorResponse;
+import app.salesimport.SalesImportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -22,6 +29,12 @@ public class ApiExceptionHandler {
         // Deliberately avoid revealing why a credential was rejected.
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)  //checks for error 401
                 .body(new ErrorResponse("AUTHENTICATION_FAILED", "Unable to authenticate"));
+    }
+
+    @ExceptionHandler(GoogleSignInNotConfiguredException.class)
+    public ResponseEntity<ErrorResponse> googleSignInNotConfigured(GoogleSignInNotConfiguredException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse("GOOGLE_SIGN_IN_NOT_CONFIGURED", exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -54,6 +67,12 @@ public class ApiExceptionHandler {
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
     }
 
+    @ExceptionHandler(SalesImportException.class)
+    public ResponseEntity<SalesImportErrorResponse> salesImportFailed(SalesImportException exception) {
+        return ResponseEntity.badRequest().body(new SalesImportErrorResponse(
+                exception.getCode(), exception.getMessage(), exception.getErrorCount(), exception.getErrors()));
+    }
+
     @ExceptionHandler(AliasInUseException.class)
     public ResponseEntity<ErrorResponse> aliasInUse(AliasInUseException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -61,8 +80,37 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(InvalidForecastDateException.class)
-    public ResponseEntity<Map<String, String>> handleInvalidForecastDate(InvalidForecastDateException ex) {
-        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    public ResponseEntity<ErrorResponse> handleInvalidForecastDate(InvalidForecastDateException ex) {
+        return ResponseEntity.badRequest().body(new ErrorResponse("INVALID_FORECAST_DATE", ex.getMessage()));
+    }
+
+    @ExceptionHandler(StallClosedException.class)
+    public ResponseEntity<ErrorResponse> stallClosed(StallClosedException exception) {
+        return ResponseEntity.badRequest().body(new ErrorResponse("STALL_CLOSED", exception.getMessage()));
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ErrorResponse> tooManyRequests(TooManyRequestsException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(Math.max(1, exception.getRetryAfter().toSeconds())))
+                .body(new ErrorResponse("RATE_LIMITED", exception.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidAccountTokenException.class)
+    public ResponseEntity<ErrorResponse> invalidAccountToken(InvalidAccountTokenException exception) {
+        return ResponseEntity.badRequest().body(new ErrorResponse("INVALID_LINK", exception.getMessage()));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> unreadableBody() {
+        return ResponseEntity.badRequest().body(new ErrorResponse("INVALID_REQUEST", "The request body is not valid JSON"));
+    }
+
+    @ExceptionHandler({MissingServletRequestParameterException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ErrorResponse> invalidParameter(Exception exception) {
+        String name = exception instanceof MissingServletRequestParameterException missing ? missing.getParameterName()
+                : ((MethodArgumentTypeMismatchException) exception).getName();
+        return ResponseEntity.badRequest().body(new ErrorResponse("INVALID_REQUEST", "Missing or invalid " + name));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

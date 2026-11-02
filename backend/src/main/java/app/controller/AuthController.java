@@ -47,7 +47,8 @@ public class AuthController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Authentication successful"),
             @ApiResponse(responseCode = "400", description = "Invalid login request", content = @Content),
-            @ApiResponse(responseCode = "401", description = "Invalid Google credential", content = @Content)
+            @ApiResponse(responseCode = "401", description = "Invalid Google credential", content = @Content),
+            @ApiResponse(responseCode = "503", description = "Google sign-in is not configured on this server", content = @Content)
     })
     @PostMapping("/google")
     public ResponseEntity<AuthResponse> loginWithGoogle(

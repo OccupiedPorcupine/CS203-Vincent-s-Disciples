@@ -13,12 +13,20 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import app.dto.ProfileResponse;
+import app.user.AppUser;
+import app.user.AppUserRepository;
 import app.user.AuthenticatedUser;
 
 @Tag(name = "Profile", description = "Authenticated user profile operations")
 @RestController
 @RequestMapping("/api/profile")
 public class ProfileController {
+
+    private final AppUserRepository appUserRepository;
+
+    public ProfileController(AppUserRepository appUserRepository) {
+        this.appUserRepository = appUserRepository;
+    }
 
     @Operation(summary = "Get user profile", description = "Returns the profile of the currently authenticated user.")
     @ApiResponses({
@@ -27,6 +35,8 @@ public class ProfileController {
     })
     @GetMapping
     public ResponseEntity<ProfileResponse> profile(@AuthenticationPrincipal AuthenticatedUser user) {
-        return ResponseEntity.ok(ProfileResponse.from(user));
+        // Read from the database: the session's copy doesn't change when the email is confirmed.
+        boolean verified = appUserRepository.findById(user.id()).map(AppUser::isEmailVerified).orElse(false);
+        return ResponseEntity.ok(ProfileResponse.from(user, verified));
     }
 }

@@ -6,6 +6,14 @@ const forecastButton = document.getElementById("forecast-button");
 const dishSelect = document.getElementById("dish-select");
 const historyNote = document.getElementById("history-note");
 const forecastStatus = document.getElementById("forecast-status");
+const forecastRange = document.getElementById("forecast-range");
+const forecastBasis = document.getElementById("forecast-basis");
+const forecastFallback = document.getElementById("forecast-fallback");
+const weatherContext = document.getElementById("weather-context");
+const holidayContext = document.getElementById("holiday-context");
+
+// The backend forecasts from today up to this many days ahead (Singapore time).
+const MAX_DAYS_AHEAD = 7;
 
 const toggleButtons = document.querySelectorAll(".toggle-button");
 
@@ -175,6 +183,10 @@ dishSelect.addEventListener("change", updateHistoryChart);
 forecastDateInput.addEventListener("input", updateForecastButton);
 forecastDateInput.addEventListener("change", updateHistoryChart);
 
+const todayInSingapore = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+forecastDateInput.min = todayInSingapore;
+forecastDateInput.max = addDays(todayInSingapore, MAX_DAYS_AHEAD);
+
 loadDishes();
 
 forecastForm.addEventListener("submit", async (event) => {
@@ -188,12 +200,14 @@ forecastForm.addEventListener("submit", async (event) => {
     forecastButton.disabled = true;
     forecastButton.textContent = "Generating…";
     showStatus("Working out expected demand…");
+    showForecastDetails(null);
 
     try {
         const result = await requestForecast(dishId, forecastDate);
 
         predictedDemand.textContent =
-            Math.round(result.predicted_demand);
+            Math.round(result.predictedDemand);
+        showForecastDetails(result);
 
         const formattedDate = new Date(
             `${forecastDate}T00:00:00`
@@ -209,9 +223,18 @@ forecastForm.addEventListener("submit", async (event) => {
     } catch (error) {
         console.error(error);
 
+        if (error.status === 401) {
+            window.location.href = "index.html";
+            return;
+        }
+
+        predictedDemand.textContent = "--";
+        forecastDateLabel.textContent = "Select a forecast date";
+
+        // 400s explain what to do ("Record a few days of sales…", "Choose a date from today…").
         showStatus(
-            error.status === 400
-                ? "That date is outside the weather forecast. Choose today or tomorrow."
+            error.status === 400 && error.message
+                ? error.message
                 : "Couldn’t generate a forecast. Try again in a moment.",
             "error"
         );
@@ -220,6 +243,25 @@ forecastForm.addEventListener("submit", async (event) => {
         updateForecastButton();
     }
 });
+
+// The likely range, how the number was worked out, and whether weather and holidays were used.
+// Passing null clears them.
+function showForecastDetails(result) {
+    forecastRange.textContent = !result
+        ? ""
+        : result.roughRange
+            ? `Roughly ${result.low}–${result.high} portions; this narrows as you record more sales`
+            : `Usually between ${result.low} and ${result.high} portions`;
+    forecastBasis.textContent = result ? `Based on: ${result.basis}` : "";
+    forecastFallback.textContent = result?.note ?? "";
+
+    const usedModel = result?.method === "MODEL";
+    const factorText = !result
+        ? "Included in forecast model"
+        : usedModel ? "Included in this forecast" : "Not used in this forecast";
+    weatherContext.textContent = factorText;
+    holidayContext.textContent = factorText;
+}
 
 function showStatus(message, type = "") {
     forecastStatus.textContent = message;

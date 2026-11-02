@@ -1,11 +1,21 @@
 import pandas as pd
+import pytest
 from fastapi.testclient import TestClient
 
 from ml.api.main import app
 from ml.model_comparison import load_dish_days
+from ml.src.models.inference import FEATURE_SCHEMA_PATH, MODEL_PATH
 
 
 def test_predict_endpoint_returns_forecast():
+    # The API loads the production artifacts on startup. They are not committed
+    # to Git, so skip (as test_inference.py does) when they have not been generated.
+    if not FEATURE_SCHEMA_PATH.exists() or not MODEL_PATH.exists():
+        pytest.skip(
+            "Production artifacts not found. "
+            "Run: python -m ml.train_production"
+        )
+
     wide, long = load_dish_days()
 
     dish = "CHICKEN"

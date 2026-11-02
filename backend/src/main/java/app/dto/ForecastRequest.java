@@ -7,5 +7,5 @@ import jakarta.validation.constraints.NotNull;
 
 public record ForecastRequest(
         @NotNull @Schema(description = "ID of the dish to forecast", example = "1") Long dishId,
-        @NotNull @Schema(description = "Date to generate the forecast for. Must fall within the current NEA 24-hour forecast period.", format = "date") LocalDate forecastDate
+        @NotNull @Schema(description = "Date to generate the forecast for, from today up to 7 days ahead (Singapore time)", format = "date") LocalDate forecastDate
 ) {}

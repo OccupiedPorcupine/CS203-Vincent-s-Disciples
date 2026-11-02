@@ -1,0 +1,85 @@
+/* Prep list layout. Shared tokens and components are in base.css. */
+
+/* Options */
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px 24px;
+  margin-top: 32px;
+}
+.controls .status-text { grid-column: 1 / -1; margin-top: -8px; }
+.controls .status-text:empty { display: none; }
+
+/* Portions and ingredients */
+.prep-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+  margin-top: 32px;
+  align-items: start;
+}
+.prep-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.prep-row:last-child { border-bottom: 0; }
+.prep-amount { font-size: var(--text-lg); text-align: right; white-space: nowrap; }
+.prep-caption { grid-column: 1 / -1; color: var(--muted); font-size: var(--text-xs); }
+.prep-note { margin-top: 8px; color: var(--muted); font-size: var(--text-sm); }
+.prep-note:empty { display: none; }
+.prep-grid .empty-state { padding: 24px 4px; }
+
+/* Recipes: one collapsible row per dish */
+#recipe-list { margin-top: 16px; border-top: 1px solid var(--divider); }
+.recipe { border-bottom: 1px solid var(--divider); }
+.recipe summary {
+  display: grid;
+  position: relative;
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr);
+  gap: 4px 16px;
+  align-items: center;
+  min-height: 56px;
+  padding: 8px 36px 8px 4px;
+  cursor: pointer;
+  list-style: none;
+}
+.recipe summary::-webkit-details-marker { display: none; }
+.recipe summary:hover { background: var(--teal-tint); }
+/* Chevron, as on drop-downs: points down when closed, up when open. */
+.recipe summary::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.recipe[open] summary::after { transform: translateY(-30%) rotate(225deg); }
+.recipe-summary { color: var(--muted); font-size: var(--text-sm); }
+.recipe-editor { display: grid; gap: 8px; padding: 4px 4px 20px; }
+.recipe-lines { display: grid; gap: 8px; }
+.recipe-line {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.recipe-line .input { width: 100%; }
+.recipe-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 4px; }
+
+@media (max-width: 760px) {
+  .controls { grid-template-columns: 1fr; }
+  .share-field .primary-button { width: 100%; }
+  .prep-grid { grid-template-columns: 1fr; gap: 24px; }
+  .recipe summary { grid-template-columns: 1fr; }
+  .recipe-line { grid-template-columns: 1fr 1fr; }
+  .recipe-line .input:first-child { grid-column: 1 / -1; }
+}

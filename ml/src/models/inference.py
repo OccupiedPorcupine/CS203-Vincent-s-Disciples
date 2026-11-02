@@ -20,6 +20,10 @@ FEATURE_SCHEMA_PATH = (
     PRODUCTION_ARTIFACT_DIR / "feature_schema.json"
 )
 
+MODEL_METADATA_PATH = (
+    PRODUCTION_ARTIFACT_DIR / "model_metadata.json"
+)
+
 
 # load schema
 def load_feature_schema() -> dict:
@@ -36,6 +40,22 @@ def load_feature_schema() -> dict:
         schema = json.load(file)
 
     return schema
+
+
+# load training metadata (dishes, dates, parameters).
+# Optional: older artifact sets may not have it, so a missing file gives {}.
+def load_model_metadata() -> dict:
+
+    if not MODEL_METADATA_PATH.exists():
+        return {}
+
+    with MODEL_METADATA_PATH.open(
+        "r",
+        encoding="utf-8",
+    ) as file:
+        metadata = json.load(file)
+
+    return metadata
 
 
 #load trained model

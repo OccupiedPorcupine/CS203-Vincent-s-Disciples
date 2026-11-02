@@ -12,15 +12,20 @@
       "id": "dashboard",
       "title": "Dashboard",
       "url": "dashboard.html",
-      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, and a box to talk to the assistant.",
+      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, revenue and gross profit for those days, the dishes that earn the most, and a box to talk to the assistant.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast and Data ingestion pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Prep list, Data ingestion and Dishes pages." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "demand-chart", "description": "Line chart and total of portions sold per day, all dishes combined, for the 7 days ending on the latest recorded sale." },
         { "guideId": "dish-chart", "description": "Bar chart of portions sold per dish over the same 7 days." },
-        { "guideId": "actions-needed", "description": "Checklist of things to do (placeholder items for now)." },
+        { "guideId": "revenue-card", "description": "Revenue for the same 7 days as the charts, with gross profit and margin. Dishes without a price are named here and not counted as $0; the Set prices link goes to the Dishes page." },
+        { "guideId": "top-dishes", "description": "The dishes that made the most gross profit in those 7 days, with the margin per plate." },
+        { "guideId": "revenue-heatmap", "description": "Revenue by day for the last 53 weeks, one square per day like a GitHub calendar: darker teal means more revenue, grey means no sales, an outlined square means closed. Hovering shows the amount; Show as a table lists each month." },
+        { "guideId": "actions-needed", "description": "Things to do now, worked out from the stall's data: days with no sales logged (Add sales opens a form for that day), uploaded files not imported yet, dishes without a price, and a public holiday coming up, with how the same holiday went last year. Each card can be dismissed." },
         { "guideId": "assistant-chat", "description": "Large text box for typing or speaking to the assistant, e.g. to record today's sales." }
       ]
     },
@@ -28,33 +33,77 @@
       "id": "forecast",
       "title": "Demand forecast",
       "url": "forecast.html",
-      "summary": "Predicts how many portions of a dish will sell on a date, using past sales, weather and public holidays.",
+      "summary": "Predicts how many portions of a dish will sell on a date, using past sales, weather and public holidays. For all dishes at once and the ingredients, see the Prep list.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard and Data ingestion pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Prep list, Data ingestion and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link back to the Dashboard, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "dish-select", "description": "Drop-down to choose which dish to forecast." },
-        { "guideId": "forecast-date", "description": "Date to forecast. Only dates covered by the current NEA 24-hour weather forecast work." },
+        { "guideId": "forecast-date", "description": "Date to forecast, from today up to 7 days ahead. Dates beyond the NEA weather forecast use the dish's past sales only." },
         { "guideId": "forecast-button", "description": "Generate forecast button below the date. Runs the forecast for the chosen dish and date. Disabled until a date is chosen." },
-        { "guideId": "forecast-result", "description": "Predicted portions and the chart of past sales for the chosen dish." },
+        { "guideId": "forecast-result", "description": "Predicted portions, the likely range, how the forecast was worked out (the model, or an average of past sales such as the last 4 Saturdays, and why), and the chart of past sales for the chosen dish." },
         { "guideId": "history-view", "description": "Switch the chart between the last 7 days and the same weekday in past weeks." },
         { "guideId": "demand-factors", "description": "Weather, holiday, event and disruption factors behind the forecast." }
+      ]
+    },
+    {
+      "id": "prep",
+      "title": "Prep list",
+      "url": "prep.html",
+      "summary": "What to prepare for a day: portions of each dish from its forecast plus a safety margin, the total of each ingredient from the recipes, a Share button, and each dish's recipe.",
+      "elements": [
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Data ingestion and Dishes pages." },
+        { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
+        { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
+        { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
+        { "guideId": "prep-date", "description": "Day to prepare for, from today up to 7 days ahead. Starts on tomorrow." },
+        { "guideId": "prep-buffer", "description": "How many portions to prepare: the top of each dish's likely range (the default), the forecast only, or the forecast plus 10, 20 or 30%." },
+        { "guideId": "share-prep", "description": "Shares the prep list as plain text (e.g. to WhatsApp) on a phone, or copies it on a computer." },
+        { "guideId": "prep-portions", "description": "Portions to prepare of each dish sold in the last 4 weeks, with its forecast, likely range and how it was worked out." },
+        { "guideId": "prep-ingredients", "description": "Total of each ingredient for those portions, from the recipes, and which dishes use it. Dishes without a recipe are named underneath." },
+        { "guideId": "recipe-list", "description": "Recipes section: one row per dish. Opening a row shows its ingredients, each with an amount per portion and a unit (g, ml, pcs), with Add ingredient, Remove and Save recipe." }
       ]
     },
     {
       "id": "data",
       "title": "Data ingestion",
       "url": "data.html",
-      "summary": "Upload CSV or Excel files of past sales for the forecasting model, and see the files uploaded so far.",
+      "summary": "Upload CSV or Excel files of past sales and import them into daily sales, see the files uploaded so far, and set the stall's opening days (weekly rest days and one-off closed days).",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard and Demand forecast pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "upload-dropzone", "description": "Area to drop a CSV or XLSX file onto, or click to choose one (maximum 25 MB)." },
         { "guideId": "upload-button", "description": "Uploads the chosen file. Disabled until a file is chosen." },
-        { "guideId": "source-list", "description": "Table of uploaded files, when they were uploaded, their size and whether the model uses them." }
+        { "guideId": "source-list", "description": "Table of uploaded files, when they were uploaded, their size, whether the model uses them, and an Import sales button that turns a file's rows into daily sales." },
+        { "guideId": "import-panel", "description": "Shown after an upload or after pressing Import sales: what is in the file (rows, dates, problems by row) and, for each dish name in the file, which dish to record it as, a new dish, or leave it out. Days that already have sales can be kept or replaced." },
+        { "guideId": "import-button", "description": "Imports the file's rows into daily sales, inside the import panel. Nothing is saved before this is pressed." },
+        { "guideId": "closures-panel", "description": "Opening days section at the bottom of the page: the stall's weekly rest days and one-off closed days. Closed days aren't counted as days with no sales and aren't forecast." },
+        { "guideId": "rest-days", "description": "Monday to Sunday buttons. Ticking a day makes it a weekly rest day; changes save straight away." },
+        { "guideId": "closed-date-form", "description": "Pick a date and an optional reason (e.g. centre cleaning), then press Add closed day. Added days are listed below with a Remove button." }
+      ]
+    },
+    {
+      "id": "dishes",
+      "title": "Dishes",
+      "url": "dishes.html",
+      "summary": "Each dish's selling price and cost per portion, used for revenue and gross profit on the Dashboard.",
+      "elements": [
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list and Data ingestion pages." },
+        { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
+        { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
+        { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
+        { "guideId": "price-list", "description": "Each dish's price and cost per portion in S$, the margin per plate, and a Save button per dish. A new price applies from today; earlier sales keep their price." }
       ]
     }
   ],
@@ -79,18 +128,58 @@
       "summary": "Predict how many portions of a dish will sell on a coming day.",
       "steps": [
         { "page": "forecast", "guideId": "dish-select", "message": "First choose the dish you want to plan for." },
-        { "page": "forecast", "guideId": "forecast-date", "message": "Then pick the day. Today or tomorrow works best, because the weather forecast only covers the next 24 hours." },
+        { "page": "forecast", "guideId": "forecast-date", "message": "Then pick the day, from today up to a week ahead. For today and tomorrow the forecast can use the weather too." },
         { "page": "forecast", "guideId": "forecast-button", "message": "Press this to get the forecast." },
-        { "page": "forecast", "guideId": "forecast-result", "message": "The predicted portions appear here, with your past sales for comparison." }
+        { "page": "forecast", "guideId": "forecast-result", "message": "The predicted portions appear here, with the likely range, how it was worked out, and your past sales for comparison." }
+      ]
+    },
+    {
+      "id": "plan-prep",
+      "summary": "See how many portions to prepare for tomorrow (or another day) and how much of each ingredient that needs, and share the list.",
+      "steps": [
+        { "page": "prep", "guideId": "prep-date", "message": "Pick the day you're preparing for. It starts on tomorrow." },
+        { "page": "prep", "guideId": "prep-portions", "message": "These are the portions to prepare of each dish, from its forecast with a safety margin." },
+        { "page": "prep", "guideId": "prep-ingredients", "message": "And this is how much of each ingredient they need, from your recipes." },
+        { "page": "prep", "guideId": "share-prep", "message": "Press Share list to send it to WhatsApp or copy it." }
+      ]
+    },
+    {
+      "id": "set-recipes",
+      "summary": "Enter what one portion of a dish uses (ingredients and amounts), so the prep list can add up ingredients.",
+      "steps": [
+        { "page": "prep", "guideId": "recipe-list", "message": "Open a dish, type each ingredient with its amount per portion and unit, like chicken 150 g, then press Save recipe." }
+      ]
+    },
+    {
+      "id": "set-prices",
+      "summary": "Set or change what a dish sells for and costs to make, so revenue and gross profit can be shown.",
+      "steps": [
+        { "page": "dishes", "guideId": "price-list", "message": "Type the price and cost of one portion next to the dish, then press Save. A change applies from today." }
+      ]
+    },
+    {
+      "id": "see-revenue",
+      "summary": "See how much was made recently and which dishes earn the most.",
+      "steps": [
+        { "page": "dashboard", "guideId": "revenue-card", "message": "This is your revenue for the latest 7 days, with gross profit once your dish costs are set." },
+        { "page": "dashboard", "guideId": "top-dishes", "message": "And these dishes made the most profit, with what you keep on each plate." }
       ]
     },
     {
       "id": "upload-training-data",
-      "summary": "Upload a file of past sales so the forecasting model can learn from it.",
+      "summary": "Upload a CSV or Excel file of past sales (a date, dish and quantity sold column) and import it, so the dashboard and forecasts can use it without typing the sales in.",
       "steps": [
         { "page": "data", "guideId": "upload-dropzone", "message": "Drop your CSV or Excel file here, or click to choose it." },
         { "page": "data", "guideId": "upload-button", "message": "Then press Upload source." },
-        { "page": "data", "guideId": "source-list", "message": "Your uploaded files are listed here." }
+        { "page": "data", "guideId": "source-list", "message": "After uploading, check how each dish name will be recorded and press Import. Your files are listed here, with an Import sales button to import one again." }
+      ]
+    },
+    {
+      "id": "set-opening-days",
+      "summary": "Set the stall's weekly rest days and one-off closed days (e.g. hawker centre cleaning), so they aren't counted as days with no sales and aren't forecast.",
+      "steps": [
+        { "page": "data", "guideId": "rest-days", "message": "Tick the days of the week your stall is always closed. They save straight away." },
+        { "page": "data", "guideId": "closed-date-form", "message": "For a one-off closure, pick the date, add a reason if you like, and press Add closed day." }
       ]
     }
   ]

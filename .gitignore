@@ -1,6 +1,8 @@
 ml/data/interim/*
 ml/data/processed/*
 ml/artifacts/*
+# The production model is committed so deployments can serve it (see ml/Dockerfile).
+!ml/artifacts/production/
 **/.venv/
 __pycache__/
 .pytest_cache/
@@ -19,3 +21,6 @@ backend/.env
 
 # macOS folder metadata
 .DS_Store
+
+# Local Vercel CLI link (vercel link)
+.vercel

@@ -1,4 +1,8 @@
-const API_BASE_URL = document.querySelector('meta[name="api-base-url"]').content;
+// Locally the pages (port 5500) call the backend at the address in the api-base-url meta tag.
+// When deployed, the backend is served under /api on the same address as the pages.
+const API_BASE_URL = ["localhost", "127.0.0.1"].includes(location.hostname)
+    ? document.querySelector('meta[name="api-base-url"]').content
+    : "";
 
 async function getCsrf() {
     const response = await fetch(`${API_BASE_URL}/api/csrf`, {
@@ -51,8 +55,9 @@ async function apiRequest(path, options = {}) {
         return response.blob();
     }
 
-    // 204 No Content, e.g. cancelling an assistant proposal.
-    if (response.status === 204) {
+    // No body: 204 No Content (e.g. cancelling an assistant proposal) or 202 Accepted (e.g.
+    // asking for the verification email again).
+    if (response.status === 204 || !(response.headers.get("content-type") || "").includes("application/json")) {
         return null;
     }
 

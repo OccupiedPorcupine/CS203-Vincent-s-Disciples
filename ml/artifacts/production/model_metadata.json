@@ -1,0 +1,25 @@
+{
+  "model_type": "CatBoostRegressor",
+  "trained_at_utc": "2026-09-28T03:46:13.151466+00:00",
+  "training_rows": 5124,
+  "training_start_date": "2013-11-01T00:00:00",
+  "training_end_date": "2015-11-07T00:00:00",
+  "dishes": [
+    "CALAMARI",
+    "CHICKEN",
+    "FISH",
+    "KOFTA",
+    "LAMB",
+    "PRAWNS",
+    "STEAK"
+  ],
+  "num_numeric_features": 45,
+  "num_categorical_features": 1,
+  "hyperparameters": {
+    "depth": 8,
+    "iterations": 500,
+    "l2_leaf_reg": 10,
+    "learning_rate": 0.05
+  },
+  "random_seed": 42
+}
