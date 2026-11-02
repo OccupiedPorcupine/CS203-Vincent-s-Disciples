@@ -208,7 +208,10 @@ async function mockApi(context) {
     await page.tap(".navigation summary");
     await page.tap('.navigation a[href="forecast.html"]');
     await page.waitForURL("**/forecast.html");
-    await page.fill("#forecast-date", "2026-10-31");
+    // Tomorrow in Singapore: the picker allows today to 7 days ahead of the real date, and the form
+    // refuses anything else, so the mock's fixed dates don't work here.
+    const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
+    await page.fill("#forecast-date", tomorrow);
     await page.tap("#forecast-button");
     await page.locator("#predicted-demand", { hasText: "47" }).waitFor();
     await check("forecast page");
