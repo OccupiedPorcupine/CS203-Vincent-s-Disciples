@@ -3,6 +3,7 @@ const restDayBoxes = document.querySelectorAll('input[name="rest-day"]');
 const closedDateForm = document.getElementById("closed-date-form");
 const closedDateInput = document.getElementById("closed-date");
 const closedReasonInput = document.getElementById("closed-reason");
+const closedDateButton = document.getElementById("closed-date-button");
 const closedDateList = document.getElementById("closed-date-list");
 const closuresStatus = document.getElementById("closures-status");
 
@@ -57,10 +58,12 @@ async function saveClosures(path, options, success) {
   try {
     renderClosures(await apiRequest(path, options));
     showClosuresStatus(success, "success");
+    return true;
   } catch (error) {
     console.error(error);
     showClosuresStatus(error.status === 400 && error.message ? error.message : "Couldn’t save. Try again in a moment.", "error");
     loadClosures();
+    return false;
   }
 }
 
@@ -76,14 +79,28 @@ restDayBoxes.forEach(box => box.addEventListener("change", () => {
   }, "Rest days saved.");
 }));
 
-closedDateForm.addEventListener("submit", event => {
+// As with the other forms, Add closed day stays disabled until a date is picked.
+function updateClosedDateButton() {
+  closedDateButton.disabled = !closedDateInput.value;
+}
+
+closedDateInput.addEventListener("input", updateClosedDateButton);
+
+closedDateForm.addEventListener("submit", async event => {
   event.preventDefault();
+  if (closedDateButton.disabled) return;
   const date = closedDateInput.value;
-  saveClosures(`/api/closures/dates/${date}`, {
+  closedDateButton.disabled = true;
+  closedDateButton.textContent = "Adding…";
+  showClosuresStatus("");
+  const saved = await saveClosures(`/api/closures/dates/${date}`, {
     method: "PUT",
     body: JSON.stringify({ reason: closedReasonInput.value })
   }, `${formatClosedDay(date)} marked as closed.`);
-  closedDateForm.reset();
+  closedDateButton.textContent = "Add closed day";
+  // Keep what was typed if it didn't save, so it can be tried again.
+  if (saved) closedDateForm.reset();
+  updateClosedDateButton();
 });
 
 async function loadClosures() {
@@ -92,7 +109,7 @@ async function loadClosures() {
   } catch (error) {
     if (error.status !== 401) {
       console.error(error);
-      showClosuresStatus("Couldn’t load your opening days.", "error");
+      showClosuresStatus("Couldn’t load your opening days. Refresh the page to try again.", "error");
     }
   }
 }
