@@ -52,6 +52,8 @@
 @media (max-width: 760px) {
   .controls { grid-template-columns: 1fr; }
   .page-heading + .card { margin-top: 24px; }
-  .content-grid { grid-template-columns: 1fr; gap: 24px; }
+  /* minmax(0, …) as above: with a plain 1fr the column can't shrink below the chart's drawn width,
+     which scrolled a 360px phone sideways. */
+  .content-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .chart-card { min-height: 360px; }
 }
