@@ -67,9 +67,10 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)
 
-The frontend data-ingestion page is available at `/data.html`. Uploaded files are stored under
-`../.local-data/training-data` by default and are identified by SHA-256 so duplicate uploads are
-not registered twice for the same user. Override the location with `TRAINING_DATA_STORAGE_PATH`.
+The frontend data-ingestion page is available at `/data.html`. Uploaded files are stored in the
+database (`training_data_files`) and are identified by SHA-256 so duplicate uploads are not
+registered twice for the same user. Uploads from before V25 were saved under
+`../.local-data/training-data`; they're still read from there while the file exists.
 Uploads are currently marked `AVAILABLE_FOR_TRAINING`; connecting them to a training job and an
 active model version is a separate pipeline step.
 
