@@ -10,6 +10,7 @@ const sourceSummary = document.getElementById("source-summary");
 const activeCount = document.getElementById("active-count");
 const uploadSection = document.getElementById("upload-section");
 const importSection = document.getElementById("import-section");
+const importForm = document.getElementById("import-form");
 const importHeading = document.getElementById("import-heading");
 const importSummary = document.getElementById("import-summary");
 const importErrors = document.getElementById("import-errors");
@@ -121,7 +122,7 @@ async function loadSources() {
     renderSources(sources);
   } catch (error) {
     if (error.status === 401) window.location.href = "index.html";
-    else sourceSummary.textContent = "Sources could not be loaded.";
+    else sourceSummary.textContent = "Couldn’t load your sources. Refresh the page to try again.";
   }
 }
 
@@ -152,7 +153,7 @@ uploadForm.addEventListener("submit", async (event) => {
     renderSources(await apiRequest("/api/data-sources"));
     openImport(source.id);
   } catch (error) {
-    showStatus(error.message || "The source could not be uploaded.", "error");
+    showStatus(error.message || "Couldn’t upload the source. Try again in a moment.", "error");
     uploadButton.disabled = false;
   } finally {
     uploadButton.textContent = "Upload source";
@@ -209,7 +210,7 @@ async function openImport(sourceId) {
     renderPreview(preview, dishes);
   } catch (error) {
     importSummary.textContent = "";
-    showStatus(error.message || "The file could not be read.", "error", importStatus);
+    showStatus(error.message || "Couldn’t read the file. Try again in a moment.", "error", importStatus);
   }
 }
 
@@ -338,13 +339,17 @@ async function runImport() {
     showStatus(`Imported: ${describeImport(result)}.${created}${priced}${changed}`, "success");
     renderSources(await apiRequest("/api/data-sources"));
   } catch (error) {
-    showStatus(error.message || "The sales could not be imported.", "error", importStatus);
+    showStatus(error.message || "Couldn’t import the sales. Try again in a moment.", "error", importStatus);
     importButton.disabled = false;
     importButton.textContent = `Import ${plural(importing.preview.rows, "row")}`;
   }
 }
 
-importButton.addEventListener("click", runImport);
+importForm.addEventListener("submit", event => {
+  event.preventDefault();
+  if (importButton.hidden || importButton.disabled) return;
+  runImport();
+});
 importCancel.addEventListener("click", () => {
   closeImport();
   showStatus("");
