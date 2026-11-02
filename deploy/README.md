@@ -53,6 +53,12 @@ Only the live site uses the Production project. Don't point a local `backend/.en
 
 **Email.** Password reset and email verification links are sent over SMTP. Without a domain of your own, Brevo's free plan (300 emails a day) sends from a single verified address; Resend needs a verified domain to send to anyone but you. Locally, without `MAIL_HOST`, the emails are written to the backend log instead.
 
+**Previews share Staging, so migrations can reach it out of order.** Each branch's preview applies its own migrations: one PR's V25 can land before another PR's V23. So Preview, and only Preview, also sets:
+- `SPRING_FLYWAY_OUTOFORDER=true`, which applies a lower-numbered migration that arrives later;
+- `SPRING_FLYWAY_IGNOREMIGRATIONPATTERNS=*:missing,*:future`, so a branch that lacks another branch's migrations still starts.
+
+Production keeps Flyway's strict defaults, so PRs with migrations must merge in number order.
+
 Without the `SPRING_PROFILES_ACTIVE` and database variables, the backend uses an in-memory H2 database. It's wiped every time the container stops, which is fine for a quick check of a preview and nothing else.
 
 ## Deploying
