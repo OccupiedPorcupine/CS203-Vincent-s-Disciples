@@ -1,11 +1,11 @@
 package app.salesimport;
 
 import org.apache.poi.openxml4j.opc.OPCPackage;
-import org.apache.poi.openxml4j.opc.PackageAccess;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -74,23 +74,27 @@ public final class SalesFileReader {
     }
 
     public static SalesFile read(Path path, String filename, LocalDate today) throws IOException {
+        return read(Files.readAllBytes(path), filename, today);
+    }
+
+    public static SalesFile read(byte[] content, String filename, LocalDate today) throws IOException {
         if (filename.toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
-            return readWorkbook(path, today);
+            return readWorkbook(content, today);
         }
-        return readCsv(path, today);
+        return readCsv(content, today);
     }
 
     // ---- Formats ----
 
-    private static SalesFile readCsv(Path path, LocalDate today) throws IOException {
-        String text = Files.readString(path, StandardCharsets.UTF_8);
+    private static SalesFile readCsv(byte[] content, LocalDate today) {
+        String text = new String(content, StandardCharsets.UTF_8);
         if (text.startsWith("﻿")) text = text.substring(1); // Excel's "CSV UTF-8" adds a byte order mark
         List<List<String>> lines = parseCsv(text);
         return readTable(null, lines.size(), row -> new CsvRow(lines.get(row)), today);
     }
 
-    private static SalesFile readWorkbook(Path path, LocalDate today) throws IOException {
-        try (OPCPackage pkg = OPCPackage.open(path.toFile(), PackageAccess.READ);
+    private static SalesFile readWorkbook(byte[] content, LocalDate today) throws IOException {
+        try (OPCPackage pkg = OPCPackage.open(new ByteArrayInputStream(content));
              Workbook workbook = new XSSFWorkbook(pkg)) {
             FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
             for (Sheet sheet : workbook) {

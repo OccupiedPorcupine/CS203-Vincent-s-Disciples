@@ -57,7 +57,6 @@ jobs:
       DATABASE_PASSWORD: postgres
       GOOGLE_CLIENT_ID: ci-placeholder.apps.googleusercontent.com
       ASSISTANT_PROVIDER: offline
-      TRAINING_DATA_STORAGE_PATH: /tmp/training-data
       PGHOST: localhost
       PGUSER: postgres
       PGPASSWORD: postgres
