@@ -67,6 +67,13 @@ public class AssistantInteraction {
 
     private Instant resolvedAt;
 
+    // Tokens OpenAI reported across this message's model calls; null for the offline model. See V27.
+    private Integer inputTokens;
+
+    private Integer cachedTokens;
+
+    private Integer outputTokens;
+
     protected AssistantInteraction() {
     }
 
@@ -93,6 +100,26 @@ public class AssistantInteraction {
         this.outcome = outcome;
         this.finalJson = finalJson;
         this.resolvedAt = resolvedAt;
+    }
+
+    public void recordTokens(AssistantModelClient.Usage usage) {
+        if (usage.inputTokens() + usage.outputTokens() > 0) {
+            inputTokens = (int) usage.inputTokens();
+            cachedTokens = (int) usage.cachedTokens();
+            outputTokens = (int) usage.outputTokens();
+        }
+    }
+
+    public Integer getInputTokens() {
+        return inputTokens;
+    }
+
+    public Integer getCachedTokens() {
+        return cachedTokens;
+    }
+
+    public Integer getOutputTokens() {
+        return outputTokens;
     }
 
     public Long getId() {

@@ -34,6 +34,10 @@ public class AppUser {
     @Column(nullable = false)
     private String role = "ROLE_USER";
 
+    // Sets the assistant's daily allowances: FREE, STANDARD or PRO (see app.assistant.AssistantPlan, V27).
+    @Column(nullable = false, length = 20)
+    private String plan = "FREE";
+
     // When the user proved they own the email address; null until then. See V19__account_tokens.sql.
     private Instant emailVerifiedAt;
 
@@ -111,5 +115,13 @@ public class AppUser {
 
     public String getRole() {
         return role;
+    }
+
+    public String getPlan() {
+        return plan;
+    }
+
+    public void changePlan(String plan) {
+        this.plan = plan;
     }
 }

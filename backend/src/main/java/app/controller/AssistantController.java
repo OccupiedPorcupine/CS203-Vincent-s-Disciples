@@ -26,10 +26,11 @@ public class AssistantController {
         this.assistantService = assistantService;
     }
 
-    @Operation(summary = "Assistant status", description = "Whether the assistant and voice input are available on this server.")
+    @Operation(summary = "Assistant status", description = "Whether the assistant and voice input are available on this server, "
+            + "and how much of today's allowance the account has used.")
     @GetMapping("/status")
-    public AssistantStatusResponse status() {
-        return assistantService.status();
+    public AssistantStatusResponse status(@AuthenticationPrincipal AuthenticatedUser user) {
+        return assistantService.status(user.id());
     }
 
     @Operation(summary = "Transcribe speech", description = "Turns a short recording (under a minute; webm, mp4/m4a, mp3 or wav) into text. "
@@ -37,7 +38,7 @@ public class AssistantController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Transcribed"),
             @ApiResponse(responseCode = "400", description = "Missing, too long or unsupported audio", content = @Content),
-            @ApiResponse(responseCode = "429", description = "Too many requests", content = @Content),
+            @ApiResponse(responseCode = "429", description = "Too many requests, or today's allowance is used up (DAILY_LIMIT)", content = @Content),
             @ApiResponse(responseCode = "502", description = "The speech service failed", content = @Content),
             @ApiResponse(responseCode = "503", description = "Voice input is not available on this server", content = @Content)
     })
@@ -50,6 +51,7 @@ public class AssistantController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "MP3 audio", content = @Content(mediaType = "audio/mpeg")),
             @ApiResponse(responseCode = "400", description = "Text missing or over 500 characters", content = @Content),
+            @ApiResponse(responseCode = "429", description = "Too many requests, or today's spoken replies are used up (SPEECH_LIMIT)", content = @Content),
             @ApiResponse(responseCode = "503", description = "Spoken replies are not available on this server", content = @Content)
     })
     @PostMapping(value = "/speech", produces = "audio/mpeg")
@@ -62,7 +64,7 @@ public class AssistantController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Reply, with a proposal if the assistant understood sales"),
             @ApiResponse(responseCode = "400", description = "Invalid message", content = @Content),
-            @ApiResponse(responseCode = "429", description = "Too many requests", content = @Content),
+            @ApiResponse(responseCode = "429", description = "Too many requests, or today's allowance is used up (DAILY_LIMIT)", content = @Content),
             @ApiResponse(responseCode = "502", description = "The AI service failed", content = @Content),
             @ApiResponse(responseCode = "503", description = "The assistant is not set up on this server", content = @Content)
     })

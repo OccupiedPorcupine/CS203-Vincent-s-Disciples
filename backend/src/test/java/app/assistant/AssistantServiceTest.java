@@ -88,6 +88,7 @@ class AssistantServiceTest {
     @Autowired DishAliasRepository aliasRepository;
     @Autowired DailySaleRepository saleRepository;
     @Autowired AssistantInteractionRepository interactionRepository;
+    @Autowired AssistantDailyUsageRepository usageRepository;
     @Autowired DishPriceService priceService;
     @Autowired DishPriceRepository priceRepository;
     @Autowired MutableClock clock;
@@ -113,6 +114,7 @@ class AssistantServiceTest {
     @AfterEach
     void cleanUp() {
         interactionRepository.deleteAll();
+        usageRepository.deleteAll();
         priceRepository.deleteAll();
         closedDateRepository.deleteAll();
         restDayRepository.deleteAll();
