@@ -34,7 +34,8 @@ public class TrainingDataSource {
     @Column(nullable = false, length = 64)
     private String sha256;
 
-    @Column(nullable = false, length = 1024)
+    // Only uploads from before files were kept in the database (TrainingDataFile) have one.
+    @Column(length = 1024)
     private String storedPath;
 
     @Column(nullable = false, length = 32)
