@@ -292,7 +292,8 @@ public class AssistantService {
                             name -> dishService.createDish(entry.newDishName(), ownerId))
                     : dishRepository.findByIdAndOwnerId(entry.dishId(), ownerId).orElseThrow();
 
-            UpdateDailySaleResponse sale = dailySaleService.setSale(dish.getId(), ownerId, entry.date(), entry.quantity());
+            UpdateDailySaleResponse sale = dailySaleService.setSale(dish.getId(), ownerId, entry.date(), entry.quantity(),
+                    entry.soldOutAt(), entry.leftoverQuantity());
 
             if (entry.spokenName() != null
                     && !DishAlias.normalize(entry.spokenName()).equals(DishAlias.normalize(dish.getName()))) {
@@ -300,7 +301,7 @@ public class AssistantService {
             }
 
             saved.add(new ProposedEntry(dish.getId(), dish.getName(), null, entry.spokenName(),
-                    entry.date(), entry.quantity(), sale.previousQuantity()));
+                    entry.date(), entry.quantity(), sale.previousQuantity(), entry.soldOutAt(), entry.leftoverQuantity()));
         }
 
         Set<LocalDate> alreadyClosed = new HashSet<>();
@@ -386,7 +387,8 @@ public class AssistantService {
         return new AssistantException(HttpStatus.CONFLICT, "PROPOSAL_CLOSED", message);
     }
 
-    // Same dishes, dates and quantities; ignores what was recorded before and the spoken names.
+    // Same dishes, dates, quantities, sold-out times and leftovers; ignores what was recorded
+    // before and the spoken names.
     private static boolean sameSales(List<ProposedEntry> proposed, List<ProposedEntry> confirmed) {
         return salesKeys(proposed).equals(salesKeys(confirmed));
     }
@@ -394,12 +396,13 @@ public class AssistantService {
     private static Set<String> salesKeys(List<ProposedEntry> entries) {
         Set<String> keys = new HashSet<>();
         entries.forEach(entry -> keys.add((entry.isNewDish() ? "new:" + DishAlias.normalize(entry.newDishName()) : "id:" + entry.dishId())
-                + "@" + entry.date() + "=" + entry.quantity()));
+                + "@" + entry.date() + "=" + entry.quantity() + "/" + entry.soldOutAt() + "/" + entry.leftoverQuantity()));
         return keys;
     }
 
     private static ProposalEntryInput toInput(ProposedEntry entry) {
-        return new ProposalEntryInput(entry.dishId(), entry.newDishName(), entry.spokenName(), entry.date(), entry.quantity());
+        return new ProposalEntryInput(entry.dishId(), entry.newDishName(), entry.spokenName(), entry.date(), entry.quantity(),
+                entry.soldOutAt(), entry.leftoverQuantity());
     }
 
     // A card with only closed days has no sales (null JSON).

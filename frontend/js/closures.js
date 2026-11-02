@@ -1,10 +1,13 @@
-// "Opening days" on the Data page: weekly rest days and one-off closed days.
+// "Opening days" on the Data page: weekly rest days, trading hours and one-off closed days.
 const restDayBoxes = document.querySelectorAll('input[name="rest-day"]');
 const closedDateForm = document.getElementById("closed-date-form");
 const closedDateInput = document.getElementById("closed-date");
 const closedReasonInput = document.getElementById("closed-reason");
 const closedDateList = document.getElementById("closed-date-list");
 const closuresStatus = document.getElementById("closures-status");
+const hoursForm = document.getElementById("trading-hours");
+const opensAtInput = document.getElementById("opens-at");
+const closesAtInput = document.getElementById("closes-at");
 
 // Closed days older than this aren't listed (they still count on the dashboard).
 const PAST_DAYS_SHOWN = 30;
@@ -24,8 +27,10 @@ function formatClosedDay(isoDate) {
   });
 }
 
-function renderClosures({ restDays, closedDates }) {
+function renderClosures({ restDays, closedDates, hours }) {
   restDayBoxes.forEach(box => { box.checked = restDays.includes(box.value); });
+  opensAtInput.value = hours ? hours.opensAt : "";
+  closesAtInput.value = hours ? hours.closesAt : "";
 
   const today = todayInSingapore();
   const cutoff = new Date(`${today}T00:00:00Z`);
@@ -75,6 +80,14 @@ restDayBoxes.forEach(box => box.addEventListener("change", () => {
     body: JSON.stringify({ restDays })
   }, "Rest days saved.");
 }));
+
+hoursForm.addEventListener("submit", event => {
+  event.preventDefault();
+  saveClosures("/api/closures/hours", {
+    method: "PUT",
+    body: JSON.stringify({ opensAt: opensAtInput.value, closesAt: closesAtInput.value })
+  }, `Trading hours saved: ${opensAtInput.value} to ${closesAtInput.value}.`);
+});
 
 closedDateForm.addEventListener("submit", event => {
   event.preventDefault();

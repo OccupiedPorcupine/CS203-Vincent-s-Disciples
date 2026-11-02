@@ -10,8 +10,10 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import app.closure.Hours;
 import app.dish.Dish;
 import app.dto.ForecastResponse;
 import app.dto.ForecastResponse.FallbackReason;
@@ -36,6 +38,8 @@ public class ForecastService {
     // The model's features need 7 earlier days of sales and 4 earlier days on the same weekday.
     static final int MODEL_MIN_DAYS = 7;
     static final int MODEL_MIN_SAME_WEEKDAYS = 4;
+    // The basis mentions sold-out days in this many days before the forecast date (the model's window).
+    static final int SOLD_OUT_NOTE_DAYS = 28;
 
     private static final String MODEL_BASIS = "Forecast model, using your recent sales, the weather forecast and public holidays";
 
@@ -45,15 +49,19 @@ public class ForecastService {
     private final MlForecastClient mlForecastClient;
     private final StallClosureService stallClosureService;
     private final Clock clock;
+    // Off until the prep list stops preparing to the top of the range (#86); see SoldOutDemand.
+    private final boolean countSoldOutDemand;
 
     public ForecastService(ForecastDataService forecastDataService, NeaWeatherForecastService neaWeatherForecastService, PublicHolidayService publicHolidayService,
-                           MlForecastClient mlForecastClient, StallClosureService stallClosureService, Clock clock) {
+                           MlForecastClient mlForecastClient, StallClosureService stallClosureService, Clock clock,
+                           @Value("${app.forecast.count-sold-out-demand:false}") boolean countSoldOutDemand) {
         this.forecastDataService = forecastDataService;
         this.neaWeatherForecastService = neaWeatherForecastService;
         this.publicHolidayService = publicHolidayService;
         this.mlForecastClient = mlForecastClient;
         this.stallClosureService = stallClosureService;
         this.clock = clock;
+        this.countSoldOutDemand = countSoldOutDemand;
     }
 
     public ForecastResponse forecast(Long dishId, LocalDate date, Long ownerId) {
@@ -67,10 +75,33 @@ public class ForecastService {
             throw new StallClosedException(message);
         });
         List<DailySale> sales = forecastDataService.getSalesHistory(dish.getId(), date);
-        List<Observation> history = sales.stream()
+        List<Observation> recorded = sales.stream()
                 .map(sale -> new Observation(sale.getSaleDate(), sale.getQuantitySold()))
                 .toList();
+        long soldOutDays = sales.stream()
+                .filter(sale -> sale.getSoldOutAt() != null && !sale.getSaleDate().isBefore(date.minusDays(SOLD_OUT_NOTE_DAYS)))
+                .count();
+        if (!countSoldOutDemand || soldOutDays == 0) {
+            return forecast(dish, date, recorded);
+        }
 
+        // Sold-out days count as the demand they likely had (SoldOutDemand), for both the model and
+        // the baseline. The range still comes from the recorded sales: measured on the scaled-up
+        // days it widens, and the prep list's top of the range would over-prepare (#50, #86).
+        Hours hours = stallClosureService.hours(ownerId).orElse(Hours.DEFAULT);
+        List<Observation> demand = sales.stream()
+                .map(sale -> new Observation(sale.getSaleDate(),
+                        SoldOutDemand.estimate(sale.getQuantitySold(), sale.getSoldOutAt(), hours)))
+                .toList();
+        ForecastResponse response = forecast(dish, date, demand);
+        Range range = BaselineForecaster.range(recorded, response.predictedDemand());
+        return new ForecastResponse(response.dish(), response.forecastDate(), response.predictedDemand(),
+                (int) Math.floor(range.low()), (int) Math.ceil(range.high()), range.rough(), response.method(),
+                response.fallbackReason(), response.basis() + ", counting " + (soldOutDays == 1 ? "1 sold-out day" : soldOutDays + " sold-out days")
+                        + " as higher demand", response.note());
+    }
+
+    private ForecastResponse forecast(Dish dish, LocalDate date, List<Observation> history) {
         Estimate baseline = BaselineForecaster.estimate(history, date).orElseThrow(() -> new IllegalArgumentException(
                 "No sales are recorded for " + dish.getName() + " yet. Record a few days of sales to get a forecast."));
 
@@ -110,8 +141,8 @@ public class ForecastService {
             prediction = mlForecastClient.predict(new MlPredictionRequest(
                     dish.getName(),
                     date.toString(),
-                    sales.stream().map(sale -> new MlPredictionRequest.SalesRecord(
-                            sale.getSaleDate().toString(), sale.getQuantitySold())).toList(),
+                    history.stream().map(observation -> new MlPredictionRequest.SalesRecord(
+                            observation.date().toString(), observation.quantity())).toList(),
                     weather,
                     publicHolidayService.isPublicHoliday(date)
             )).predicted_demand();

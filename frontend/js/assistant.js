@@ -671,9 +671,22 @@
       heard.textContent = `heard “${entry.spokenName}”`;
       dishCell.append(heard);
     }
+    // Shown only when the assistant heard one; clearing the field saves the day without it.
+    if (entry.soldOutAt) {
+      const soldOut = element("label", "assistant-outcome");
+      soldOut.append("Sold out at ", element("input", "assistant-sold-out", { type: "time", value: entry.soldOutAt }));
+      dishCell.append(soldOut);
+    }
+    if (entry.leftoverQuantity !== null && entry.leftoverQuantity !== undefined) {
+      const leftover = element("label", "assistant-outcome");
+      leftover.append("Left over ", element("input", "assistant-leftover", {
+        type: "number", min: "0", max: "9999", value: entry.leftoverQuantity, inputmode: "numeric"
+      }));
+      dishCell.append(leftover);
+    }
 
     const quantityCell = element("td");
-    const quantity = element("input", "", { type: "number", min: "0", max: "9999", value: entry.quantity, "aria-label": `Portions of ${entry.dishName}` });
+    const quantity = element("input", "assistant-quantity", { type: "number", min: "0", max: "9999", value: entry.quantity, "aria-label": `Portions of ${entry.dishName}` });
     quantityCell.append(quantity);
     if (entry.previousQuantity !== null && entry.previousQuantity !== undefined) {
       const previous = element("span", "assistant-previous");
@@ -692,13 +705,16 @@
   }
 
   function readRow(row) {
-    const [date, quantity] = row.querySelectorAll("input");
+    const value = selector => row.querySelector(selector)?.value || null;
+    const leftover = value(".assistant-leftover");
     return {
       dishId: row.dataset.dishId ? Number(row.dataset.dishId) : null,
       newDishName: row.dataset.newDishName || null,
       spokenName: row.dataset.spokenName || null,
-      date: date.value,
-      quantity: quantity.value === "" ? null : Number(quantity.value)
+      date: value('input[type="date"]'),
+      quantity: value(".assistant-quantity") === null ? null : Number(value(".assistant-quantity")),
+      soldOutAt: value(".assistant-sold-out"),
+      leftoverQuantity: leftover === null ? null : Number(leftover)
     };
   }
 

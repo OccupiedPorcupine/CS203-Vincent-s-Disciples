@@ -4,6 +4,7 @@ import app.assistant.AssistantModelClient.ToolCall;
 import app.assistant.AssistantModelClient.ToolSpec;
 import app.assistant.guide.AppGuide;
 import app.assistant.guide.GuideStep;
+import app.closure.Hours;
 import app.dish.Dish;
 import app.dish.DishAlias;
 import app.dish.DishAliasRepository;
@@ -26,6 +27,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
@@ -128,7 +130,7 @@ public class AssistantTools {
                                 """)),
                 new ToolSpec(GET_SALES,
                         "Get recorded daily sales for one of the user's dishes between two dates (inclusive, at most "
-                                + MAX_SALES_DAYS + " days).",
+                                + MAX_SALES_DAYS + " days), with the time it sold out and portions left over if recorded.",
                         schema("""
                                 {"type": "object",
                                  "properties": {
@@ -139,7 +141,8 @@ public class AssistantTools {
                                  "additionalProperties": false}
                                 """)),
                 new ToolSpec(PROPOSE_SALES_ENTRY,
-                        "Show the user a confirm card with the daily sales you understood from their message. "
+                        "Show the user a confirm card with the daily sales you understood from their message, "
+                                + "including when a dish sold out and portions left over. "
                                 + "This does NOT save anything; the user checks the card and confirms it. "
                                 + "Include every entry from the message in one call. Use dish_id for an existing dish, "
                                 + "or new_dish_name (with dish_id null) for a dish the user doesn't have yet.",
@@ -153,8 +156,10 @@ public class AssistantTools {
                                        "new_dish_name": {"type": ["string", "null"]},
                                        "spoken_name": {"type": ["string", "null"], "description": "The words the user used for the dish, exactly as said"},
                                        "date": {"type": "string", "description": "YYYY-MM-DD"},
-                                       "quantity": {"type": "integer", "description": "Portions sold"}},
-                                     "required": ["dish_id", "new_dish_name", "spoken_name", "date", "quantity"],
+                                       "quantity": {"type": ["integer", "null"], "description": "Portions sold; null only if the user gave just a sold-out time or leftovers"},
+                                       "sold_out_at": {"type": ["string", "null"], "description": "HH:MM, 24-hour, when the dish sold out; null if not mentioned"},
+                                       "leftover": {"type": ["integer", "null"], "description": "Portions left over (not sold); null if not mentioned"}},
+                                     "required": ["dish_id", "new_dish_name", "spoken_name", "date", "quantity", "sold_out_at", "leftover"],
                                      "additionalProperties": false}}},
                                  "required": ["entries"],
                                  "additionalProperties": false}
@@ -310,7 +315,9 @@ public class AssistantTools {
                 .filter(sale -> !sale.getSaleDate().isBefore(from) && !sale.getSaleDate().isAfter(to))
                 .forEach(sale -> sales.addObject()
                         .put("date", sale.getSaleDate().toString())
-                        .put("quantity", sale.getQuantitySold()));
+                        .put("quantity", sale.getQuantitySold())
+                        .put("sold_out_at", sale.getSoldOutAt() == null ? null : sale.getSoldOutAt().toString())
+                        .put("leftover", sale.getLeftoverQuantity()));
         return sales;
     }
 
@@ -322,11 +329,25 @@ public class AssistantTools {
                     textOrNull(entry.path("new_dish_name")),
                     textOrNull(entry.path("spoken_name")),
                     LocalDate.parse(entry.path("date").asString()),
-                    entry.path("quantity").isNumber() ? entry.path("quantity").asInt() : null));
+                    entry.path("quantity").isNumber() ? entry.path("quantity").asInt() : null,
+                    textOrNull(entry.path("sold_out_at")) == null ? null : LocalTime.parse(entry.path("sold_out_at").asString().strip()),
+                    entry.path("leftover").isNumber() ? entry.path("leftover").asInt() : null));
         }
 
-        ProposalValidator.Result result = proposalValidator.validate(context.ownerId, inputs, context.today);
+        ProposalValidator.Result result = proposalValidator.validateProposal(context.ownerId, inputs, context.today);
         ObjectNode output = jsonMapper.createObjectNode();
+
+        // "Sold out at one" is 13:00 at a lunch stall; a time outside the stall's hours is likely a slip.
+        Hours hours = stallClosureService.hours(context.ownerId).orElse(null);
+        List<String> outsideHours = new ArrayList<>();
+        for (int i = 0; hours != null && result.isValid() && i < inputs.size(); i++) {
+            LocalTime soldOutAt = inputs.get(i).soldOutAt();
+            if (soldOutAt != null && hours.minutesUntil(soldOutAt).isEmpty()) {
+                outsideHours.add(result.entries().get(i).dishName() + ": sold out at " + soldOutAt + " is outside the stall's "
+                        + "trading hours (" + hours + "). Use 24-hour time, e.g. 13:00 for 1 pm, or ask the user.");
+            }
+        }
+        if (!outsideHours.isEmpty()) result = new ProposalValidator.Result(List.of(), outsideHours);
 
         if (!result.isValid()) {
             output.put("ok", false);
@@ -341,7 +362,7 @@ public class AssistantTools {
         output.put("ok", true);
         output.set("entries", jsonMapper.valueToTree(result.entries()));
         output.put("note", "Shown to the user as a confirm card. Not saved until they confirm. "
-                + "Mention any entry that replaces an existing quantity (previousQuantity).");
+                + "Mention any entry that replaces an existing quantity (previousQuantity), and any sold-out time or leftovers.");
         return output;
     }
 

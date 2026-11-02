@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,7 +75,7 @@ class DailySaleServiceTest {
 
         var response = new DailySaleService(dishRepository, saleRepository).setSale(3L, 7L, day, 42);
 
-        assertEquals(new UpdateDailySaleResponse(day, 42, null), response);
+        assertEquals(new UpdateDailySaleResponse(day, 42, null, null, null), response);
         var saved = ArgumentCaptor.forClass(DailySale.class);
         verify(saleRepository).save(saved.capture());
         assertEquals(day, saved.getValue().getSaleDate());
@@ -93,9 +94,44 @@ class DailySaleServiceTest {
 
         var response = new DailySaleService(dishRepository, saleRepository).setSale(3L, 7L, day, 45);
 
-        assertEquals(new UpdateDailySaleResponse(day, 45, 40), response);
+        assertEquals(new UpdateDailySaleResponse(day, 45, 40, null, null), response);
         assertEquals(45, existing.getQuantitySold());
         verify(saleRepository).save(existing);
+    }
+
+    @Test
+    void aNewQuantityKeepsTheSoldOutTimeButAFullRecordReplacesIt() {
+        var dishRepository = mock(DishRepository.class);
+        var saleRepository = mock(DailySaleRepository.class);
+        var dish = mock(Dish.class);
+        var day = LocalDate.of(2026, 10, 28);
+        var existing = new DailySale(dish, day, 40);
+        existing.setOutcome(LocalTime.of(12, 40), null);
+        when(dishRepository.findByIdAndOwnerId(3L, 7L)).thenReturn(Optional.of(dish));
+        when(saleRepository.findByDishIdAndSaleDate(3L, day)).thenReturn(Optional.of(existing));
+        var service = new DailySaleService(dishRepository, saleRepository);
+
+        service.setSale(3L, 7L, day, 45);
+        assertEquals(LocalTime.of(12, 40), existing.getSoldOutAt());
+
+        var response = service.setSale(3L, 7L, day, 45, null, 2);
+        assertEquals(new UpdateDailySaleResponse(day, 45, 45, null, 2), response);
+        assertNull(existing.getSoldOutAt());
+        assertEquals(2, existing.getLeftoverQuantity());
+    }
+
+    @Test
+    void aDishThatSoldOutCannotHaveLeftovers() {
+        var dishRepository = mock(DishRepository.class);
+        var saleRepository = mock(DailySaleRepository.class);
+        when(dishRepository.findByIdAndOwnerId(3L, 7L)).thenReturn(Optional.of(mock(Dish.class)));
+        var service = new DailySaleService(dishRepository, saleRepository);
+
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> service.setSale(3L, 7L, LocalDate.of(2026, 10, 28), 40, LocalTime.of(12, 0), 3));
+        assertEquals("A dish that sold out has no leftovers.", error.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> service.setSale(3L, 7L, LocalDate.of(2026, 10, 28), 40, null, -1));
+        verify(saleRepository, never()).save(any());
     }
 
     @Test

@@ -1,7 +1,9 @@
 package app.actions;
 
 import app.closure.ClosedDateRepository;
+import app.closure.Hours;
 import app.closure.RestDayRepository;
+import app.closure.TradingHoursRepository;
 import app.datasource.TrainingDataSource;
 import app.datasource.TrainingDataSourceRepository;
 import app.dish.Dish;
@@ -37,8 +39,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-// The Actions needed rules on H2, on Wednesday 4 November 2026 in Singapore.
-@SpringBootTest
+// The Actions needed rules on H2, on Wednesday 4 November 2026 in Singapore, with sold-out days
+// counted in forecasts (so the trading-hours card can show).
+@SpringBootTest(properties = "app.forecast.count-sold-out-demand=true")
 class ActionServiceTest {
 
     static final LocalDate TODAY = LocalDate.of(2026, 11, 4);
@@ -67,6 +70,7 @@ class ActionServiceTest {
     @Autowired StallClosureService closureService;
     @Autowired ClosedDateRepository closedDateRepository;
     @Autowired RestDayRepository restDayRepository;
+    @Autowired TradingHoursRepository tradingHoursRepository;
     @Autowired PublicHolidayRepository holidayRepository;
     @Autowired TrainingDataSourceRepository sourceRepository;
     @Autowired AppUserRepository users;
@@ -89,6 +93,7 @@ class ActionServiceTest {
         sourceRepository.deleteAll();
         closedDateRepository.deleteAll();
         restDayRepository.deleteAll();
+        tradingHoursRepository.deleteAll();
         priceRepository.deleteAll();
         saleRepository.deleteAll();
         dishRepository.deleteAll();
@@ -190,5 +195,18 @@ class ActionServiceTest {
         closureService.closeDate(owner, TODAY.plusDays(5), "Holiday");
 
         assertTrue(keys().stream().noneMatch(key -> key.startsWith("holiday:")));
+    }
+
+    @Test
+    void aStallWhoseDishesSellOutIsAskedForItsTradingHoursOnce() {
+        sell(chickenRice, TODAY.minusDays(7), TODAY.minusDays(1), 40);
+        assertTrue(keys().stream().noneMatch(key -> key.equals("trading-hours")));
+
+        saleService.setSale(chickenRice.getId(), owner, TODAY.minusDays(1), 40, LocalTime.of(12, 40), null);
+        ActionCard card = actionService.actions(owner).stream().filter(c -> c.key().equals("trading-hours")).findFirst().orElseThrow();
+        assertEquals("data.html#trading-hours", card.href());
+
+        closureService.setHours(owner, new Hours(LocalTime.of(10, 0), LocalTime.of(15, 0)));
+        assertTrue(keys().stream().noneMatch(key -> key.equals("trading-hours")));
     }
 }

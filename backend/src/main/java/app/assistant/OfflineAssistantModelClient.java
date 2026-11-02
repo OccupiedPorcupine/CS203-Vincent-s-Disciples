@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 
 // A rule-based stand-in for the language model (ASSISTANT_PROVIDER=offline), for demos,
 // development and tests without an OpenAI key. It is not AI: it only understands typed sales
-// like "yesterday chicken rice 42, char siew 30", closures like "closed tomorrow" (today,
+// like "yesterday chicken rice 42, char siew 30" (with "sold out at 12:40" or "3 left over"), closures like "closed tomorrow" (today,
 // tomorrow or yesterday only), "what do I prep for tomorrow?", and "how do I ..." questions that
 // share words with a task in the app guide. It drives the same tools a real model would (list_dishes
 // then propose_sales_entry and/or propose_closure, get_prep_list, or guide_user), so the rest of the
@@ -41,8 +41,13 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     private static final Pattern EVERY_WEEKDAY = Pattern.compile(
             "\\bevery (mon|tues|wednes|thurs|fri|satur|sun)day|每个?(星期|礼拜)|每周", Pattern.CASE_INSENSITIVE);
     private static final Pattern FILLER = Pattern.compile(
-            "\\b(today|yesterday|ytd|sold|sell|sells|selling|plates?|portions?|packets?|bowls?|lor|leh|lah|ah)\\b|今天|今日|昨天|昨日|卖了|卖|份|碗|盘",
+            "\\b(today|yesterday|ytd|sold|sell|sells|selling|plates?|portions?|packets?|bowls?|with|lor|leh|lah|ah)\\b|今天|今日|昨天|昨日|卖了|卖|份|碗|盘",
             Pattern.CASE_INSENSITIVE);
+
+    // "sold out at 12:40", "sold out 13.00"; "15 left over", "leftover 3".
+    private static final Pattern SOLD_OUT = Pattern.compile("\\bsold out(?: at)?\\s*(\\d{1,2})[:.](\\d{2})", Pattern.CASE_INSENSITIVE);
+    private static final Pattern LEFTOVER = Pattern.compile(
+            "(\\d+)\\s*(?:left ?over|left)\\b|\\bleft ?overs?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern PREP = Pattern.compile("\\b(prep|prepare)\\b|准备|备料", Pattern.CASE_INSENSITIVE);
     private static final Pattern TODAY_WORD = Pattern.compile("\\btoday\\b|今天|今日", Pattern.CASE_INSENSITIVE);
@@ -184,14 +189,27 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         String date = find(YESTERDAY_WORD.matcher(text).find() ? YESTERDAY : TODAY, instructions);
         ArrayNode entries = jsonMapper.createArrayNode();
 
-        for (String segment : SEGMENT_SEPARATOR.split(text)) {
+        for (String part : SEGMENT_SEPARATOR.split(text)) {
+            String soldOutAt = null;
+            Integer leftover = null;
+            Matcher soldOut = SOLD_OUT.matcher(part);
+            if (soldOut.find()) {
+                soldOutAt = String.format("%02d:%s", Integer.parseInt(soldOut.group(1)), soldOut.group(2));
+            }
+            Matcher left = LEFTOVER.matcher(part);
+            if (left.find()) {
+                leftover = Integer.parseInt(left.group(1) != null ? left.group(1) : left.group(2));
+            }
+            String segment = LEFTOVER.matcher(SOLD_OUT.matcher(part).replaceAll(" ")).replaceAll(" ");
+            boolean outcome = soldOutAt != null || leftover != null;
+
             Matcher number = NUMBER.matcher(segment);
             String quantity = null;
             while (number.find()) {
                 quantity = number.group();
             }
             String phrase = FILLER.matcher(NUMBER.matcher(segment).replaceAll(" ")).replaceAll(" ").strip().replaceAll("\\s+", " ");
-            if (quantity == null || phrase.isEmpty() || CLOSED.matcher(segment).find() || OPEN_AGAIN.matcher(segment).find()) {
+            if ((quantity == null && !outcome) || phrase.isEmpty() || CLOSED.matcher(segment).find() || OPEN_AGAIN.matcher(segment).find()) {
                 continue;
             }
 
@@ -206,7 +224,9 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             }
             entry.put("spoken_name", phrase);
             entry.put("date", date);
-            entry.put("quantity", Integer.parseInt(quantity));
+            entry.put("quantity", quantity == null ? null : Integer.valueOf(quantity));
+            entry.put("sold_out_at", soldOutAt);
+            entry.put("leftover", leftover);
         }
         return entries;
     }

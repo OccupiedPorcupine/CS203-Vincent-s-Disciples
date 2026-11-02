@@ -153,6 +153,24 @@
         </div>
       </fieldset>
 
+      <form id="trading-hours" class="trading-hours-form" data-guide-id="trading-hours">
+        <fieldset>
+          <legend>Trading hours</legend>
+          <p class="field-hint">Used to tell how early in the day a dish sold out. If you close after midnight, put the closing time after midnight, e.g. 02:00.</p>
+          <div class="trading-hours-fields">
+            <div class="field">
+              <label for="opens-at">Opens</label>
+              <input id="opens-at" class="input" type="time" required>
+            </div>
+            <div class="field">
+              <label for="closes-at">Closes</label>
+              <input id="closes-at" class="input" type="time" required>
+            </div>
+            <button class="secondary-button" type="submit">Save hours</button>
+          </div>
+        </fieldset>
+      </form>
+
       <form id="closed-date-form" class="closed-date-form" data-guide-id="closed-date-form">
         <div class="field">
           <label for="closed-date">Closed on</label>

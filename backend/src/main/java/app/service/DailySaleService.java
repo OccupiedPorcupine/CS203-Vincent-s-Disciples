@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +21,8 @@ import java.util.Set;
 
 @Service
 public class DailySaleService {
+
+    public static final int MAX_LEFTOVER = 9999;
 
     private final DishRepository dishRepository;
     private final DailySaleRepository dailySaleRepository;
@@ -51,8 +54,13 @@ public class DailySaleService {
             if (dailySaleRepository.existsByDishIdAndSaleDate(dishId, input.date())) {
                 throw new IllegalArgumentException("Sales already exist for " + input.date());
             }
+            outcomeProblem(input.soldOutAt(), input.leftoverQuantity()).ifPresent(problem -> {
+                throw new IllegalArgumentException(input.date() + ": " + problem);
+            });
 
-            salesToSave.add(new DailySale(dish, input.date(), input.quantitySold()));
+            DailySale sale = new DailySale(dish, input.date(), input.quantitySold());
+            sale.setOutcome(input.soldOutAt(), input.leftoverQuantity());
+            salesToSave.add(sale);
         }
 
         dailySaleRepository.saveAll(salesToSave);
@@ -69,9 +77,21 @@ public class DailySaleService {
         return dailySaleRepository.findByDishIdOrderBySaleDateAsc(dishId);
     }
 
-    // Records one day's sales, replacing any quantity already recorded for that day.
+    // Records one day's quantity, replacing any quantity already recorded for that day. A sold-out
+    // time or leftovers already recorded are kept.
     @Transactional
     public UpdateDailySaleResponse setSale(Long dishId, Long ownerId, LocalDate date, int quantitySold) {
+        Optional<DailySale> existing = dailySaleRepository.findByDishIdAndSaleDate(dishId, date);
+        return setSale(dishId, ownerId, date, quantitySold,
+                existing.map(DailySale::getSoldOutAt).orElse(null),
+                existing.map(DailySale::getLeftoverQuantity).orElse(null));
+    }
+
+    // Records one day's sales, replacing everything already recorded for that day: null clears
+    // the sold-out time or leftovers.
+    @Transactional
+    public UpdateDailySaleResponse setSale(Long dishId, Long ownerId, LocalDate date, int quantitySold,
+                                           LocalTime soldOutAt, Integer leftoverQuantity) {
         Dish dish = dishRepository
                 .findByIdAndOwnerId(dishId, ownerId)
                 .orElseThrow(
@@ -80,15 +100,30 @@ public class DailySaleService {
         if (quantitySold < 0) {
             throw new IllegalArgumentException("Quantity sold cannot be negative");
         }
+        outcomeProblem(soldOutAt, leftoverQuantity).ifPresent(problem -> {
+            throw new IllegalArgumentException(problem);
+        });
 
         Optional<DailySale> existing = dailySaleRepository.findByDishIdAndSaleDate(dishId, date);
         Integer previousQuantity = existing.map(DailySale::getQuantitySold).orElse(null);
 
         DailySale sale = existing.orElseGet(() -> new DailySale(dish, date, quantitySold));
         sale.setQuantitySold(quantitySold);
+        sale.setOutcome(soldOutAt, leftoverQuantity);
         dailySaleRepository.save(sale);
 
-        return new UpdateDailySaleResponse(date, quantitySold, previousQuantity);
+        return new UpdateDailySaleResponse(date, quantitySold, previousQuantity, soldOutAt, leftoverQuantity);
+    }
+
+    // What's wrong with a day's sold-out time and leftovers, if anything.
+    public static Optional<String> outcomeProblem(LocalTime soldOutAt, Integer leftoverQuantity) {
+        if (leftoverQuantity != null && (leftoverQuantity < 0 || leftoverQuantity > MAX_LEFTOVER)) {
+            return Optional.of("Leftovers must be between 0 and " + MAX_LEFTOVER + ".");
+        }
+        if (soldOutAt != null && leftoverQuantity != null && leftoverQuantity > 0) {
+            return Optional.of("A dish that sold out has no leftovers.");
+        }
+        return Optional.empty();
     }
 
     public record ImportResult(int added, int overwritten, int skipped) {}

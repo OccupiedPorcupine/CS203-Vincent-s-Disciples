@@ -109,7 +109,9 @@ async function mockApi(context) {
       dish: "Chicken rice", forecastDate: "2026-10-31", predictedDemand: 47.2, low: 41, high: 53,
       roughRange: false, method: "MODEL", fallbackReason: null, basis: "the forecast model", note: null
     });
-    if (path === "/api/closures") return json(route, { restDays: ["TUESDAY"], closedDates: [{ date: day(14), reason: "Centre cleaning" }] });
+    if (path === "/api/closures") return json(route, { restDays: ["TUESDAY"], closedDates: [{ date: day(14), reason: "Centre cleaning" }], hours: { opensAt: "10:00", closesAt: "15:00" } });
+    if (path === "/api/waste") return json(route, { leftoverPortions: 12, leftoverCost: "20.40", leftoversWithoutCost: 0, soldOutDays: 2, daysRecorded: 3,
+      dishes: [{ dishId: 1, name: "Chicken rice", leftoverPortions: 12, leftoverCost: "20.40", soldOutDays: 2, earliestSoldOutAt: "12:40" }] });
     return route.fulfill({ status: 404, body: "" });
   });
 }

@@ -81,6 +81,8 @@ function isClosed(isoDate, { restDays, closedDates }) {
 }
 
 function showEmpty(message) {
+  document.getElementById("waste-note").textContent = "";
+  document.getElementById("sold-out-note").textContent = "";
   document.getElementById("demand-note").textContent = message;
   document.getElementById("dish-note").textContent = message;
   document.getElementById("revenue-note").textContent = message;
@@ -162,6 +164,10 @@ async function loadDashboard() {
     console.error(error);
     document.getElementById("revenue-note").textContent = "Revenue could not be loaded.";
   });
+  loadWaste(firstDay, latestDate).catch(error => {
+    console.error(error);
+    document.getElementById("waste-note").textContent = "Leftovers could not be loaded.";
+  });
 
   drawChart(
     "dish-chart",
@@ -221,6 +227,39 @@ async function loadRevenue(from, to) {
     return item;
   }));
   document.getElementById("top-dishes-note").textContent = top.children.length ? "" : "No sales in these 7 days.";
+}
+
+// ---- Leftovers and sell-outs (issue #50) ----
+
+async function loadWaste(from, to) {
+  const waste = await apiRequest(`/api/waste?from=${from}&to=${to}`);
+  const note = document.getElementById("waste-note");
+  document.getElementById("waste-total").textContent = waste.daysRecorded ? waste.leftoverPortions : "--";
+
+  if (!waste.daysRecorded) {
+    note.textContent = "Record leftovers and sell-outs with your sales to see them here.";
+  } else {
+    const withLeftovers = waste.dishes.filter(dish => dish.leftoverPortions > 0);
+    const cost = waste.leftoverCost === null ? null
+      : `${money.format(Number(waste.leftoverCost))} of food not sold${waste.leftoversWithoutCost ? " (dishes without a cost left out)" : ""}`;
+    const most = withLeftovers.slice(0, 3).map(dish => `${dish.name} ${dish.leftoverPortions}`).join(", ");
+    note.textContent = [cost, most].filter(Boolean).join(" · ") || "No leftovers recorded.";
+  }
+
+  const soldOut = waste.dishes.filter(dish => dish.soldOutDays > 0).sort((a, b) => b.soldOutDays - a.soldOutDays);
+  const list = document.getElementById("sold-out-dishes");
+  list.replaceChildren(...soldOut.slice(0, 5).map(dish => {
+    const item = document.createElement("li");
+    const name = document.createElement("span");
+    name.textContent = dish.name;
+    const detail = document.createElement("span");
+    detail.textContent = `${dish.soldOutDays} ${dish.soldOutDays === 1 ? "day" : "days"} · earliest ${dish.earliestSoldOutAt}`;
+    item.append(name, detail);
+    return item;
+  }));
+  document.getElementById("sold-out-note").textContent = soldOut.length
+    ? "On these days more people wanted it than you made."
+    : "No dish sold out in these 7 days.";
 }
 
 // ---- Revenue by day: a GitHub-style heatmap ----
@@ -413,74 +452,130 @@ function actionItem(card) {
   return item;
 }
 
-// ---- Recording a missed day ----
+// ---- Recording a day's sales, sell-outs and leftovers ----
 
 const recordDialog = document.getElementById("record-dialog");
 const recordForm = document.getElementById("record-form");
+const recordDateInput = document.getElementById("record-date");
 const recordList = document.getElementById("record-list");
 const recordStatus = document.getElementById("record-status");
 const recordSave = document.getElementById("record-save");
-let recordDate = null;
 
-async function openRecordDialog(date) {
-  recordDate = date;
-  document.getElementById("record-heading").textContent =
-    `Sales for ${formatDay(date, { weekday: "short", day: "numeric", month: "short" })}`;
-  recordStatus.textContent = "";
-  recordStatus.className = "status-text";
+function showRecordStatus(message) {
+  recordStatus.textContent = message;
+  recordStatus.className = message ? "status-text is-error" : "status-text";
+}
+
+function recordInput(attributes, label) {
+  const input = document.createElement("input");
+  input.className = "input";
+  Object.entries(attributes).forEach(([name, value]) => input.setAttribute(name, value));
+  input.setAttribute("aria-label", label);
+  return input;
+}
+
+function recordField(text, input) {
+  const field = document.createElement("label");
+  field.className = "record-field";
+  const caption = document.createElement("span");
+  caption.textContent = text;
+  field.append(caption, input);
+  return field;
+}
+
+async function openRecordDialog(date = singaporeToday()) {
+  recordDateInput.value = date;
+  recordDateInput.max = singaporeToday();
+  showRecordStatus("");
   recordList.replaceChildren();
   recordSave.disabled = false;
   recordDialog.showModal();
-
-  const dishes = await apiRequest("/api/dishes");
-  recordList.replaceChildren(...dishes.map(dish => {
-    const row = document.createElement("label");
-    row.className = "record-row";
-    const name = document.createElement("span");
-    name.textContent = dish.name;
-    const input = document.createElement("input");
-    input.className = "input";
-    input.type = "number";
-    input.min = "0";
-    input.max = "9999";
-    input.step = "1";
-    input.inputMode = "numeric";
-    input.placeholder = "0";
-    input.dataset.dishId = dish.id;
-    input.setAttribute("aria-label", `Portions of ${dish.name} sold`);
-    row.append(name, input);
-    return row;
-  }));
+  await fillRecordList();
   recordList.querySelector("input")?.focus();
 }
 
+// One row per dish, filled with what's already recorded for the chosen day.
+async function fillRecordList() {
+  const date = recordDateInput.value;
+  const dishes = await apiRequest("/api/dishes");
+  const sales = await Promise.all(dishes.map(dish => apiRequest(`/api/dishes/${dish.id}/sales`)));
+  if (date !== recordDateInput.value) return; // the date changed while loading
+
+  recordList.replaceChildren(...dishes.map((dish, index) => {
+    const recorded = sales[index].find(sale => sale.date === date);
+    const row = document.createElement("fieldset");
+    row.className = "record-row";
+    row.dataset.dishId = dish.id;
+    const name = document.createElement("legend");
+    name.textContent = dish.name;
+
+    const portions = recordInput({ type: "number", min: "0", max: "9999", step: "1", inputmode: "numeric", placeholder: "0" },
+      `Portions of ${dish.name} sold`);
+    portions.dataset.field = "quantity";
+    portions.value = recorded ? recorded.quantitySold : "";
+    const soldOut = recordInput({ type: "time" }, `Time ${dish.name} sold out`);
+    soldOut.dataset.field = "soldOutAt";
+    soldOut.value = recorded?.soldOutAt ?? "";
+    const leftover = recordInput({ type: "number", min: "0", max: "9999", step: "1", inputmode: "numeric" },
+      `Portions of ${dish.name} left over`);
+    leftover.dataset.field = "leftover";
+    leftover.value = recorded?.leftoverQuantity ?? "";
+
+    row.append(name, recordField("Sold", portions), recordField("Sold out at", soldOut), recordField("Left over", leftover));
+    return row;
+  }));
+}
+
+recordDateInput.addEventListener("change", () => {
+  showRecordStatus("");
+  if (recordDateInput.value) fillRecordList();
+});
+
 recordForm.addEventListener("submit", async event => {
   event.preventDefault();
-  const filled = [...recordList.querySelectorAll("input")].filter(input => input.value !== "");
+  const rows = [...recordList.querySelectorAll(".record-row")].map(row => {
+    const value = field => row.querySelector(`[data-field="${field}"]`).value;
+    return { row, dishId: row.dataset.dishId, name: row.querySelector("legend").textContent,
+      quantity: value("quantity"), soldOutAt: value("soldOutAt"), leftover: value("leftover") };
+  });
+  const filled = rows.filter(row => row.quantity !== "" || row.soldOutAt !== "" || row.leftover !== "");
   if (!filled.length) {
-    recordStatus.textContent = "Enter the portions of at least one dish.";
-    recordStatus.className = "status-text is-error";
+    showRecordStatus("Enter the portions of at least one dish.");
     return;
   }
-  if (!filled.every(input => input.reportValidity())) return;
+  const missing = filled.find(row => row.quantity === "");
+  if (missing) {
+    showRecordStatus(`Enter the portions of ${missing.name} sold too.`);
+    return;
+  }
+  const both = filled.find(row => row.soldOutAt !== "" && Number(row.leftover) > 0);
+  if (both) {
+    showRecordStatus(`${both.name} can’t have sold out and have leftovers. Clear one of them.`);
+    return;
+  }
+  if (!recordForm.reportValidity()) return;
 
   recordSave.disabled = true;
   try {
-    for (const input of filled) {
-      await apiRequest(`/api/dishes/${input.dataset.dishId}/sales/${recordDate}`, {
+    for (const row of filled) {
+      await apiRequest(`/api/dishes/${row.dishId}/sales/${recordDateInput.value}`, {
         method: "PUT",
-        body: JSON.stringify({ quantitySold: Number(input.value) })
+        body: JSON.stringify({
+          quantitySold: Number(row.quantity),
+          soldOutAt: row.soldOutAt || null,
+          leftoverQuantity: row.leftover === "" ? null : Number(row.leftover)
+        })
       });
     }
     recordDialog.close();
     refreshDashboard();
   } catch (error) {
-    recordStatus.textContent = error.message || "The sales could not be saved.";
-    recordStatus.className = "status-text is-error";
+    showRecordStatus(error.message || "The sales could not be saved.");
     recordSave.disabled = false;
   }
 });
 
+document.getElementById("record-open").addEventListener("click", () => openRecordDialog());
 document.getElementById("record-cancel").addEventListener("click", () => recordDialog.close());
 
 function refreshDashboard() {

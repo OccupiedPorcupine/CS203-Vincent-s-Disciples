@@ -53,7 +53,7 @@ class ForecastServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(TODAY.atTime(9, 0).atZone(SINGAPORE).toInstant(), SINGAPORE);
-        service = new ForecastService(data, weather, holidays, ml, closures, clock);
+        service = new ForecastService(data, weather, holidays, ml, closures, clock, false);
         when(data.getOwnedDish(1L, 7L)).thenReturn(dish);
     }
 
