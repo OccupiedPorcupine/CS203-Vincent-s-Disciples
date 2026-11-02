@@ -13,6 +13,7 @@ import app.sale.DailySale;
 import app.sale.DailySaleRepository;
 import app.service.StallClosureService;
 import app.user.AppUserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,11 +47,13 @@ public class ActionService {
     private final DismissedActionRepository dismissedRepository;
     private final AppUserRepository users;
     private final Clock clock;
+    private final boolean countSoldOutDemand;
 
     public ActionService(DishRepository dishRepository, DailySaleRepository saleRepository,
                          StallClosureService closureService, PublicHolidayRepository holidayRepository,
                          TrainingDataSourceRepository sourceRepository, DishPriceService priceService,
-                         DismissedActionRepository dismissedRepository, AppUserRepository users, Clock clock) {
+                         DismissedActionRepository dismissedRepository, AppUserRepository users, Clock clock,
+                         @Value("${app.forecast.count-sold-out-demand:false}") boolean countSoldOutDemand) {
         this.dishRepository = dishRepository;
         this.saleRepository = saleRepository;
         this.closureService = closureService;
@@ -60,6 +63,7 @@ public class ActionService {
         this.dismissedRepository = dismissedRepository;
         this.users = users;
         this.clock = clock;
+        this.countSoldOutDemand = countSoldOutDemand;
     }
 
     // Most urgent first. Dismissed cards are left out.
@@ -77,6 +81,7 @@ public class ActionService {
         }
         cards.addAll(unimportedFiles(ownerId));
         unpricedDishes(ownerId, today).ifPresent(cards::add);
+        tradingHours(ownerId, today, closures).ifPresent(cards::add);
         upcomingHoliday(ownerId, today, closures).ifPresent(cards::add);
 
         Set<String> dismissed = dismissedRepository.findByOwnerId(ownerId).stream()
@@ -166,6 +171,23 @@ public class ActionService {
                 "Set prices for " + names,
                 "Then the dashboard can show your revenue and profit.",
                 "Set prices", "dishes.html", null));
+    }
+
+    // Sold-out days count as higher demand by how early in the trading day the dish ran out
+    // (SoldOutDemand), which needs the stall's hours; until they're set, 8 am to 8 pm is assumed.
+    // Only asked for while forecasts count sold-out days (app.forecast.count-sold-out-demand).
+    private Optional<ActionCard> tradingHours(Long ownerId, LocalDate today, StallClosureService.StallClosures closures) {
+        if (!countSoldOutDemand || closures.hours() != null) {
+            return Optional.empty();
+        }
+        boolean soldOut = saleRepository.findByDishOwnerIdAndSaleDateBetween(ownerId, today.minusDays(UNPRICED_LOOKBACK_DAYS), today)
+                .stream().anyMatch(sale -> sale.getSoldOutAt() != null);
+        if (!soldOut) {
+            return Optional.empty();
+        }
+        return Optional.of(new ActionCard("trading-hours", "trading-hours", "Set your trading hours",
+                "Then forecasts can tell how early a dish sold out, and plan for the customers you missed.",
+                "Set hours", "data.html#trading-hours", null));
     }
 
     // The next public holiday in the coming two weeks, unless the stall is closed that day. When

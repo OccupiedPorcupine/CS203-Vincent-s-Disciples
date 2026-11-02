@@ -1,17 +1,23 @@
-// "Opening days" on the Data page: weekly rest days and one-off closed days.
+// "Opening days" on the Data page: weekly rest days, trading hours and one-off closed days.
 const restDayBoxes = document.querySelectorAll('input[name="rest-day"]');
 const closedDateForm = document.getElementById("closed-date-form");
 const closedDateInput = document.getElementById("closed-date");
 const closedReasonInput = document.getElementById("closed-reason");
+const closedDateButton = document.getElementById("closed-date-button");
 const closedDateList = document.getElementById("closed-date-list");
 const closuresStatus = document.getElementById("closures-status");
+const hoursForm = document.getElementById("trading-hours");
+const opensAtInput = document.getElementById("opens-at");
+const closesAtInput = document.getElementById("closes-at");
+const hoursButton = document.getElementById("trading-hours-button");
+const hoursStatus = document.getElementById("trading-hours-status");
 
 // Closed days older than this aren't listed (they still count on the dashboard).
 const PAST_DAYS_SHOWN = 30;
 
-function showClosuresStatus(message, type = "") {
-  closuresStatus.textContent = message;
-  closuresStatus.className = `status-text${type ? ` is-${type}` : ""}`;
+function showClosuresStatus(message, type = "", element = closuresStatus) {
+  element.textContent = message;
+  element.className = `status-text${type ? ` is-${type}` : ""}`;
 }
 
 function todayInSingapore() {
@@ -24,8 +30,11 @@ function formatClosedDay(isoDate) {
   });
 }
 
-function renderClosures({ restDays, closedDates }) {
+function renderClosures({ restDays, closedDates, hours }) {
   restDayBoxes.forEach(box => { box.checked = restDays.includes(box.value); });
+  opensAtInput.value = hours ? hours.opensAt : "";
+  closesAtInput.value = hours ? hours.closesAt : "";
+  updateHoursButton();
 
   const today = todayInSingapore();
   const cutoff = new Date(`${today}T00:00:00Z`);
@@ -53,14 +62,17 @@ function renderClosures({ restDays, closedDates }) {
   }));
 }
 
-async function saveClosures(path, options, success) {
+// Messages go to the opening days status line unless the form has its own (trading hours).
+async function saveClosures(path, options, success, statusElement = closuresStatus) {
   try {
     renderClosures(await apiRequest(path, options));
-    showClosuresStatus(success, "success");
+    showClosuresStatus(success, "success", statusElement);
+    return true;
   } catch (error) {
     console.error(error);
-    showClosuresStatus(error.status === 400 && error.message ? error.message : "Couldn’t save. Try again in a moment.", "error");
+    showClosuresStatus(error.status === 400 && error.message ? error.message : "Couldn’t save. Try again in a moment.", "error", statusElement);
     loadClosures();
+    return false;
   }
 }
 
@@ -76,14 +88,50 @@ restDayBoxes.forEach(box => box.addEventListener("change", () => {
   }, "Rest days saved.");
 }));
 
-closedDateForm.addEventListener("submit", event => {
+// As with the other forms, Save hours stays disabled until both times are filled in.
+function updateHoursButton() {
+  hoursButton.disabled = !opensAtInput.value || !closesAtInput.value;
+}
+
+opensAtInput.addEventListener("input", updateHoursButton);
+closesAtInput.addEventListener("input", updateHoursButton);
+
+hoursForm.addEventListener("submit", async event => {
   event.preventDefault();
+  if (hoursButton.disabled) return;
+  hoursButton.disabled = true;
+  hoursButton.textContent = "Saving…";
+  showClosuresStatus("", "", hoursStatus);
+  await saveClosures("/api/closures/hours", {
+    method: "PUT",
+    body: JSON.stringify({ opensAt: opensAtInput.value, closesAt: closesAtInput.value })
+  }, `Trading hours saved: ${opensAtInput.value} to ${closesAtInput.value}.`, hoursStatus);
+  hoursButton.textContent = "Save hours";
+  updateHoursButton();
+});
+
+// As with the other forms, Add closed day stays disabled until a date is picked.
+function updateClosedDateButton() {
+  closedDateButton.disabled = !closedDateInput.value;
+}
+
+closedDateInput.addEventListener("input", updateClosedDateButton);
+
+closedDateForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (closedDateButton.disabled) return;
   const date = closedDateInput.value;
-  saveClosures(`/api/closures/dates/${date}`, {
+  closedDateButton.disabled = true;
+  closedDateButton.textContent = "Adding…";
+  showClosuresStatus("");
+  const saved = await saveClosures(`/api/closures/dates/${date}`, {
     method: "PUT",
     body: JSON.stringify({ reason: closedReasonInput.value })
   }, `${formatClosedDay(date)} marked as closed.`);
-  closedDateForm.reset();
+  closedDateButton.textContent = "Add closed day";
+  // Keep what was typed if it didn't save, so it can be tried again.
+  if (saved) closedDateForm.reset();
+  updateClosedDateButton();
 });
 
 async function loadClosures() {
@@ -92,7 +140,7 @@ async function loadClosures() {
   } catch (error) {
     if (error.status !== 401) {
       console.error(error);
-      showClosuresStatus("Couldn’t load your opening days.", "error");
+      showClosuresStatus("Couldn’t load your opening days. Refresh the page to try again.", "error");
     }
   }
 }

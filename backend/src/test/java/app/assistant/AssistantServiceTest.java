@@ -2,7 +2,9 @@ package app.assistant;
 
 import app.closure.ClosedDate;
 import app.closure.ClosedDateRepository;
+import app.closure.Hours;
 import app.closure.RestDayRepository;
+import app.closure.TradingHoursRepository;
 import app.dish.Dish;
 import app.dish.DishAliasRepository;
 import app.dish.DishRepository;
@@ -93,6 +95,7 @@ class AssistantServiceTest {
     @Autowired StallClosureService closureService;
     @Autowired ClosedDateRepository closedDateRepository;
     @Autowired RestDayRepository restDayRepository;
+    @Autowired TradingHoursRepository tradingHoursRepository;
 
     static final LocalDate TODAY = LocalDate.of(2026, 10, 29);
     Long owner;
@@ -115,6 +118,7 @@ class AssistantServiceTest {
         priceRepository.deleteAll();
         closedDateRepository.deleteAll();
         restDayRepository.deleteAll();
+        tradingHoursRepository.deleteAll();
         aliasRepository.deleteAll();
         saleRepository.deleteAll();
         dishRepository.deleteAll();
@@ -247,6 +251,55 @@ class AssistantServiceTest {
         var result = assistant.confirmProposal(owner, proposal.id(), null);
         assertEquals(40, result.saved().getFirst().previousQuantity());
         assertEquals(45, saleRepository.findByDishIdAndSaleDate(chickenRice.getId(), TODAY).orElseThrow().getQuantitySold());
+    }
+
+    @Test
+    void aSoldOutTimeAloneKeepsTheRecordedQuantityAndACorrectionKeepsTheTime() {
+        dailySaleService.setSale(chickenRice.getId(), owner, TODAY, 40);
+
+        var proposal = say(owner, "chicken rice sold out at 12:40").proposal();
+        var entry = proposal.entries().getFirst();
+        assertEquals(40, entry.quantity());
+        assertEquals(LocalTime.of(12, 40), entry.soldOutAt());
+        assertEquals("CONFIRMED", assistant.confirmProposal(owner, proposal.id(), null).outcome());
+
+        var correction = say(owner, "chicken rice 45").proposal();
+        assertEquals(LocalTime.of(12, 40), correction.entries().getFirst().soldOutAt());
+        assistant.confirmProposal(owner, correction.id(), null);
+        var sale = saleRepository.findByDishIdAndSaleDate(chickenRice.getId(), TODAY).orElseThrow();
+        assertEquals(45, sale.getQuantitySold());
+        assertEquals(LocalTime.of(12, 40), sale.getSoldOutAt());
+        assertNull(sale.getLeftoverQuantity());
+    }
+
+    @Test
+    void leftoversAreSavedWithTheSalesAndCanBeClearedOnTheCard() {
+        var proposal = say(owner, "char siew 30 with 4 left over").proposal();
+        assertEquals(4, proposal.entries().getFirst().leftoverQuantity());
+
+        var edited = new ConfirmProposalRequest(List.of(
+                new ProposalEntryInput(charSiewRice.getId(), null, "char siew", TODAY, 30, null, null)), null, null);
+        assertEquals("EDITED", assistant.confirmProposal(owner, proposal.id(), edited).outcome());
+        assertNull(saleRepository.findByDishIdAndSaleDate(charSiewRice.getId(), TODAY).orElseThrow().getLeftoverQuantity());
+    }
+
+    @Test
+    void leftoversForADayWithNoSalesAskForTheQuantity() {
+        var response = say(owner, "char siew 5 left over");
+
+        assertNull(response.proposal());
+        assertTrue(response.reply().contains("so the quantity sold is needed too"), response.reply());
+    }
+
+    @Test
+    void aSoldOutTimeOutsideTheTradingHoursIsSentBackToTheModel() {
+        closureService.setHours(owner, new Hours(LocalTime.of(10, 0), LocalTime.of(15, 0)));
+
+        var response = say(owner, "chicken rice 40 sold out at 1:00");
+
+        assertNull(response.proposal());
+        assertTrue(response.reply().contains("outside the stall's trading hours (10:00–15:00)"), response.reply());
+        assertNotNull(say(owner, "chicken rice 40 sold out at 13:00").proposal());
     }
 
     @Test

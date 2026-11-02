@@ -7,14 +7,21 @@ import app.dish.DishRepository;
 import app.dto.ProposalEntryInput;
 import app.sale.DailySale;
 import app.sale.DailySaleRepository;
+import app.service.DailySaleService;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 
 // Checks sales entries from the model (before they are shown) and from the user (before they
 // are saved). The model is never trusted: dishes must belong to the user, dates can't be in the
 // future, and quantities must be plausible.
+//
+// The model only mentions what the user said, so for its entries (validateProposal) a missing
+// quantity, sold-out time or leftover count is taken from the day's record: "sold out of char siew
+// at one" keeps the quantity already recorded, and a corrected quantity keeps the sold-out time.
+// Entries the user confirms (validate) are saved exactly as given.
 @Component
 public class ProposalValidator {
 
@@ -41,6 +48,14 @@ public class ProposalValidator {
     }
 
     public Result validate(Long ownerId, List<ProposalEntryInput> inputs, LocalDate today) {
+        return validate(ownerId, inputs, today, false);
+    }
+
+    public Result validateProposal(Long ownerId, List<ProposalEntryInput> inputs, LocalDate today) {
+        return validate(ownerId, inputs, today, true);
+    }
+
+    private Result validate(Long ownerId, List<ProposalEntryInput> inputs, LocalDate today, boolean fillFromRecord) {
         List<String> problems = new ArrayList<>();
         List<ProposedEntry> entries = new ArrayList<>();
 
@@ -77,8 +92,27 @@ public class ProposalValidator {
                 problems.add(label + ": " + input.date() + " is more than a year ago.");
                 continue;
             }
-            if (input.quantity() == null || input.quantity() < 0 || input.quantity() > MAX_QUANTITY) {
+            Optional<DailySale> recorded = dish.flatMap(d -> dailySaleRepository.findByDishIdAndSaleDate(d.getId(), input.date()));
+            Integer quantity = input.quantity();
+            LocalTime soldOutAt = input.soldOutAt();
+            Integer leftoverQuantity = input.leftoverQuantity();
+            if (fillFromRecord && recorded.isPresent()) {
+                if (quantity == null) quantity = recorded.get().getQuantitySold();
+                if (soldOutAt == null && (leftoverQuantity == null || leftoverQuantity == 0)) soldOutAt = recorded.get().getSoldOutAt();
+                if (leftoverQuantity == null && soldOutAt == null) leftoverQuantity = recorded.get().getLeftoverQuantity();
+            }
+
+            if (quantity == null && (soldOutAt != null || leftoverQuantity != null)) {
+                problems.add(label + ": no sales are recorded for " + input.date() + " yet, so the quantity sold is needed too.");
+                continue;
+            }
+            if (quantity == null || quantity < 0 || quantity > MAX_QUANTITY) {
                 problems.add(label + ": quantity must be between 0 and " + MAX_QUANTITY + ".");
+                continue;
+            }
+            Optional<String> outcomeProblem = DailySaleService.outcomeProblem(soldOutAt, leftoverQuantity);
+            if (outcomeProblem.isPresent()) {
+                problems.add(label + ": " + outcomeProblem.get());
                 continue;
             }
 
@@ -89,19 +123,16 @@ public class ProposalValidator {
                 continue;
             }
 
-            Integer previousQuantity = dish
-                    .flatMap(d -> dailySaleRepository.findByDishIdAndSaleDate(d.getId(), input.date()))
-                    .map(DailySale::getQuantitySold)
-                    .orElse(null);
-
             entries.add(new ProposedEntry(
                     dish.map(Dish::getId).orElse(null),
                     dish.map(Dish::getName).orElseGet(() -> input.newDishName().strip()),
                     dish.isPresent() ? null : input.newDishName().strip(),
                     blankToNull(input.spokenName()),
                     input.date(),
-                    input.quantity(),
-                    previousQuantity));
+                    quantity,
+                    recorded.map(DailySale::getQuantitySold).orElse(null),
+                    soldOutAt,
+                    leftoverQuantity));
         }
 
         return new Result(entries, problems);

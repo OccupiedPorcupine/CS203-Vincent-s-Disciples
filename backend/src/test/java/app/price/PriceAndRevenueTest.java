@@ -3,6 +3,7 @@ package app.price;
 import app.dish.Dish;
 import app.dish.DishRepository;
 import app.dto.RevenueResponse;
+import app.dto.WasteResponse;
 import app.dto.SetDishPriceRequest;
 import app.sale.DailySaleRepository;
 import app.service.DailySaleService;
@@ -20,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -134,6 +136,31 @@ class PriceAndRevenueTest {
         assertEquals(new BigDecimal("1240.00"), dish(week, "Chicken rice").revenue()); // 4 × 40 × 4.00 + 3 × 40 × 5.00
         assertEquals(new BigDecimal("5.00"), dish(week, "Chicken rice").price());
         assertEquals(new BigDecimal("640.00"), revenueService.summary(owner, MONDAY, MONDAY.plusDays(3)).revenue());
+    }
+
+    @Test
+    void leftoversAreValuedAtEachDaysUnitCostAndSellOutsAreCountedPerDish() {
+        price(chickenRice, "4.50", "1.70", null);
+        price(charSiew, "5.00", null, null);
+        saleService.setSale(chickenRice.getId(), owner, MONDAY, 40, null, 5);
+        saleService.setSale(chickenRice.getId(), owner, MONDAY.plusDays(1), 40, null, 3);
+        saleService.setSale(charSiew.getId(), owner, MONDAY, 20, null, 2);
+        saleService.setSale(laksa.getId(), owner, MONDAY.plusDays(2), 10, LocalTime.of(13, 10), null);
+        saleService.setSale(laksa.getId(), owner, MONDAY.plusDays(4), 10, LocalTime.of(12, 5), null);
+        saleService.setSale(laksa.getId(), owner, SUNDAY.plusDays(1), 10, LocalTime.of(11, 0), null); // after the week
+
+        WasteResponse week = revenueService.waste(owner, MONDAY, SUNDAY);
+
+        assertEquals(10, week.leftoverPortions());
+        assertEquals(new BigDecimal("13.60"), week.leftoverCost()); // 8 × 1.70; char siew has no cost
+        assertEquals(2, week.leftoversWithoutCost());
+        assertEquals(2, week.soldOutDays());
+        assertEquals(4, week.daysRecorded());
+        assertEquals(List.of("Chicken rice", "Char siew rice", "Laksa"),
+                week.dishes().stream().map(WasteResponse.DishWaste::name).toList());
+        assertNull(week.dishes().get(1).leftoverCost());
+        assertEquals(LocalTime.of(12, 5), week.dishes().get(2).earliestSoldOutAt());
+        assertEquals(2, week.dishes().get(2).soldOutDays());
     }
 
     @Test

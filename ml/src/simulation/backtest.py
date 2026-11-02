@@ -118,6 +118,32 @@ class SoldOutAwareBaseline(AppBaseline):
         return super().forecast(adjusted, target)
 
 
+class AppSoldOutBaseline(AppBaseline):
+    """SoldOutDemand.java, as the app does it with app.forecast.count-sold-out-demand on (#50):
+    a sold-out day counts as what it would have sold at the same rate until closing, at most
+    MAX_UPLIFT times the recorded sales; a sell-out outside the trading hours counts as recorded.
+    The range still comes from the recorded sales, moved to the new estimate. The app uses the
+    stall's own trading hours; here every stall gets the generic ones."""
+
+    name = "App baseline + sell-out times"
+    MAX_UPLIFT = 1.5
+
+    def forecast(self, history: History, target: Target) -> Forecast | None:
+        recorded = super().forecast(history, target)
+        opens, closes = (hour * 60 for hour in A.GENERIC_OPENING_HOURS)
+        uplift = np.ones(len(history.sold))
+        sold_out = ~np.isnan(history.sold_out_minute)
+        on_sale = history.sold_out_minute[sold_out] - opens
+        inside = (on_sale >= 0) & (on_sale <= closes - opens)
+        scaled = np.where(on_sale > 0, (closes - opens) / np.maximum(on_sale, 1), self.MAX_UPLIFT)
+        uplift[sold_out] = np.where(inside, np.minimum(scaled, self.MAX_UPLIFT), 1.0)
+        demand = super().forecast(History(history.dates, history.sold * uplift, history.sold_out_minute), target)
+        if recorded is None or demand is None:
+            return demand
+        shift = demand.point - recorded.point
+        return Forecast(demand.point, lambda p: recorded.quantile(p) + shift)
+
+
 def _weekdays(dates: np.ndarray) -> np.ndarray:
     # 1970-01-01 was a Thursday; Monday = 0.
     return (dates.astype("datetime64[D]").astype(np.int64) + 3) % 7

@@ -12,7 +12,7 @@
       "id": "dashboard",
       "title": "Dashboard",
       "url": "dashboard.html",
-      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, revenue and gross profit for those days, the dishes that earn the most, and a box to talk to the assistant.",
+      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, revenue and gross profit for those days, the dishes that earn the most, leftovers and sell-outs, and a box to talk to the assistant.",
       "elements": [
         { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Prep list, Data ingestion and Dishes pages." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
@@ -24,8 +24,11 @@
         { "guideId": "dish-chart", "description": "Bar chart of portions sold per dish over the same 7 days." },
         { "guideId": "revenue-card", "description": "Revenue for the same 7 days as the charts, with gross profit and margin. Dishes without a price are named here and not counted as $0; the Set prices link goes to the Dishes page." },
         { "guideId": "top-dishes", "description": "The dishes that made the most gross profit in those 7 days, with the margin per plate." },
+        { "guideId": "waste-card", "description": "Leftover portions for the same 7 days, and what that food cost at each dish's unit cost (dishes without a cost are left out)." },
+        { "guideId": "sold-out-card", "description": "Dishes that sold out in those 7 days: on how many days, and the earliest time." },
         { "guideId": "revenue-heatmap", "description": "Revenue by day for the last 53 weeks, one square per day like a GitHub calendar: darker teal means more revenue, grey means no sales, an outlined square means closed. Hovering shows the amount; Show as a table lists each month." },
-        { "guideId": "actions-needed", "description": "Things to do now, worked out from the stall's data: days with no sales logged (Add sales opens a form for that day), uploaded files not imported yet, dishes without a price, and a public holiday coming up, with how the same holiday went last year. Each card can be dismissed." },
+        { "guideId": "actions-needed", "description": "Things to do now, worked out from the stall's data: days with no sales logged (Add sales opens a form for that day), uploaded files not imported yet, dishes without a price, trading hours to set once dishes sell out (when sold-out days count in forecasts), and a public holiday coming up, with how the same holiday went last year. Each card can be dismissed." },
+        { "guideId": "record-sales-button", "description": "Record sales button next to Actions needed. Opens a form for any day: portions sold of each dish, the time a dish sold out, and portions left over." },
         { "guideId": "assistant-chat", "description": "Large text box for typing or speaking to the assistant, e.g. to record today's sales." }
       ]
     },
@@ -43,7 +46,7 @@
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "dish-select", "description": "Drop-down to choose which dish to forecast." },
         { "guideId": "forecast-date", "description": "Date to forecast, from today up to 7 days ahead. Dates beyond the NEA weather forecast use the dish's past sales only." },
-        { "guideId": "forecast-button", "description": "Button that runs the forecast for the chosen dish and date." },
+        { "guideId": "forecast-button", "description": "Generate forecast button below the date. Runs the forecast for the chosen dish and date. Disabled until a date is chosen." },
         { "guideId": "forecast-result", "description": "Predicted portions, the likely range, how the forecast was worked out (the model, or an average of past sales such as the last 4 Saturdays, and why), and the chart of past sales for the chosen dish." },
         { "guideId": "history-view", "description": "Switch the chart between the last 7 days and the same weekday in past weeks." },
         { "guideId": "demand-factors", "description": "Weather, holiday, event and disruption factors behind the forecast." }
@@ -73,7 +76,7 @@
       "id": "data",
       "title": "Data ingestion",
       "url": "data.html",
-      "summary": "Upload CSV or Excel files of past sales and import them into daily sales, see the files uploaded so far, and set the stall's opening days (weekly rest days and one-off closed days).",
+      "summary": "Upload CSV or Excel files of past sales and import them into daily sales, see the files uploaded so far, and set the stall's opening days (weekly rest days, trading hours and one-off closed days).",
       "elements": [
         { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
@@ -88,6 +91,7 @@
         { "guideId": "import-button", "description": "Imports the file's rows into daily sales, inside the import panel. Nothing is saved before this is pressed." },
         { "guideId": "closures-panel", "description": "Opening days section at the bottom of the page: the stall's weekly rest days and one-off closed days. Closed days aren't counted as days with no sales and aren't forecast." },
         { "guideId": "rest-days", "description": "Monday to Sunday buttons. Ticking a day makes it a weekly rest day; changes save straight away." },
+        { "guideId": "trading-hours", "description": "Trading hours: when the stall opens and closes, with Save hours. They tell how early in the day a dish sold out. A closing time after midnight (e.g. 02:00) is fine." },
         { "guideId": "closed-date-form", "description": "Pick a date and an optional reason (e.g. centre cleaning), then press Add closed day. Added days are listed below with a Remove button." }
       ]
     },
@@ -128,9 +132,9 @@
       "summary": "Predict how many portions of a dish will sell on a coming day.",
       "steps": [
         { "page": "forecast", "guideId": "dish-select", "message": "First choose the dish you want to plan for." },
-        { "page": "forecast", "guideId": "forecast-date", "message": "Then pick the day. Today or tomorrow works best, because the weather forecast only covers the next 24 hours." },
+        { "page": "forecast", "guideId": "forecast-date", "message": "Then pick the day, from today up to a week ahead. For today and tomorrow the forecast can use the weather too." },
         { "page": "forecast", "guideId": "forecast-button", "message": "Press this to get the forecast." },
-        { "page": "forecast", "guideId": "forecast-result", "message": "The predicted portions appear here, with your past sales for comparison." }
+        { "page": "forecast", "guideId": "forecast-result", "message": "The predicted portions appear here, with the likely range, how it was worked out, and your past sales for comparison." }
       ]
     },
     {

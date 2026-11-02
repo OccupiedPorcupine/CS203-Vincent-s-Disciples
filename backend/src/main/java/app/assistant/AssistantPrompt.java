@@ -35,6 +35,16 @@ final class AssistantPrompt {
             - If propose_sales_entry reports problems, fix them or ask the user.
             - Use get_sales when the user asks about sales already recorded.
 
+            Sold out and leftovers
+            - When a dish sold out ("sold out of char siew at 12:40", "roast pork finish already at one", \
+            叉烧一点卖完了), set sold_out_at in 24-hour HH:MM on that dish's entry. A lunch-time "at one" is 13:00; \
+            "half past twelve" is 12:30. A sold-out day means more people wanted it than the stall made.
+            - When food was left over or thrown away ("15 rice left over", "threw away 15 packets of rice", \
+            剩下十五份), set leftover on that dish's entry. A dish that sold out has no leftovers.
+            - Put them on the same entry as the quantity sold if the user gave one. If they give only a sold-out \
+            time or leftovers, leave quantity null: the quantity already recorded that day is kept. If nothing is \
+            recorded for that day yet, propose_sales_entry says so; then ask how many they sold.
+
             Closed days
             The stall's weekly rest days and closed days from today on (JSON):
             %9$s

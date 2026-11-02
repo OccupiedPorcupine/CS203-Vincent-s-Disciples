@@ -3,6 +3,7 @@ package app.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 // One day's sales of one dish, as proposed by the assistant or edited by the user before confirming.
 // Exactly one of dishId and newDishName is set.
@@ -11,5 +12,11 @@ public record ProposalEntryInput(
         @Schema(description = "Name for a dish to create on confirm; null for an existing dish", example = "Laksa") String newDishName,
         @Schema(description = "The name the user used, saved as an alias on confirm", example = "鸡饭") String spokenName,
         @Schema(description = "Sales date", example = "2026-10-28") LocalDate date,
-        @Schema(description = "Quantity sold", example = "42") Integer quantity
-) {}
+        @Schema(description = "Quantity sold", example = "42") Integer quantity,
+        @Schema(type = "string", description = "When the dish sold out, 24-hour; null if it didn't", example = "12:40") LocalTime soldOutAt,
+        @Schema(description = "Portions left over; null if not recorded", example = "3") Integer leftoverQuantity
+) {
+    public ProposalEntryInput(Long dishId, String newDishName, String spokenName, LocalDate date, Integer quantity) {
+        this(dishId, newDishName, spokenName, date, quantity, null, null);
+    }
+}

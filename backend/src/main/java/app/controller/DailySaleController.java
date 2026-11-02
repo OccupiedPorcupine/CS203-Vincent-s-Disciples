@@ -107,7 +107,8 @@ public class DailySaleController {
     }
 
     @Operation(summary = "Set one day's sales",
-            description = "Records the quantity sold on one date, replacing any quantity already recorded for that date. "
+            description = "Records the quantity sold on one date, with the time the dish sold out and the portions left over, "
+                    + "replacing anything already recorded for that date (leaving out soldOutAt or leftoverQuantity clears it). "
                     + "The response includes the previous quantity so a correction can be shown as \"40 → 45\".")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Sales recorded or replaced"),
@@ -121,7 +122,7 @@ public class DailySaleController {
             @AuthenticationPrincipal AuthenticatedUser user,
             @Valid @RequestBody UpdateDailySaleRequest request
     ) {
-        return dailySaleService.setSale(dishId, user.id(), date, request.quantitySold());
+        return dailySaleService.setSale(dishId, user.id(), date, request.quantitySold(), request.soldOutAt(), request.leftoverQuantity());
     }
 
 }

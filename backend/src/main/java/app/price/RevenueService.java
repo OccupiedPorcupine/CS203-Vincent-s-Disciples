@@ -5,6 +5,7 @@ import app.dish.DishRepository;
 import app.dto.DailyRevenueResponse;
 import app.dto.RevenueResponse;
 import app.dto.RevenueResponse.DishRevenue;
+import app.dto.WasteResponse;
 import app.sale.DailySale;
 import app.sale.DailySaleRepository;
 import app.service.StallClosureService;
@@ -13,10 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
-// Revenue and gross profit from recorded sales, each day valued at the price that applied then.
+// Revenue and gross profit from recorded sales, each day valued at the price that applied then;
+// and the cost of leftovers (issue #50).
 @Service
 public class RevenueService {
 
@@ -119,5 +122,63 @@ public class RevenueService {
                 .thenComparing(DishRevenue::revenue, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(DishRevenue::name));
         return new RevenueResponse(from, to, portions, revenue, grossProfit, unpricedPortions, portionsWithoutCost, dishes);
+    }
+
+    @Transactional(readOnly = true)
+    public WasteResponse waste(Long ownerId, LocalDate from, LocalDate to) {
+        if (to.isBefore(from)) throw new IllegalArgumentException("The end date is before the start date.");
+        if (ChronoUnit.DAYS.between(from, to) >= MAX_DAYS) throw new IllegalArgumentException("Choose at most a year.");
+
+        PriceBook book = priceService.priceBook(ownerId);
+        Map<Long, List<DailySale>> salesByDish = new HashMap<>();
+        Set<LocalDate> daysRecorded = new HashSet<>();
+        for (DailySale sale : saleRepository.findByDishOwnerIdAndSaleDateBetween(ownerId, from, to)) {
+            if (sale.getSoldOutAt() == null && sale.getLeftoverQuantity() == null) continue;
+            salesByDish.computeIfAbsent(sale.getDish().getId(), ignored -> new ArrayList<>()).add(sale);
+            daysRecorded.add(sale.getSaleDate());
+        }
+
+        int leftoverPortions = 0, leftoversWithoutCost = 0, soldOutDays = 0;
+        BigDecimal leftoverCost = null;
+        List<WasteResponse.DishWaste> dishes = new ArrayList<>();
+
+        for (Dish dish : dishRepository.findByOwnerIdOrderByNameAsc(ownerId)) {
+            List<DailySale> sales = salesByDish.getOrDefault(dish.getId(), List.of());
+            int dishLeftovers = 0, dishSoldOut = 0;
+            boolean costMissing = false;
+            BigDecimal dishCost = BigDecimal.ZERO;
+            LocalTime earliest = null;
+            for (DailySale sale : sales) {
+                if (sale.getSoldOutAt() != null) {
+                    dishSoldOut++;
+                    if (earliest == null || sale.getSoldOutAt().isBefore(earliest)) earliest = sale.getSoldOutAt();
+                }
+                int leftovers = sale.getLeftoverQuantity() == null ? 0 : sale.getLeftoverQuantity();
+                if (leftovers == 0) continue;
+                dishLeftovers += leftovers;
+                BigDecimal unitCost = book.on(dish.getId(), sale.getSaleDate()).map(PriceBook.Price::unitCost).orElse(null);
+                if (unitCost == null) {
+                    costMissing = true;
+                    leftoversWithoutCost += leftovers;
+                } else {
+                    dishCost = dishCost.add(unitCost.multiply(BigDecimal.valueOf(leftovers)));
+                    leftoverCost = (leftoverCost == null ? BigDecimal.ZERO : leftoverCost).add(unitCost.multiply(BigDecimal.valueOf(leftovers)));
+                }
+            }
+            if (dishLeftovers == 0 && dishSoldOut == 0) continue;
+
+            leftoverPortions += dishLeftovers;
+            soldOutDays += dishSoldOut;
+            dishes.add(new WasteResponse.DishWaste(dish.getId(), dish.getName(), dishLeftovers,
+                    dishLeftovers == 0 || costMissing ? null : dishCost, dishSoldOut, earliest));
+        }
+
+        dishes.sort(Comparator
+                .comparing(WasteResponse.DishWaste::leftoverCost, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(WasteResponse.DishWaste::leftoverPortions, Comparator.reverseOrder())
+                .thenComparing(WasteResponse.DishWaste::soldOutDays, Comparator.reverseOrder())
+                .thenComparing(WasteResponse.DishWaste::name));
+        return new WasteResponse(from, to, leftoverPortions, leftoverCost, leftoversWithoutCost, soldOutDays,
+                daysRecorded.size(), dishes);
     }
 }

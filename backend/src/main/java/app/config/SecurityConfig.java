@@ -62,7 +62,8 @@ public class SecurityConfig {
                         // Public GET endpoints.
                         .requestMatchers(HttpMethod.GET,
                                 "/api/csrf",
-                                "/api/config"
+                                "/api/config",
+                                "/api/health"
                         ).permitAll()
 
                         // Public authentication endpoints.

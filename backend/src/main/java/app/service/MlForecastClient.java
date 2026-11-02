@@ -71,6 +71,16 @@ public class MlForecastClient {
         return Optional.of(info.dishes().stream().map(MlForecastClient::normalise).collect(Collectors.toSet()));
     }
 
+    // Whether the ML service answers its /health check. Never throws.
+    public boolean isUp() {
+        try {
+            restClient.get().uri("/health").retrieve().toBodilessEntity();
+            return true;
+        } catch (RuntimeException unreachable) {
+            return false;
+        }
+    }
+
     static String normalise(String dishName) {
         return dishName.strip().toUpperCase(Locale.ROOT);
     }

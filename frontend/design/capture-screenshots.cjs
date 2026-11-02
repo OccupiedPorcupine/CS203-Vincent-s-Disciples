@@ -48,6 +48,11 @@ const capture = async (page, out) => {
       { filename: "pos-export-2026-q3.csv", sha256: "9f2c1ab4e7d0c3aa", uploadedAt: "2026-10-28T09:12:00Z", sizeBytes: 482113, usedByModel: true },
       { filename: "accounting-sept.xlsx", sha256: "41be09c2d3f1aa77", uploadedAt: "2026-10-02T14:40:00Z", sizeBytes: 1830211, usedByModel: false }
     ]);
+    // Closed days older than 30 days aren't listed, so the example sits a fortnight from today.
+    if (p === "/api/closures") return json(route, {
+      restDays: ["MONDAY"],
+      closedDates: [{ date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), reason: "Centre cleaning" }]
+    });
     if (p === "/api/assistant/status") return json(route, { available: true, voice: true });
     if (p === "/api/assistant/messages") return json(route, {
       conversationId: "c1",

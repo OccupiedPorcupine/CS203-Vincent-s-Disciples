@@ -2,7 +2,9 @@ package app.controller;
 
 import app.dto.CloseDateRequest;
 import app.dto.ClosuresResponse;
+import app.closure.Hours;
 import app.dto.SetRestDaysRequest;
+import app.dto.SetTradingHoursRequest;
 import app.service.StallClosureService;
 import app.user.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -72,5 +74,28 @@ public class StallClosureController {
     public ClosuresResponse reopenDate(@AuthenticationPrincipal AuthenticatedUser user,
                                        @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ClosuresResponse.from(stallClosureService.reopenDate(user.id(), date));
+    }
+
+    @Operation(summary = "Set trading hours", description = "Sets when the stall opens and closes on an open day. "
+            + "A closing time before the opening time means the stall closes after midnight.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Hours saved; returns all closures"),
+            @ApiResponse(responseCode = "400", description = "A time is missing, or both are the same", content = @Content),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @PutMapping("/hours")
+    public ClosuresResponse setHours(@AuthenticationPrincipal AuthenticatedUser user,
+                                     @Valid @RequestBody SetTradingHoursRequest request) {
+        return ClosuresResponse.from(stallClosureService.setHours(user.id(), new Hours(request.opensAt(), request.closesAt())));
+    }
+
+    @Operation(summary = "Clear trading hours", description = "Forgets the stall's trading hours.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Hours cleared; returns all closures"),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @DeleteMapping("/hours")
+    public ClosuresResponse clearHours(@AuthenticationPrincipal AuthenticatedUser user) {
+        return ClosuresResponse.from(stallClosureService.clearHours(user.id()));
     }
 }
