@@ -209,4 +209,29 @@ class ActionServiceTest {
         closureService.setHours(owner, new Hours(LocalTime.of(10, 0), LocalTime.of(15, 0)));
         assertTrue(keys().stream().noneMatch(key -> key.equals("trading-hours")));
     }
+
+    @Test
+    void aDishThatSoldOutTwiceThisWeekGetsACardThatComesBackAfterTheNextSellOut() {
+        sell(chickenRice, TODAY.minusDays(7), TODAY.minusDays(1), 40);
+        Dish charSiew = dishService.createDish("Char siew rice", owner);
+        priceService.setPrice(owner, charSiew.getId(), new SetDishPriceRequest(new BigDecimal("5.00"), null, LocalDate.of(2025, 1, 1)));
+        closureService.setHours(owner, new Hours(LocalTime.of(10, 0), LocalTime.of(15, 0)));
+        saleService.setSale(charSiew.getId(), owner, TODAY.minusDays(3), 30, LocalTime.of(14, 0), null); // 4 of 5 hours: 37.5
+        saleService.setSale(charSiew.getId(), owner, TODAY.minusDays(1), 30, LocalTime.of(12, 30), null); // capped: 45
+        saleService.setSale(chickenRice.getId(), owner, TODAY.minusDays(2), 40, LocalTime.of(14, 30), null); // only once
+        saleService.setSale(charSiew.getId(), owner, TODAY.minusDays(9), 30, LocalTime.of(11, 0), null); // before this week
+
+        ActionCard card = actionService.actions(owner).stream().filter(c -> c.kind().equals("sold-out")).findFirst().orElseThrow();
+        assertEquals("sold-out:" + charSiew.getId() + ":" + TODAY.minusDays(1), card.key());
+        assertEquals("Char siew rice sold out 2 times this week", card.title());
+        assertEquals("Earliest at 12:30. You'd likely have sold about 11 more on those days, so consider preparing extra.", card.detail());
+        assertEquals("prep.html", card.href());
+        assertEquals(1, keys().stream().filter(key -> key.startsWith("sold-out:")).count());
+
+        actionService.dismiss(owner, card.key());
+        assertTrue(keys().stream().noneMatch(key -> key.startsWith("sold-out:")));
+        saleService.setSale(charSiew.getId(), owner, TODAY, 30, LocalTime.of(13, 0), null);
+        assertEquals("Char siew rice sold out 3 times this week",
+                actionService.actions(owner).stream().filter(c -> c.kind().equals("sold-out")).findFirst().orElseThrow().title());
+    }
 }

@@ -4,6 +4,7 @@ import app.datasource.TrainingDataSource;
 import app.datasource.TrainingDataSourceRepository;
 import app.dish.Dish;
 import app.dish.DishRepository;
+import app.closure.Hours;
 import app.dto.ActionCard;
 import app.holiday.PublicHoliday;
 import app.holiday.PublicHolidayRepository;
@@ -11,6 +12,7 @@ import app.price.DishPriceService;
 import app.price.PriceBook;
 import app.sale.DailySale;
 import app.sale.DailySaleRepository;
+import app.service.SoldOutDemand;
 import app.service.StallClosureService;
 import app.user.AppUserRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
@@ -36,7 +39,11 @@ public class ActionService {
     static final int HOLIDAY_DAYS_AHEAD = 14;
     static final int UNPRICED_LOOKBACK_DAYS = 30;
     static final int MAX_IMPORT_CARDS = 2;
+    static final int SOLD_OUT_DAYS = 7;
+    static final int MIN_SOLD_OUT_TIMES = 2;
+    static final int MAX_SOLD_OUT_CARDS = 2;
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH);
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
     private final DishRepository dishRepository;
     private final DailySaleRepository saleRepository;
@@ -81,6 +88,7 @@ public class ActionService {
         }
         cards.addAll(unimportedFiles(ownerId));
         unpricedDishes(ownerId, today).ifPresent(cards::add);
+        cards.addAll(soldOutDishes(ownerId, today, closures));
         tradingHours(ownerId, today, closures).ifPresent(cards::add);
         upcomingHoliday(ownerId, today, closures).ifPresent(cards::add);
 
@@ -171,6 +179,39 @@ public class ActionService {
                 "Set prices for " + names,
                 "Then the dashboard can show your revenue and profit.",
                 "Set prices", "dishes.html", null));
+    }
+
+    // Dishes that sold out on at least MIN_SOLD_OUT_TIMES days this past week (today included),
+    // most sell-outs first (issue #96). The key names the latest sell-out, so a dismissed card comes
+    // back when the dish sells out again. "About N more" is what SoldOutDemand reckons those days
+    // would have sold had there been enough, on average.
+    private List<ActionCard> soldOutDishes(Long ownerId, LocalDate today, StallClosureService.StallClosures closures) {
+        Hours hours = closures.hours() == null ? Hours.DEFAULT : closures.hours();
+        Map<Long, List<DailySale>> soldOut = new HashMap<>();
+        saleRepository.findByDishOwnerIdAndSaleDateBetween(ownerId, today.minusDays(SOLD_OUT_DAYS - 1), today).stream()
+                .filter(sale -> sale.getSoldOutAt() != null)
+                .forEach(sale -> soldOut.computeIfAbsent(sale.getDish().getId(), ignored -> new ArrayList<>()).add(sale));
+
+        return soldOut.values().stream()
+                .filter(sales -> sales.size() >= MIN_SOLD_OUT_TIMES)
+                .sorted(Comparator.comparing((List<DailySale> sales) -> -sales.size())
+                        .thenComparing(sales -> sales.getFirst().getDish().getName()))
+                .limit(MAX_SOLD_OUT_CARDS)
+                .map(sales -> soldOutCard(sales.getFirst().getDish(), sales, hours))
+                .toList();
+    }
+
+    private static ActionCard soldOutCard(Dish dish, List<DailySale> sales, Hours hours) {
+        LocalTime earliest = sales.stream().map(DailySale::getSoldOutAt).min(Comparator.naturalOrder()).orElseThrow();
+        LocalDate latest = sales.stream().map(DailySale::getSaleDate).max(Comparator.naturalOrder()).orElseThrow();
+        long more = Math.round(sales.stream()
+                .mapToDouble(sale -> SoldOutDemand.estimate(sale.getQuantitySold(), sale.getSoldOutAt(), hours) - sale.getQuantitySold())
+                .average().orElse(0));
+        String detail = "Earliest at " + earliest.format(TIME) + "."
+                + (more >= 1 ? " You'd likely have sold about " + more + " more on those days, so consider preparing extra." : "");
+        return new ActionCard("sold-out:" + dish.getId() + ":" + latest, "sold-out",
+                dish.getName() + " sold out " + sales.size() + " times this week", detail,
+                "See prep list", "prep.html", null);
     }
 
     // Sold-out days count as higher demand by how early in the trading day the dish ran out

@@ -14,8 +14,9 @@ import java.util.OptionalLong;
 //
 // In the prep simulator (ml/README.md, 24 stalls, 182 days) this rule, with a 1.5 cap, beats the
 // simulator's generic customer-curve rule: forecast error 24.3% vs 25.7% (32.0% without either).
-// Used only when app.forecast.count-sold-out-demand is on (see ForecastService).
-final class SoldOutDemand {
+// Forecasts use it only when app.forecast.count-sold-out-demand is on (see ForecastService); the
+// dashboard's sold-out card (ActionService) uses it to say how many more might have sold.
+public final class SoldOutDemand {
 
     static final double MAX_UPLIFT = 1.5;
 
@@ -24,7 +25,7 @@ final class SoldOutDemand {
 
     // The demand a day stands for. Days that didn't sell out, or whose sold-out time is outside
     // the trading hours (so how early it was can't be told), count as recorded.
-    static double estimate(int quantity, LocalTime soldOutAt, Hours hours) {
+    public static double estimate(int quantity, LocalTime soldOutAt, Hours hours) {
         if (soldOutAt == null) return quantity;
         OptionalLong onSale = hours.minutesUntil(soldOutAt);
         if (onSale.isEmpty()) return quantity;
