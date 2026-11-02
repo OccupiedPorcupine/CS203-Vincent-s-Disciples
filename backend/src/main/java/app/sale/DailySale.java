@@ -4,6 +4,7 @@ import app.dish.Dish;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Entity
 @Table(
@@ -32,6 +33,14 @@ public class DailySale {
 
     @Column(name = "quantity_sold", nullable = false)
     private int quantitySold;
+
+    // When the dish ran out; null if it didn't, or it wasn't recorded.
+    @Column(name = "sold_out_at")
+    private LocalTime soldOutAt;
+
+    // Portions prepared but not sold; null if not recorded.
+    @Column(name = "leftover_quantity")
+    private Integer leftoverQuantity;
 
     protected DailySale() {
     }
@@ -64,5 +73,18 @@ public class DailySale {
 
     public void setQuantitySold(int quantitySold) {
         this.quantitySold = quantitySold;
+    }
+
+    public LocalTime getSoldOutAt() {
+        return soldOutAt;
+    }
+
+    public Integer getLeftoverQuantity() {
+        return leftoverQuantity;
+    }
+
+    public void setOutcome(LocalTime soldOutAt, Integer leftoverQuantity) {
+        this.soldOutAt = soldOutAt;
+        this.leftoverQuantity = leftoverQuantity;
     }
 }

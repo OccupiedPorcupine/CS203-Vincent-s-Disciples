@@ -12,6 +12,7 @@ from ml.src.simulation.backtest import (
     Forecast,
     History,
     POLICIES,
+    AppSoldOutBaseline,
     SoldOutAwareBaseline,
     Target,
     critical_ratio,
@@ -104,6 +105,20 @@ def test_sell_out_times_raise_the_estimate():
                                                 target(date(2025, 3, 31)))
     assert plain.point == pytest.approx(50)
     assert 50 < adjusted.point <= 50 / A.MIN_ARRIVED_SHARE
+
+
+def test_the_apps_sell_out_rule_scales_by_the_time_left_and_keeps_the_recorded_range():
+    sold = [50.0] * 28
+    # Every Monday: out at 17:20, 10h20m into a 13-hour day (x1.26); otherwise not sold out.
+    late = [np.nan if day % 7 else 17 * 60 + 20 for day in range(28)]
+    early = [np.nan if day % 7 else 9 * 60 for day in range(28)]  # 2 hours in: capped at 1.5
+    monday = target(date(2025, 3, 31))
+    plain = AppBaseline().forecast(history_from(sold), monday)
+
+    assert AppSoldOutBaseline().forecast(history_from(sold, sold_out_minute=late), monday).point == pytest.approx(50 * 13 / (10 + 1 / 3))
+    adjusted = AppSoldOutBaseline().forecast(history_from(sold, sold_out_minute=early), monday)
+    assert adjusted.point == pytest.approx(75)
+    assert adjusted.quantile(0.9) - adjusted.point == pytest.approx(plain.quantile(0.9) - plain.point)
 
 
 def test_margin_rule_prepares_to_the_critical_ratio():

@@ -27,8 +27,9 @@ a minute when it is limited.
 
 | Category | Cases | Passes when |
 |---|---|---|
-| english, singlish, mandarin, mixed | 8 each | The proposed sales match exactly: dish, date and quantity, no extras |
+| english, singlish, mandarin, mixed | 8 each | The proposed sales match exactly: dish, date and quantity (and no sold-out time or leftovers), no extras |
 | clarify | 4 | Nothing is proposed for an ambiguous dish, a missing quantity or dish, or a future date |
+| sold-out | 8 | "sold out at 12:40", "finish already by 1pm", 十二点半就卖完了 and "threw away 6 packets" / 剩下八份 fill the sold-out time or leftovers on the right entry (English, Singlish, Mandarin, mixed); a sell-out for a day with no sales asks for the quantity |
 | correction | 2 | After "no, it was 45" or "I meant today", the latest proposal is the corrected one |
 | guide | 3 | A how-to question starts a tour that highlights the right element |
 | price | 9 | "char siew rice is now $5" (English, Singlish, Mandarin, mixed, spoken amounts, with a cost) proposes that price for that dish; an unknown dish is asked about; "chicken rice 5" stays a sale |

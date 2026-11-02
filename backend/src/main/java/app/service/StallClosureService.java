@@ -2,8 +2,11 @@ package app.service;
 
 import app.closure.ClosedDate;
 import app.closure.ClosedDateRepository;
+import app.closure.Hours;
 import app.closure.RestDay;
 import app.closure.RestDayRepository;
+import app.closure.TradingHours;
+import app.closure.TradingHoursRepository;
 import app.user.AppUserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +24,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 // The days a user's stall doesn't trade: weekly rest days and one-off closed dates. Closed days
-// aren't forecast, and the dashboard doesn't show them as days with no sales.
+// aren't forecast, and the dashboard doesn't show them as days with no sales. Also the stall's
+// trading hours, which tell how early in the day a dish sold out.
 @Service
 public class StallClosureService {
 
@@ -31,19 +35,41 @@ public class StallClosureService {
 
     private final RestDayRepository restDayRepository;
     private final ClosedDateRepository closedDateRepository;
+    private final TradingHoursRepository tradingHoursRepository;
     private final AppUserRepository appUserRepository;
 
     public StallClosureService(RestDayRepository restDayRepository, ClosedDateRepository closedDateRepository,
-                               AppUserRepository appUserRepository) {
+                               TradingHoursRepository tradingHoursRepository, AppUserRepository appUserRepository) {
         this.restDayRepository = restDayRepository;
         this.closedDateRepository = closedDateRepository;
+        this.tradingHoursRepository = tradingHoursRepository;
         this.appUserRepository = appUserRepository;
     }
 
-    public record StallClosures(Set<DayOfWeek> restDays, List<ClosedDate> closedDates) {}
+    // hours is null when the stall hasn't set them.
+    public record StallClosures(Set<DayOfWeek> restDays, List<ClosedDate> closedDates, Hours hours) {}
 
     public StallClosures getClosures(Long ownerId) {
-        return new StallClosures(restDays(ownerId), closedDateRepository.findByOwnerIdOrderByClosedDateAsc(ownerId));
+        return new StallClosures(restDays(ownerId), closedDateRepository.findByOwnerIdOrderByClosedDateAsc(ownerId),
+                hours(ownerId).orElse(null));
+    }
+
+    public Optional<Hours> hours(Long ownerId) {
+        return tradingHoursRepository.findByOwnerId(ownerId).map(TradingHours::getHours);
+    }
+
+    @Transactional
+    public StallClosures setHours(Long ownerId, Hours hours) {
+        tradingHoursRepository.findByOwnerId(ownerId).ifPresentOrElse(
+                saved -> saved.set(hours),
+                () -> tradingHoursRepository.save(new TradingHours(appUserRepository.getReferenceById(ownerId), hours)));
+        return getClosures(ownerId);
+    }
+
+    @Transactional
+    public StallClosures clearHours(Long ownerId) {
+        tradingHoursRepository.findByOwnerId(ownerId).ifPresent(tradingHoursRepository::delete);
+        return getClosures(ownerId);
     }
 
     // Replaces the weekly rest days. Rows are added and removed individually rather than all

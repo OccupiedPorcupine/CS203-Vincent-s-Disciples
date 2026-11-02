@@ -154,7 +154,9 @@ async function mockApi(context) {
       { dishId: 2, dish: "Char siew rice", items: [] }
     ]);
     if (path === "/api/ingredients") return json(route, [{ name: "Rice", unit: "g" }, { name: "Roast chicken", unit: "g" }]);
-    if (path === "/api/closures") return json(route, { restDays: ["TUESDAY"], closedDates: [{ date: day(14), reason: "Centre cleaning" }] });
+    if (path === "/api/closures") return json(route, { restDays: ["TUESDAY"], closedDates: [{ date: day(14), reason: "Centre cleaning" }], hours: { opensAt: "10:00", closesAt: "15:00" } });
+    if (path === "/api/waste") return json(route, { leftoverPortions: 12, leftoverCost: "20.40", leftoversWithoutCost: 0, soldOutDays: 2, daysRecorded: 3,
+      dishes: [{ dishId: 1, name: "Chicken rice", leftoverPortions: 12, leftoverCost: "20.40", soldOutDays: 2, earliestSoldOutAt: "12:40" }] });
     return route.fulfill({ status: 404, body: "" });
   });
 }

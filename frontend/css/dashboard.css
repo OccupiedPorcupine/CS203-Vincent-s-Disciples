@@ -99,8 +99,13 @@
 .record-dialog::backdrop { background: rgb(0 0 0 / 0.3); }
 .record-dialog h2 { font-size: var(--text-lg); }
 .record-dialog .lede { margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
-.record-list { display: grid; gap: 8px; max-height: 50vh; overflow: auto; margin-top: 16px; }
-.record-row { display: grid; grid-template-columns: 1fr 96px; gap: 12px; align-items: center; font-size: var(--text-sm); }
+.record-date { margin-top: 16px; }
+.record-list { display: grid; gap: 12px; max-height: 50vh; overflow: auto; margin-top: 16px; }
+/* Each dish: its name, then portions sold, sold-out time and leftovers side by side. */
+.record-row { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 5fr) minmax(0, 3fr); gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--divider); font-size: var(--text-sm); }
+.record-row legend { float: left; grid-column: 1 / -1; width: 100%; margin-bottom: 4px; font-weight: 500; }
+.record-field { display: grid; gap: 4px; color: var(--muted); font-size: var(--text-xs); }
+.actions .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .record-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
 /* The assistant's large input box: an assistant surface, so it uses the UI font (see DESIGN.md). */

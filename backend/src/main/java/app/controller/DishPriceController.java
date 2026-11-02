@@ -4,6 +4,7 @@ import app.dto.DailyRevenueResponse;
 import app.dto.DishPriceResponse;
 import app.dto.RevenueResponse;
 import app.dto.SetDishPriceRequest;
+import app.dto.WasteResponse;
 import app.price.DishPriceService;
 import app.price.RevenueService;
 import app.user.AuthenticatedUser;
@@ -60,5 +61,14 @@ public class DishPriceController {
                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                    @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return revenueService.summary(user.id(), from, to);
+    }
+
+    @Operation(summary = "Leftovers and sell-outs", description = "For sales from 'from' to 'to' inclusive, at most a year: "
+            + "leftover portions and their cost at each day's unit cost, and how often each dish sold out.")
+    @GetMapping("/waste")
+    public WasteResponse waste(@AuthenticationPrincipal AuthenticatedUser user,
+                               @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                               @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return revenueService.waste(user.id(), from, to);
     }
 }

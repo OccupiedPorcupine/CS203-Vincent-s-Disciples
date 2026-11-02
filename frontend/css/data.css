@@ -70,6 +70,10 @@
 .rest-day-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .rest-day { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }
 .rest-day:has(input:checked) { border-color: var(--teal-strong); background: var(--teal-soft); color: var(--teal-strong); }
+.trading-hours-form { margin-top: 24px; font-size: var(--text-sm); }
+.trading-hours-form legend { margin-bottom: 4px; }
+.trading-hours-form .field-hint { margin: 0 0 12px; color: var(--muted); }
+.trading-hours-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; max-width: 360px; }
 .closed-date-form { margin-top: 24px; }
 .closed-date-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; }
 .closed-date-list { margin: 16px 0 0; padding: 0; list-style: none; font-size: var(--text-sm); }

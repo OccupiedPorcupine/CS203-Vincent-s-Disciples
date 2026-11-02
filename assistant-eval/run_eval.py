@@ -90,13 +90,14 @@ def ensure_dishes(api, names):
 
 def entry_key(entry):
     dish = f"new:{normalize(entry['newDishName'])}" if entry.get("newDish") else normalize(entry["dishName"])
-    return dish, entry["date"], entry["quantity"]
+    return dish, entry["date"], (entry["quantity"], entry.get("soldOutAt"), entry.get("leftoverQuantity"))
 
 
+# The quantity must match, and so must a sold-out time and leftovers: given when expected, absent otherwise.
 def expected_key(entry, today):
     dish = entry["dish"]
     dish = dish if dish.startswith("new:") else normalize(dish)
-    return dish, resolve_date(entry["date"], today).isoformat(), entry["quantity"]
+    return dish, resolve_date(entry["date"], today).isoformat(), (entry["quantity"], entry.get("soldOutAt"), entry.get("leftover"))
 
 
 def closure_keys(closures):
