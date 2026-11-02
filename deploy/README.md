@@ -16,6 +16,7 @@ Contents:
 2. [Environment variables](#environment-variables)
 3. [Deploying](#deploying)
 4. [Things to know](#things-to-know)
+5. [Assistant costs and limits](#assistant-costs-and-limits)
 
 ## How it behaves
 
@@ -71,3 +72,35 @@ Previews are protected by Vercel login. To call a protected preview from a scrip
 - **Hobby plan limits:** 4 hours of active CPU and 360 GB-hours of memory a month, and non-commercial use only. Going over pauses the project instead of charging.
 - **The production model** is committed under `ml/artifacts/production/`, so deployments can serve it. To ship a newly trained model, run `python -m ml.train_production` and commit the three files.
 - **Local development is unchanged.** Run `node frontend/server.mjs` and the backend on port 8080, as in `LOCAL_RUN_GUIDE.md`. `.vercelignore` keeps `frontend/server.mjs` out of deployments, because otherwise Vercel treats `frontend/` as a Node app.
+
+## Assistant costs and limits
+
+Every assistant message, voice recording and spoken reply is a paid OpenAI call, and the site is public, so each account has daily allowances (issue #65). Days run from midnight to midnight, Singapore time.
+
+| Plan | Messages a day (voice recordings too) | Spoken replies a day |
+|---|---:|---:|
+| FREE (every new account) | 50 | 20 |
+| STANDARD | 150 | 60 |
+| PRO | 500 | 200 |
+
+- **The limits** are set in `application.properties` (`app.assistant.plans.*`). The FREE plan's can also be changed without a release, through `ASSISTANT_FREE_MESSAGES_PER_DAY` and `ASSISTANT_FREE_SPOKEN_REPLIES_PER_DAY`.
+- **When an account hits a limit,** the assistant says so in English and Mandarin, and entering sales by hand keeps working. When spoken replies run out, replies carry on as text. Replies that are already cached are still read aloud, because they cost nothing.
+- **Failures don't count:** a message or reply that fails at OpenAI is given back.
+- **Usage is logged:** each message stores its tokens (`assistant_interactions`), and `assistant_daily_usage` adds up each account's messages, recordings, spoken replies, tokens, seconds of audio and characters spoken per day.
+
+**Admin view.** Make an account an admin in the Supabase SQL editor, then sign out and in again:
+
+```sql
+UPDATE app_users SET role = 'ROLE_ADMIN' WHERE email = 'you@example.com';
+```
+
+An admin can then call these endpoints, while signed in on the site:
+- `GET /api/admin/assistant-usage?days=30` lists the accounts that cost the most, with estimated costs at the list prices in `app.assistant.prices.*`.
+- `PUT /api/admin/users/{id}/plan` with `{"plan": "STANDARD"}` moves an account to another plan.
+
+**Spend alert.** The limits cap each account, not the total. In the OpenAI platform, open your organisation's **Settings → Limits** and set:
+- a **monthly budget**;
+- an **email alert** at about 80% of it.
+
+At 50 messages a day, one FREE account costs at most about $10 a month.
+

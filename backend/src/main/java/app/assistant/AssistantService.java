@@ -3,6 +3,7 @@ package app.assistant;
 import app.assistant.AssistantInteraction.Outcome;
 import app.assistant.AssistantModelClient.ModelResponse;
 import app.assistant.AssistantModelClient.ToolCall;
+import app.assistant.AssistantModelClient.Usage;
 import app.assistant.guide.GuideRetriever;
 import app.assistant.guide.GuideStep;
 import app.dish.Dish;
@@ -54,6 +55,7 @@ public class AssistantService {
     private final AssistantTools tools;
     private final ConversationStore conversations;
     private final AssistantRateLimiter rateLimiter;
+    private final AssistantUsageService usage;
     private final AssistantInteractionRepository interactions;
     private final AppUserRepository users;
     private final ProposalValidator proposalValidator;
@@ -69,7 +71,8 @@ public class AssistantService {
     private final Clock clock;
 
     public AssistantService(AssistantModelClient modelClient, AssistantTools tools, ConversationStore conversations,
-                            AssistantRateLimiter rateLimiter, AssistantInteractionRepository interactions,
+                            AssistantRateLimiter rateLimiter, AssistantUsageService usage,
+                            AssistantInteractionRepository interactions,
                             AppUserRepository users, ProposalValidator proposalValidator, DishRepository dishRepository,
                             DishService dishService, DailySaleService dailySaleService,
                             DishAliasService dishAliasService, StallClosureService stallClosureService,
@@ -79,6 +82,7 @@ public class AssistantService {
         this.tools = tools;
         this.conversations = conversations;
         this.rateLimiter = rateLimiter;
+        this.usage = usage;
         this.interactions = interactions;
         this.users = users;
         this.proposalValidator = proposalValidator;
@@ -94,8 +98,9 @@ public class AssistantService {
         this.clock = clock;
     }
 
-    public AssistantStatusResponse status() {
-        return new AssistantStatusResponse(modelClient.isAvailable(), modelClient.supportsVoice(), modelClient.modelName());
+    public AssistantStatusResponse status(Long ownerId) {
+        return new AssistantStatusResponse(modelClient.isAvailable(), modelClient.supportsVoice(), modelClient.modelName(),
+                usage.today(ownerId));
     }
 
     public TranscriptionResponse transcribe(Long ownerId, MultipartFile audio) {
@@ -116,20 +121,30 @@ public class AssistantService {
             throw new AssistantException(HttpStatus.BAD_REQUEST, "UNSUPPORTED_AUDIO", "This audio format isn't supported.");
         }
 
+        byte[] bytes;
+        try {
+            bytes = audio.getBytes();
+        } catch (IOException exception) {
+            throw new AssistantException(HttpStatus.BAD_REQUEST, "NO_AUDIO", "The recording could not be read.");
+        }
+
+        usage.useTranscription(ownerId);
         try {
             AssistantModelClient.Transcription transcription = modelClient.transcribe(
-                    audio.getBytes(), "speech." + extension, tools.dishVocabulary(ownerId));
+                    bytes, "speech." + extension, tools.dishVocabulary(ownerId));
+            usage.recordTranscribedSeconds(ownerId, transcription.seconds());
             log.info("Transcribed for user {}: {} bytes of {} in {} ms -> {} characters, languages {}", ownerId,
                     audio.getSize(), contentType, millisSince(started), transcription.text().length(), transcription.languages());
             log.debug("Transcript for user {}: {}", ownerId, transcription.text());
             return new TranscriptionResponse(transcription.text(), transcription.languages());
-        } catch (IOException exception) {
-            throw new AssistantException(HttpStatus.BAD_REQUEST, "NO_AUDIO", "The recording could not be read.");
+        } catch (RuntimeException exception) {
+            usage.refundTranscription(ownerId);
+            throw exception;
         }
     }
 
     // MP3 of a reply or guide step. Guide steps repeat, so audio is cached, and cached audio
-    // doesn't count towards the user's rate limit.
+    // doesn't count towards the user's rate limit or daily spoken replies.
     public byte[] speak(Long ownerId, String text) {
         String cleaned = text.strip();
         byte[] cached = speechCache.get(cleaned);
@@ -138,8 +153,16 @@ public class AssistantService {
             return cached;
         }
         rateLimiter.check(ownerId);
+        usage.useSpokenReply(ownerId);
         long started = System.nanoTime();
-        byte[] audio = modelClient.speak(cleaned);
+        byte[] audio;
+        try {
+            audio = modelClient.speak(cleaned);
+        } catch (RuntimeException exception) {
+            usage.refundSpokenReply(ownerId);
+            throw exception;
+        }
+        usage.recordSpokenCharacters(ownerId, cleaned.length());
         speechCache.put(cleaned, audio);
         log.info("Speech for user {}: {} characters -> {} bytes in {} ms", ownerId, cleaned.length(), audio.length, millisSince(started));
         return audio;
@@ -150,6 +173,16 @@ public class AssistantService {
         if (!modelClient.isAvailable()) {
             throw AssistantException.unavailable("The assistant is not set up on this server yet.");
         }
+        usage.useMessage(ownerId);
+        try {
+            return respond(ownerId, request);
+        } catch (RuntimeException exception) {
+            usage.refundMessage(ownerId);
+            throw exception;
+        }
+    }
+
+    private AssistantMessageResponse respond(Long ownerId, AssistantMessageRequest request) {
 
         long started = System.nanoTime();
         String conversationId = request.conversationId() == null ? UUID.randomUUID().toString() : request.conversationId();
@@ -172,10 +205,12 @@ public class AssistantService {
         String reply = null;
         List<String> toolsCalled = new ArrayList<>();
         int modelCalls = 0;
+        Usage tokens = Usage.NONE;
 
         for (int call = 0; call < MAX_MODEL_CALLS && reply == null; call++) {
             modelCalls++;
             ModelResponse response = modelClient.respond(instructions, items, tools.specs());
+            tokens = tokens.plus(response.usage());
             items.addAll(response.outputItems());
 
             if (response.toolCalls().isEmpty()) {
@@ -204,7 +239,7 @@ public class AssistantService {
         String proposalType = proposal != null || closures != null ? "SALES" : priceChange != null ? "PRICE" : null;
         conversations.save(ownerId, conversationId, items);
 
-        AssistantInteraction interaction = interactions.save(new AssistantInteraction(
+        AssistantInteraction record = new AssistantInteraction(
                 users.getReferenceById(ownerId),
                 conversationId,
                 request.page(),
@@ -218,11 +253,14 @@ public class AssistantService {
                 "PRICE".equals(proposalType) ? jsonMapper.writeValueAsString(priceChange)
                         : proposal == null ? null : jsonMapper.writeValueAsString(proposal),
                 closures == null ? null : jsonMapper.writeValueAsString(closures),
-                clock.instant()));
+                clock.instant());
+        record.recordTokens(tokens);
+        AssistantInteraction interaction = interactions.save(record);
+        usage.recordTokens(ownerId, tokens);
 
-        log.info("Message from user {} ({}, page {}, {} characters, {}): {} model calls, tools {}, proposal {}, guide {} steps, {} ms",
+        log.info("Message from user {} ({}, page {}, {} characters, {}): {} model calls ({} tokens in, {} cached, {} out), tools {}, proposal {}, guide {} steps, {} ms",
                 ownerId, request.inputMode() == null ? "text" : request.inputMode(), request.page(), request.text().strip().length(), interaction.getDetectedLanguages(),
-                modelCalls, toolsCalled, proposalType == null ? "none"
+                modelCalls, tokens.inputTokens(), tokens.cachedTokens(), tokens.outputTokens(), toolsCalled, proposalType == null ? "none"
                         : "PRICE".equals(proposalType) ? "#" + interaction.getId() + " price of dish " + priceChange.dishId()
                         : "#" + interaction.getId() + " with " + (proposal == null ? 0 : proposal.size()) + " entries and "
                                 + (closures == null ? 0 : closures.size()) + " closures",
@@ -235,7 +273,7 @@ public class AssistantService {
                 sales ? (proposal == null ? List.of() : proposal) : null,
                 sales ? (closures == null ? List.of() : closures) : null,
                 priceChange, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
-        return new AssistantMessageResponse(conversationId, reply, proposalView, guide);
+        return new AssistantMessageResponse(conversationId, reply, proposalView, guide, usage.today(ownerId));
     }
 
     // Saves a proposal, as proposed or as the user edited it. Confirming again returns the same

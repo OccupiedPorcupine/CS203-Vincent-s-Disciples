@@ -93,6 +93,10 @@ public class SecurityConfig {
                         // want to expose the DB console anymore.
                         // .requestMatchers(h2Console).permitAll()
 
+                        // Admin views (assistant usage and plans). Make an account an admin with
+                        // UPDATE app_users SET role = 'ROLE_ADMIN', then sign in again.
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+
                         .anyRequest().authenticated()
                 )
 

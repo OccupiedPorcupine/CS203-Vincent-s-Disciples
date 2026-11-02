@@ -26,6 +26,9 @@
   let fromVoice = false; // the text box holds a transcript
   let stopReason = null; // why the last recording stopped, for the console
   let busy = false;
+  // Today's assistant use and allowance (issue #65), from the status and each reply.
+  let usage = null;
+  let speechLimitShown = false;
 
   const bubble = element("button", "assistant-bubble", {
     type: "button",
@@ -49,6 +52,7 @@
       <button class="assistant-close" type="button" aria-label="Close assistant">&times;</button>
     </header>
     <div class="assistant-log" role="log" aria-live="polite"></div>
+    <p class="assistant-usage" hidden></p>
     <p class="assistant-status" role="status" aria-live="polite"></p>
     <form class="assistant-input">
       <textarea rows="2" aria-label="Message to the assistant" placeholder="Say or type your sales, e.g. &ldquo;chicken rice 42&rdquo;"></textarea>
@@ -58,6 +62,7 @@
 
   const log = panel.querySelector(".assistant-log");
   const statusLine = panel.querySelector(".assistant-status");
+  const usageLine = panel.querySelector(".assistant-usage");
   const form = panel.querySelector(".assistant-input");
   const input = form.querySelector("textarea");
   const micButton = form.querySelector(".assistant-mic");
@@ -88,6 +93,7 @@
     addMessage("assistant", status.available
       ? "Tell me what you sold, like “today chicken rice 42, char siew 30”. I’ll show it to you before anything is saved."
       : "The assistant isn’t set up on this server yet.");
+    if (status.available) showUsage(status.usage);
     updateControls();
 
     bubble.addEventListener("click", () => setOpen(panel.hidden));
@@ -159,10 +165,34 @@
   }
 
   function updateControls() {
-    input.disabled = !status.available || busy;
-    sendButton.disabled = !status.available || busy;
-    micButton.disabled = !status.voice || (busy && !recorder);
+    const usedUp = !messagesLeft();
+    input.disabled = !status.available || busy || usedUp;
+    sendButton.disabled = !status.available || busy || usedUp;
+    micButton.disabled = !status.voice || (busy && !recorder) || usedUp;
     micButton.title = status.voice ? "" : "Voice input isn’t available on this server; please type";
+  }
+
+  // ---- Daily allowance ----
+
+  function messagesLeft() {
+    return !usage || usage.messagesUsed < usage.messagesPerDay;
+  }
+
+  function showUsage(next) {
+    if (!next) return;
+    usage = next;
+    const left = usage.messagesPerDay - usage.messagesUsed;
+    usageLine.hidden = false;
+    usageLine.textContent = left > 0
+      ? `${usage.messagesUsed} of ${usage.messagesPerDay} messages used today`
+      : `All ${usage.messagesPerDay} of today’s messages are used. You can still enter sales yourself; the assistant is back at midnight.`;
+    usageLine.classList.toggle("is-low", left <= Math.max(1, Math.floor(usage.messagesPerDay / 10)));
+    updateControls();
+  }
+
+  // The server said today's messages are used up (another tab may have used them).
+  function markMessagesUsedUp() {
+    if (usage) showUsage({ ...usage, messagesUsed: usage.messagesPerDay });
   }
 
   function sendFromInput(source) {
@@ -189,6 +219,7 @@
       conversationId = response.conversationId;
       writeStored(CONVERSATION_KEY, conversationId);
       debug("reply", { proposal: response.proposal?.id ?? null, guideSteps: response.guide?.length ?? 0 });
+      showUsage(response.usage);
       addMessage("assistant", response.reply);
       if (response.proposal) addConfirmCard(response.proposal);
       if (response.guide?.length && window.chickyGuide) {
@@ -201,6 +232,7 @@
     } catch (error) {
       warn("message failed:", error.status, error.code, error.message);
       addMessage("error", errorMessage(error));
+      if (error.code === "DAILY_LIMIT") markMessagesUsedUp();
     } finally {
       setBusy(false, "");
     }
@@ -253,6 +285,12 @@
     } catch (error) {
       // Text only. NotAllowedError means the browser blocked playback without a recent tap.
       warn("speech failed:", error.name, error.status ?? "", error.code ?? "", error.message);
+      // Today's spoken replies are used up. Say so once; replies already heard today (cached on
+      // the server) still play, and everything else stays as text.
+      if (error.code === "SPEECH_LIMIT" && !speechLimitShown) {
+        speechLimitShown = true;
+        addMessage("assistant", error.message);
+      }
     }
   }
 
@@ -461,6 +499,7 @@
     } catch (error) {
       warn("transcription failed:", error.status, error.code, error.message);
       addMessage("error", errorMessage(error));
+      if (error.code === "DAILY_LIMIT") markMessagesUsedUp();
     }
     setBusy(false, "");
   }

@@ -13,7 +13,8 @@ public record AssistantMessageResponse(
         @Schema(description = "Send this back to continue the conversation") String conversationId,
         @Schema(description = "The assistant's reply", example = "Please check these and press Confirm to save them.") String reply,
         @Schema(description = "A confirm card: sales and closed days, or a price change; null if the assistant proposed none") Proposal proposal,
-        @Schema(description = "Guided tour to show; null if none") List<GuideStep> guide
+        @Schema(description = "Guided tour to show; null if none") List<GuideStep> guide,
+        @Schema(description = "The account's assistant use today, this message included") AssistantUsageResponse usage
 ) {
     public record Proposal(
             @Schema(description = "Proposal ID for confirm or cancel", example = "12") Long id,

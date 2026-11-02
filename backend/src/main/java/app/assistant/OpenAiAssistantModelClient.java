@@ -114,7 +114,9 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
                 .body(String.class)));
 
         String text = body.path("text").asString();
-        return new Transcription(text, MessageLanguages.in(text));
+        // Per-minute models report {"type": "duration", "seconds": ...}; token-billed ones don't.
+        double seconds = body.path("usage").path("seconds").asDouble(0);
+        return new Transcription(text, MessageLanguages.in(text), seconds);
     }
 
     @Override
@@ -191,7 +193,11 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
                 }
             }
         }
-        return new ModelResponse(outputItems, toolCalls, text.toString());
+        JsonNode usage = response.path("usage");
+        return new ModelResponse(outputItems, toolCalls, text.toString(), new Usage(
+                usage.path("input_tokens").asLong(0),
+                usage.path("input_tokens_details").path("cached_tokens").asLong(0),
+                usage.path("output_tokens").asLong(0)));
     }
 
     private void requireConfigured() {

@@ -25,10 +25,29 @@ public interface AssistantModelClient {
 
     ModelResponse respond(String instructions, List<JsonNode> input, List<ToolSpec> tools);
 
-    record Transcription(String text, List<String> languages) {}
+    // seconds: the audio's length as the API reported it; 0 when it didn't say.
+    record Transcription(String text, List<String> languages, double seconds) {
+        public Transcription(String text, List<String> languages) {
+            this(text, languages, 0);
+        }
+    }
 
     // outputItems are appended to the conversation as-is; toolCalls and text are read from them.
-    record ModelResponse(List<JsonNode> outputItems, List<ToolCall> toolCalls, String text) {}
+    record ModelResponse(List<JsonNode> outputItems, List<ToolCall> toolCalls, String text, Usage usage) {
+        public ModelResponse(List<JsonNode> outputItems, List<ToolCall> toolCalls, String text) {
+            this(outputItems, toolCalls, text, Usage.NONE);
+        }
+    }
+
+    // Tokens a model call used, as the API reported them. inputTokens includes cachedTokens.
+    record Usage(long inputTokens, long cachedTokens, long outputTokens) {
+        public static final Usage NONE = new Usage(0, 0, 0);
+
+        public Usage plus(Usage other) {
+            return new Usage(inputTokens + other.inputTokens, cachedTokens + other.cachedTokens,
+                    outputTokens + other.outputTokens);
+        }
+    }
 
     record ToolCall(String callId, String name, JsonNode arguments) {}
 
