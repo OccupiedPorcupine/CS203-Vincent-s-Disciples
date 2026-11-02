@@ -34,7 +34,7 @@ public class AppUser {
     @Column(nullable = false)
     private String role = "ROLE_USER";
 
-    // Sets the assistant's daily allowances: FREE, STANDARD or PRO (see app.assistant.AssistantPlan, V23).
+    // Sets the assistant's daily allowances: FREE, STANDARD or PRO (see app.assistant.AssistantPlan, V27).
     @Column(nullable = false, length = 20)
     private String plan = "FREE";
 

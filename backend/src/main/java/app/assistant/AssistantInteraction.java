@@ -67,7 +67,7 @@ public class AssistantInteraction {
 
     private Instant resolvedAt;
 
-    // Tokens OpenAI reported across this message's model calls; null for the offline model. See V23.
+    // Tokens OpenAI reported across this message's model calls; null for the offline model. See V27.
     private Integer inputTokens;
 
     private Integer cachedTokens;

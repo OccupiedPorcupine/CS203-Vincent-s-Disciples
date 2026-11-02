@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 
 import java.time.LocalDate;
 
-// One account's assistant use on one day (Singapore time). See V23__assistant_usage.sql.
+// One account's assistant use on one day (Singapore time). See V27__assistant_usage.sql.
 // The counters are changed with single UPDATE statements in AssistantDailyUsageRepository, so
 // two requests at once can't both take the last message of the day.
 @Entity
