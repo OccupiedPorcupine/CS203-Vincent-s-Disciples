@@ -51,9 +51,20 @@ class Forecast:
 
 
 class Forecaster(Protocol):
+    """Forecasts one dish's next day. A forecaster may also define
+    forecast_batch(histories, targets) -> list[Forecast | None] to forecast many series in one
+    call (a pretrained model batches far faster); the backtest uses it when present."""
+
     name: str
 
     def forecast(self, history: History, target: Target) -> Forecast | None: ...
+
+
+def forecast_all(forecaster: Forecaster, histories: list[History], targets: list[Target]) -> list[Forecast | None]:
+    batch = getattr(forecaster, "forecast_batch", None)
+    if batch is not None:
+        return batch(histories, targets)
+    return [forecaster.forecast(history, target) for history, target in zip(histories, targets)]
 
 
 class AppBaseline:
@@ -99,24 +110,28 @@ class AppBaseline:
         return float(sold[max(0, end - self.RECENT_DAYS):end].mean())
 
 
+_GENERIC_CURVE = arrival_curve(A.GENERIC_OPENING_HOURS, A.GENERIC_ARRIVAL_PEAKS)
+
+
+def adjust_for_sell_outs(history: History) -> History:
+    """Scales up each sold-out day by how much of the day was left (#50): sold out at 1pm means
+    most of the dinner crowd never got any. Uses a generic hawker customer pattern, not the
+    stall's own, and the owner's rounded sell-out time."""
+    minutes, share = _GENERIC_CURVE
+    sold_out = ~np.isnan(history.sold_out_minute)
+    arrived = np.ones(len(history.sold))
+    positions = np.clip(np.searchsorted(minutes, history.sold_out_minute[sold_out]), 0, len(minutes) - 1)
+    arrived[sold_out] = np.maximum(share[positions], A.MIN_ARRIVED_SHARE)
+    return History(history.dates, history.sold / arrived, history.sold_out_minute)
+
+
 class SoldOutAwareBaseline(AppBaseline):
-    """The app baseline, after scaling up each sold-out day by how much of the day was left
-    (#50): sold out at 1pm means most of the dinner crowd never got any. It uses a generic
-    hawker customer pattern, not the stall's own, and the owner's rounded sell-out time."""
+    """The app baseline on sales adjusted for sell-outs (adjust_for_sell_outs)."""
 
     name = "Baseline + sell-out times"
 
-    def __init__(self) -> None:
-        self._curve = arrival_curve(A.GENERIC_OPENING_HOURS, A.GENERIC_ARRIVAL_PEAKS)
-
     def forecast(self, history: History, target: Target) -> Forecast | None:
-        minutes, share = self._curve
-        sold_out = ~np.isnan(history.sold_out_minute)
-        arrived = np.ones(len(history.sold))
-        positions = np.clip(np.searchsorted(minutes, history.sold_out_minute[sold_out]), 0, len(minutes) - 1)
-        arrived[sold_out] = np.maximum(share[positions], A.MIN_ARRIVED_SHARE)
-        adjusted = History(history.dates, history.sold / arrived, history.sold_out_minute)
-        return super().forecast(adjusted, target)
+        return super().forecast(adjust_for_sell_outs(history), target)
 
 
 class AppMarginBaseline(AppBaseline):
@@ -209,13 +224,40 @@ def best_possible_portions(expected_demand: float, price: float, unit_cost: floa
     return _round_up(float(np.quantile(draws, critical_ratio(price, unit_cost))))
 
 
+@dataclass
+class _Series:
+    """One stall's dish: what's fixed during the backtest."""
+    base: dict
+    price: float
+    cost: float
+    dates: np.ndarray
+    demand: np.ndarray
+    curve: tuple[np.ndarray, np.ndarray]
+    first: int
+    targets: dict[np.datetime64, Target]
+    recorded_sold: np.ndarray
+    recorded_sold_out: np.ndarray
+
+
+@dataclass
+class _Run:
+    """One series under one policy: its own recorded sales, which the policy changes."""
+    series: _Series
+    policy_name: str
+    policy: Policy
+    sold: list
+    sold_out: list
+
+
 def run_backtest(sales: pd.DataFrame, forecasters: list[Forecaster],
                  policies: dict[str, Policy] = POLICIES, eval_days: int = 182,
                  min_history_days: int = 28) -> pd.DataFrame:
-    """One row per forecaster, policy and evaluated stall-dish-day."""
+    """One row per forecaster, policy and evaluated stall-dish-day. Steps through the evaluation
+    days in order, asking each forecaster for every series due that day at once."""
     eval_start = sales["date"].max() - pd.Timedelta(days=eval_days - 1)
     rng = np.random.default_rng(0)
     records = []
+    series = []
 
     for (stall_id, dish), rows in sales[sales["open"]].groupby(["stall_id", "dish"], sort=False):
         rows = rows.sort_values("date")
@@ -228,8 +270,6 @@ def run_backtest(sales: pd.DataFrame, forecasters: list[Forecaster],
         price, cost = float(rows["price"].iloc[0]), float(rows["unit_cost"].iloc[0])
         demand = rows["demand"].to_numpy()
         stall_type = A.STALL_TYPES[rows["stall_type"].iloc[0]]
-        curve = arrival_curve(stall_type.opening_hours, stall_type.arrival_peaks)
-        recorded_sold_out = np.array([_clock_to_minute(clock) for clock in rows["sold_out_at"]])
         base = {"stall_id": stall_id, "stall_type": rows["stall_type"].iloc[0], "dish": dish,
                 "price": price, "unit_cost": cost}
 
@@ -242,23 +282,34 @@ def run_backtest(sales: pd.DataFrame, forecasters: list[Forecaster],
                             "point": expected[index], "demand": demand[index],
                             "prepared": best_possible_portions(expected[index], price, cost, rng)})
 
-        targets = [Target(dates[index], rows["holiday"].iloc[index], float(rows["rainfall_mm"].iloc[index]))
-                   for index in range(first, len(rows))]
-        for forecaster in forecasters:
-            for policy_name, policy in policies.items():
-                sold = list(rows["sold"].to_numpy()[:first].astype(float))
-                sold_out = list(recorded_sold_out[:first])
-                for offset, target in enumerate(targets):
-                    index = first + offset
-                    history = History(dates[:index], np.array(sold), np.array(sold_out, dtype=float))
-                    forecast = forecaster.forecast(history, target)
-                    prepared = policy(forecast, price, cost) if forecast else 0
-                    records.append({**base, "forecaster": forecaster.name, "policy": policy_name,
-                                    "date": dates[index], "point": forecast.point if forecast else np.nan,
-                                    "demand": demand[index], "prepared": prepared})
-                    sold.append(min(prepared, demand[index]))
-                    sold_out.append(reported_minute(sold_out_minute(prepared, demand[index], curve))
-                                    if demand[index] > prepared else np.nan)
+        series.append(_Series(
+            base=base, price=price, cost=cost, dates=dates, demand=demand,
+            curve=arrival_curve(stall_type.opening_hours, stall_type.arrival_peaks), first=first,
+            targets={dates[index]: Target(dates[index], rows["holiday"].iloc[index], float(rows["rainfall_mm"].iloc[index]))
+                     for index in range(first, len(rows))},
+            recorded_sold=rows["sold"].to_numpy().astype(float),
+            recorded_sold_out=np.array([_clock_to_minute(clock) for clock in rows["sold_out_at"]]),
+        ))
+
+    eval_dates = sorted({day for one in series for day in one.targets})
+    for forecaster in forecasters:
+        runs = [_Run(one, policy_name, policy, list(one.recorded_sold[:one.first]), list(one.recorded_sold_out[:one.first]))
+                for one in series for policy_name, policy in policies.items()]
+        for day in eval_dates:
+            due = [run for run in runs if day in run.series.targets]
+            histories = [History(run.series.dates[:len(run.sold)], np.array(run.sold), np.array(run.sold_out, dtype=float))
+                         for run in due]
+            forecasts = forecast_all(forecaster, histories, [run.series.targets[day] for run in due])
+            for run, forecast in zip(due, forecasts):
+                one = run.series
+                index = len(run.sold)
+                prepared = run.policy(forecast, one.price, one.cost) if forecast else 0
+                records.append({**one.base, "forecaster": forecaster.name, "policy": run.policy_name,
+                                "date": day, "point": forecast.point if forecast else np.nan,
+                                "demand": one.demand[index], "prepared": prepared})
+                run.sold.append(min(prepared, one.demand[index]))
+                run.sold_out.append(reported_minute(sold_out_minute(prepared, one.demand[index], one.curve))
+                                    if one.demand[index] > prepared else np.nan)
 
     result = pd.DataFrame(records)
     result["sold"] = np.minimum(result["prepared"], result["demand"])

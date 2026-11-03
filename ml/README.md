@@ -174,3 +174,77 @@ What this suggests:
 6. **The app is only slightly ahead of the owners' habit (82.1% vs 80.2%).** The headroom up to 85.6% is what better forecasts (#87) and real sell-out data (#50, #88) have to win.
 
 These numbers measure our assumptions, not real stalls (#6). Use them to compare methods and catch mistakes. For claims about real demand, use pilot data (#88).
+
+# Pretrained forecasting models (#87)
+
+`ml/chronos_benchmark.py` compares two pretrained models from Amazon with the app's baseline. Neither model is trained on our data:
+- **Chronos-2** (120M parameters, Apache-2.0);
+- **Chronos-Bolt tiny** (9M).
+
+```bash
+pip install -r ml/requirements.txt -r ml/requirements-chronos.txt   # adds PyTorch, about 1 GB
+python -m ml.chronos_benchmark                                       # about 40 minutes on a laptop CPU
+python -m ml.chronos_benchmark --parts restaurant resources --models chronos-bolt-tiny   # a minute
+```
+
+How the models are fed:
+- `src/simulation/chronos_forecaster.py` gives each model a dish's daily sales up to the day before the forecast, with closed days left empty, so the weekly pattern stays seven days long.
+- **Chronos-2** also gets each day's rainfall and whether it's a public holiday, including for the day being forecast. Chronos-Bolt takes no extra inputs.
+- Neither is fine-tuned. The app and CI don't need PyTorch; only this benchmark does.
+
+## Stuttgart restaurant: one day ahead from real sales
+
+The test set is the same 110 dates and 7 dishes as `ml/model_comparison.py` (21 July – 7 November 2015). The trained models were tuned on the 17 months before it. Their figures come from re-running `python -m ml.model_comparison` on the current split; the committed `results/metrics.csv` predates a loader change and covers 114 dates.
+
+| Model | Trained on this restaurant? | MAE | WAPE | Quantile loss | Share inside the 80% range |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Naive: previous day | — | 7.11 | 39.5% | — | — |
+| App baseline (mean of last 4 same weekdays) | — | 5.25 | 29.1% | 2.21 | 65.3% |
+| Ridge | yes | 5.22 | 29.0% | — | — |
+| XGBoost | yes | 5.10 | 28.3% | — | — |
+| Random Forest | yes | 5.01 | 27.8% | — | — |
+| CatBoost | yes | 4.92 | 27.3% | — | — |
+| **Chronos-2** | **no** | **4.89** | **27.1%** | **1.98** | 73.4% |
+| Chronos-Bolt tiny | no | 5.14 | 28.5% | 2.07 | **78.7%** |
+
+Chronos-2, without training, is as accurate as the best model trained and tuned on 17 months of this restaurant's sales. Chronos-Bolt tiny is level with XGBoost and Ridge, and its 80% range is the closest to honest. The app's range is too narrow: it contains the real number only 65% of the time.
+
+## Simulator: what it does to prep (24 stalls, 13,890 dish-days)
+
+This is the closed-loop backtest from #85: a policy's sell-outs change the sales the forecaster sees next.
+
+| Forecaster | Best policy | Left over | Days sold out | % of best possible profit |
+| --- | --- | ---: | ---: | ---: |
+| Reference | Best possible: knows each day's true average | 13.7% | 33.9% | 85.6% |
+| **Chronos-2 + sell-out times** | **Margin rule** | 18.1% | 28.9% | **83.6%** |
+| Chronos-2 + sell-out times | Forecast only | 11.7% | 43.3% | 83.4% |
+| Chronos-2 | Forecast + 20% | 21.7% | 23.9% | 83.1% |
+| Chronos-2 | Margin rule | 8.5% | 50.4% | 82.4% |
+| App baseline | Forecast + 20% | 20.2% | 30.3% | 81.8% |
+| Baseline + sell-out times | Forecast only | 15.8% | 40.1% | 81.0% |
+| Chronos-Bolt tiny | Forecast + 20% | 23.6% | 24.9% | 80.9% |
+| — | Owner's own habit (no app) | 25.4% | 23.2% | 80.2% |
+
+Every forecaster and policy pair is in `artifacts/chronos/simulator.csv` after a run. Against the true demand, Chronos-2's forecast error is 20.7%, the baseline's 23.1%, and the best possible 19.1%.
+
+## Cost to run (Apple M-series CPU, 4 threads, each model in a fresh process)
+
+| | Chronos-2 | Chronos-Bolt tiny |
+| --- | ---: | ---: |
+| Weights | 456 MB | 33 MB |
+| Load time (weights on disk) | 3.3 s | 2.6 s |
+| One stall's 5 dishes | 0.12 s | 0.01 s |
+| 400 dishes in one batch | 7.3 s | 0.13 s |
+| Peak memory | 1.6 GB | 0.86 GB |
+
+Python, PyTorch and pandas take about 340 MB before either model loads.
+
+## Recommendation: serve Chronos-2
+
+1. **It is the most accurate forecaster we have, on real and simulated data.** Untrained, it matches the trained CatBoost on the restaurant. On the simulator it captures 3.4 of the 5.4 points between the owners' habits and the ceiling; the baseline captures 1.6.
+2. **It works for any dish from the first weeks.** The served CatBoost only knows the Stuttgart restaurant's 7 dishes. So today every hawker dish falls back to the baseline (`DISH_NOT_IN_MODEL`), and #46 can't retrain it until real hawker data exists (#88).
+3. **It makes the margin rule (#86) work.** Its ranges are good enough to aim at a percentile: the margin rule plus sell-out times (#50) is its best policy. The app's 12-day range isn't good enough (see #86).
+4. **The cost to watch is memory.** Chronos-2 needs about 1.6 GB and a container image about 1 GB larger, with PyTorch and the weights. Measure its cold start and memory on Vercel before switching. If it doesn't fit, Chronos-Bolt tiny is the fallback: cheap and honest about its range, but no better than the baseline on the simulator.
+5. **Keep the baseline as the fallback** for when the ML service is down, as it is today.
+
+The restaurant result is one restaurant and 7 dishes, and the simulator measures our own assumptions (#6). Pilot data (#88) is still what will show the gain for real stalls.
