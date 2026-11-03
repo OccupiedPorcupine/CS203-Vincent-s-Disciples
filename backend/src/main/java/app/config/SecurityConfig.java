@@ -9,17 +9,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -31,7 +35,14 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository,
-                                                   @Value("${app.security.require-https:false}") boolean requireHttps) throws Exception {
+                                                   @Value("${app.security.require-https:false}") boolean requireHttps,
+                                                   @Value("${spring.h2.console.enabled:false}") boolean h2ConsoleEnabled) throws Exception {
+
+        // The H2 console is only reachable while it is turned on (local development). Everywhere
+        // else (the supabase and prod profiles turn it off) /h2-console/** is refused outright,
+        // instead of relying on the console simply not being there.
+        AuthorizationManager<RequestAuthorizationContext> h2ConsoleAccess =
+                (authentication, context) -> new AuthorizationDecision(h2ConsoleEnabled);
 
         CsrfTokenRequestAttributeHandler csrfTokenRequestHandler = new CsrfTokenRequestAttributeHandler();
         csrfTokenRequestHandler.setCsrfRequestAttributeName(null);
@@ -87,8 +98,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**"
                         ).permitAll()
 
-                        // H2 console for local development.
-                        .requestMatchers("/h2-console/**").permitAll()
+                        // H2 console for local development only (see h2ConsoleAccess above).
+                        .requestMatchers("/h2-console/**").access(h2ConsoleAccess)
 
                         // Change back to the previous H2 matcher if you don't
                         // want to expose the DB console anymore.
@@ -106,8 +117,19 @@ public class SecurityConfig {
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
                 )
 
-                // Required only for the embedded H2 console used during development.
-                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+                .headers(headers -> headers
+                        // Clickjacking: no other site may show our responses in a frame. The H2
+                        // console is itself made of frames, so it needs same-origin while it's on.
+                        .frameOptions(frame -> {
+                            if (h2ConsoleEnabled) {
+                                frame.sameOrigin();
+                            } else {
+                                frame.deny();
+                            }
+                        })
+                        // Don't leak full URLs (which can hold reset or verification tokens) to other sites.
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                )
 
                 .logout(logout -> logout
                         .logoutUrl("/api/auth/logout")
