@@ -13,7 +13,9 @@ if [ -f "$VERCEL_CA" ]; then
   cp "$JAVA_HOME/lib/security/cacerts" "$TRUSTSTORE"
   keytool -importcert -noprompt -alias vercel-proxy-ca -file "$VERCEL_CA" \
     -keystore "$TRUSTSTORE" -storepass changeit > /dev/null
-  exec java -Djavax.net.ssl.trustStore="$TRUSTSTORE" -Djavax.net.ssl.trustStorePassword=changeit -jar app.jar
+  exec java -XX:SharedArchiveFile=application.jsa -Djavax.net.ssl.trustStore="$TRUSTSTORE" \
+    -Djavax.net.ssl.trustStorePassword=changeit -jar application/app.jar
 fi
 
-exec java -jar app.jar
+# application.jsa is the class archive made when the image was built (see Dockerfile).
+exec java -XX:SharedArchiveFile=application.jsa -jar application/app.jar
