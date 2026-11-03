@@ -100,7 +100,9 @@ public class DailySaleController {
                             )
                     )
             )
-            @RequestBody AddDailySalesRequest request
+            // @Valid runs the checks in AddDailySalesRequest (dates present, quantities in range,
+            // at most MAX_SALES records); without it they were silently skipped.
+            @Valid @RequestBody AddDailySalesRequest request
     ) {
         int added = dailySaleService.addSales(dishId, user.id(), request);
         return new AddDailySalesResponse(added);
