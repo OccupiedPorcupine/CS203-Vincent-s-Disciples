@@ -53,6 +53,7 @@ class PrepListApiTest {
         jdbc.update("DELETE FROM dish_ingredients WHERE owner_id IN (" + owners + ")");
         jdbc.update("DELETE FROM ingredients WHERE owner_id IN (" + owners + ")");
         jdbc.update("DELETE FROM daily_sales WHERE dish_id IN (SELECT id FROM dishes WHERE owner_id IN (" + owners + "))");
+        jdbc.update("DELETE FROM dish_prices WHERE dish_id IN (SELECT id FROM dishes WHERE owner_id IN (" + owners + "))");
         jdbc.update("DELETE FROM closed_dates WHERE owner_id IN (" + owners + ")");
         jdbc.update("DELETE FROM dishes WHERE owner_id IN (" + owners + ")");
     }
@@ -91,6 +92,27 @@ class PrepListApiTest {
         assertEquals(46, prep.path("dishes").get(0).path("portions").asInt());
         assertEquals("6900", prep.path("ingredients").get(0).path("quantity").asString());
         assertEquals(400, session.get("/api/prep-list?date=" + tomorrow + "&bufferPercent=101").statusCode());
+    }
+
+    @Test
+    void aDishWithAPriceAndCostIsPreparedByItsMarginAndTheOthersToTheTopOfTheRange() throws Exception {
+        Session session = signUp("margin@prep.test");
+        long chickenRice = dishSelling(session, "Chicken rice", 40);
+        dishSelling(session, "Laksa", 20);
+        HttpResponse<String> price = session.send("PUT", "/api/dishes/" + chickenRice + "/price",
+                "{\"price\":4.50,\"unitCost\":1.60,\"effectiveFrom\":null}");
+        assertEquals(200, price.statusCode(), price.body());
+
+        JsonNode dishes = json.readTree(session.get("/api/prep-list?date=" + tomorrow).body()).path("dishes");
+
+        assertEquals(List.of("Chicken rice 40 MARGIN", "Laksa 20 TOP_OF_RANGE"), rows(dishes, "dish", "portions", "rule"));
+        assertEquals("Running out costs you $2.90 a plate and a leftover $1.60, so this is enough on about 64% of days like it.",
+                dishes.get(0).path("why").asString());
+        assertTrue(dishes.get(1).path("why").asString().contains("Set this dish's price and cost"));
+
+        JsonNode top = json.readTree(session.get("/api/prep-list?date=" + tomorrow + "&rule=top").body()).path("dishes");
+        assertEquals(List.of("Chicken rice TOP_OF_RANGE", "Laksa TOP_OF_RANGE"), rows(top, "dish", "rule"));
+        assertEquals("The top of the likely range.", top.get(0).path("why").asString());
     }
 
     @Test

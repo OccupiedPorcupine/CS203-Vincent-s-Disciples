@@ -49,7 +49,7 @@ public class ForecastService {
     private final MlForecastClient mlForecastClient;
     private final StallClosureService stallClosureService;
     private final Clock clock;
-    // Off until the prep list stops preparing to the top of the range (#86); see SoldOutDemand.
+    // Off: with the baseline's ranges it doesn't help the prep list's margin rule (#86); see SoldOutDemand.
     private final boolean countSoldOutDemand;
 
     public ForecastService(ForecastDataService forecastDataService, NeaWeatherForecastService neaWeatherForecastService, PublicHolidayService publicHolidayService,
@@ -64,7 +64,19 @@ public class ForecastService {
         this.countSoldOutDemand = countSoldOutDemand;
     }
 
+    // A forecast and the recorded sales it came from, so the prep list can work out other points
+    // of the likely demand (BaselineForecaster.atProbability).
+    record Prediction(ForecastResponse response, List<Observation> recorded) {
+        double atProbability(double probability) {
+            return BaselineForecaster.atProbability(recorded, response.predictedDemand(), probability);
+        }
+    }
+
     public ForecastResponse forecast(Long dishId, LocalDate date, Long ownerId) {
+        return predict(dishId, date, ownerId).response();
+    }
+
+    Prediction predict(Long dishId, LocalDate date, Long ownerId) {
         LocalDate today = LocalDate.now(clock);
         if (date.isBefore(today) || date.isAfter(today.plusDays(MAX_DAYS_AHEAD))) {
             throw new InvalidForecastDateException("Choose a date from today up to " + MAX_DAYS_AHEAD + " days ahead.");
@@ -82,7 +94,7 @@ public class ForecastService {
                 .filter(sale -> sale.getSoldOutAt() != null && !sale.getSaleDate().isBefore(date.minusDays(SOLD_OUT_NOTE_DAYS)))
                 .count();
         if (!countSoldOutDemand || soldOutDays == 0) {
-            return forecast(dish, date, recorded);
+            return new Prediction(forecast(dish, date, recorded), recorded);
         }
 
         // Sold-out days count as the demand they likely had (SoldOutDemand), for both the model and
@@ -95,10 +107,10 @@ public class ForecastService {
                 .toList();
         ForecastResponse response = forecast(dish, date, demand);
         Range range = BaselineForecaster.range(recorded, response.predictedDemand());
-        return new ForecastResponse(response.dish(), response.forecastDate(), response.predictedDemand(),
+        return new Prediction(new ForecastResponse(response.dish(), response.forecastDate(), response.predictedDemand(),
                 (int) Math.floor(range.low()), (int) Math.ceil(range.high()), range.rough(), response.method(),
                 response.fallbackReason(), response.basis() + ", counting " + (soldOutDays == 1 ? "1 sold-out day" : soldOutDays + " sold-out days")
-                        + " as higher demand", response.note());
+                        + " as higher demand", response.note()), recorded);
     }
 
     private ForecastResponse forecast(Dish dish, LocalDate date, List<Observation> history) {

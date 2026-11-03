@@ -104,4 +104,34 @@ class BaselineForecasterTest {
         assertEquals(0, range.low(), 1e-9);
         assertTrue(range.high() >= 3);
     }
+
+    @Test
+    void steadySalesNeedNoMoreThanTheForecastAtAnyShareOfDays() {
+        List<Observation> history = new ArrayList<>();
+        for (int daysAgo = 70; daysAgo >= 1; daysAgo--) history.add(new Observation(TARGET.minusDays(daysAgo), 40));
+
+        assertEquals(40, BaselineForecaster.atProbability(history, 40, 0.64), 1e-9);
+        assertEquals(40, BaselineForecaster.atProbability(history, 40, 0.99), 1e-9);
+    }
+
+    @Test
+    void fewPastDaysStretchTheRoughRangeToTheShareOfDays() {
+        List<Observation> history = List.of(new Observation(TARGET.minusDays(2), 40), new Observation(TARGET.minusDays(1), 40));
+
+        assertEquals(50, BaselineForecaster.atProbability(history, 40, 0.9), 1e-9);
+        assertEquals(40, BaselineForecaster.atProbability(history, 40, 0.5), 1e-9);
+        assertEquals(0, BaselineForecaster.atProbability(history, 0, 0.01), 1e-9);
+    }
+
+    @Test
+    void aBusyDaySevenWeeksAgoCountsForTheMarginButNotForTheRange() {
+        List<Observation> history = new ArrayList<>();
+        for (int daysAgo = 120; daysAgo >= 1; daysAgo--) {
+            history.add(new Observation(TARGET.minusDays(daysAgo), daysAgo == 50 ? 140 : 40));
+        }
+
+        // The last 12 days' errors are all 0; the last 56 include the busy day (+100).
+        assertEquals(40, BaselineForecaster.range(history, 40).high(), 1e-9);
+        assertTrue(BaselineForecaster.atProbability(history, 40, 0.99) > 40);
+    }
 }

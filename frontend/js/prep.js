@@ -92,7 +92,7 @@ function renderPrepList(list) {
     portionList.replaceChildren(...list.dishes.map(dish => listRow(
       dish.dish,
       `${dish.portions} portions`,
-      `Forecast ${dish.expected} (likely ${dish.low}–${dish.high}) · ${dish.basis}`
+      `${dish.why} Forecast ${dish.expected} (likely ${dish.low}–${dish.high}) · ${dish.basis}`
     )), ...skipped);
   }
 
@@ -126,7 +126,7 @@ async function loadPrepList() {
   showStatus("", null, prepStatus);
   portionList.replaceChildren(emptyState("Working out the forecasts…"));
   ingredientList.replaceChildren(emptyState("Loading…"));
-  const buffer = prepBuffer.value === "" ? "" : `&bufferPercent=${prepBuffer.value}`;
+  const buffer = prepBuffer.value === "" ? "" : prepBuffer.value === "top" ? "&rule=top" : `&bufferPercent=${prepBuffer.value}`;
   try {
     renderPrepList(await apiRequest(`/api/prep-list?date=${prepDate.value}${buffer}`));
   } catch (error) {

@@ -139,6 +139,7 @@ It writes `simulated_sales.csv`, `backtest_days.csv`, `summary.csv` and `ingredi
 - The loop is closed: what a policy prepares decides what sells, and those sales are what the forecaster sees the next day, as in the app.
 - `AppBaseline` reproduces `BaselineForecaster.java`, and the tests check it against the Java logic.
 - `SoldOutAwareBaseline` scales up sold-out days by how much of the day was left (#50). It uses a generic hawker customer pattern and sell-out times rounded to 30 minutes, not the simulated stall's true pattern.
+- `AppMarginBaseline` is the app's prep list default since #86: the margin rule, aimed with the baseline's errors over the last 8 weeks instead of 12 days.
 - `AppSoldOutBaseline` is what the app does (`SoldOutDemand.java`, with `app.forecast.count-sold-out-demand` on). It assumes customers come evenly through the trading hours, caps the uplift at 1.5 times, and keeps the range of the recorded sales.
 - Two reference rows:
   - **Owner's own habit** is the stalls without the app.
@@ -154,6 +155,7 @@ It writes `simulated_sales.csv`, `backtest_days.csv`, `summary.csv` and `ingredi
 | App baseline | Forecast + 20% | 23.2% | 20.2% | 30.3% | **81.8%** |
 | App baseline | Top of likely range (prep list default) | 23.1% | 21.0% | 26.4% | 81.6% |
 | App baseline | Margin rule | 28.4% | 8.2% | 55.4% | 75.6% |
+| **App baseline, 8-week errors** | **Margin rule (prep list default since #86)** | 23.8% | 12.8% | 41.4% | **82.1%** |
 | Baseline + sell-out times | Forecast only | 25.7% | 15.8% | 40.1% | 81.0% |
 | Baseline + sell-out times | Margin rule | 25.4% | 22.0% | 31.5% | 79.4% |
 | App baseline + sell-out times | Forecast only | 24.3% | 13.4% | 44.0% | 81.4% |
@@ -167,7 +169,8 @@ What this suggests:
 1. **Sell-outs feed back into the forecast.** Preparing only the forecast sells out on 79% of days. Each sell-out lowers the next forecast, and profit falls to 69%. Any policy aimed near the middle of the forecast needs sell-out times (#50). With them, "forecast only" recovers to 81%.
 2. **The margin rule needs a steadier range than the app's.** The app measures its range from the last 12 days' errors, which is too noisy to aim at a percentile. In a run with 8 weeks of errors (`AppBaseline.BACKTEST_DAYS = 56`), the margin rule reaches 81.8%, level with the best policy. That's the work for #86.
 3. **Selling out is sometimes right.** At chicken rice margins (64%), the best possible policy sells out on a third of days and still makes the most money.
-4. **The app's sell-out rule forecasts best, but the prep list isn't ready for it.** The app's rule (`AppSoldOutBaseline`) has the lowest forecast error, 24.3%. That's lower than the customer-pattern rule, because its 1.5 cap stops early sell-outs from swinging the forecast. But the prep list prepares to the top of the likely range, which only works because the plain forecast runs low after sell-outs. With sell-outs counted, it over-prepares: 32% leftovers, and profit falls from 81.6% to 77.8%. So `app.forecast.count-sold-out-demand` stays off until the prep list aims lower (#86). With sell-outs counted, preparing just the forecast already gives 81.4% with 13% leftovers, against 21% today.
-5. **The app is only slightly ahead of the owners' habit (81.8% vs 80.2%).** The headroom up to 85.6% is what better forecasts (#87) and real sell-out data (#50, #88) have to win.
+4. **The app's sell-out rule forecasts best, but the prep list isn't ready for it.** The app's rule (`AppSoldOutBaseline`) has the lowest forecast error, 24.3%. That's lower than the customer-pattern rule, because its 1.5 cap stops early sell-outs from swinging the forecast. But the prep list prepares to the top of the likely range, which only works because the plain forecast runs low after sell-outs. With sell-outs counted, it over-prepares: 32% leftovers, and profit falls from 81.6% to 77.8%. So `app.forecast.count-sold-out-demand` stays off (see point 5). With sell-outs counted, preparing just the forecast already gives 81.4% with 13% leftovers, against 21% today.
+5. **The prep list now prepares by margin (#86).** With 8 weeks of errors, the margin rule earns 82.1% of the best possible profit, ahead of the top of the range (81.6%) and forecast + 20% (81.8%). It throws away about 40% less food ($81.7k against $136.8k of cost), but sells out on more days (41% against 26%). That's the right trade at hawker margins. By stall it beats both on 18 of 24: on average +0.8% profit against the top of the range (from −2.5% to +2.8%), +1.1% for residential stalls and +0.2% for office stalls. Adding sell-out times doesn't help it with the baseline's ranges (81.4%), so `app.forecast.count-sold-out-demand` stays off. With Chronos-2's ranges it does (#87, #106).
+6. **The app is only slightly ahead of the owners' habit (82.1% vs 80.2%).** The headroom up to 85.6% is what better forecasts (#87) and real sell-out data (#50, #88) have to win.
 
 These numbers measure our assumptions, not real stalls (#6). Use them to compare methods and catch mistakes. For claims about real demand, use pilot data (#88).
