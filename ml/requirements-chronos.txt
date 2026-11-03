@@ -1,0 +1,3 @@
+# Pretrained forecasting models for ml/chronos_benchmark.py (issue #87). Not needed by the app,
+# the ML service or CI; install on top of ml/requirements.txt. Pulls in PyTorch (about 1 GB).
+chronos-forecasting==2.3.2
