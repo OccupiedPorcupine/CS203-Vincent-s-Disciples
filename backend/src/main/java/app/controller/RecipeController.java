@@ -59,7 +59,9 @@ public class RecipeController {
     }
 
     @Operation(summary = "Prep list for a day", description = "Portions to prepare of each dish sold in the last 28 days, and the ingredients they need. "
-            + "Portions are the top of the forecast's likely range, or the forecast plus bufferPercent when it is given.")
+            + "By default (rule=MARGIN) each dish with a price and cost is prepared as far as its margin makes worthwhile: up to the point "
+            + "demand stays under with probability (price - cost) / price. Dishes without both get the top of the likely range, "
+            + "as rule=RANGE gives every dish. With bufferPercent, every dish gets the forecast plus that many percent.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Prep list worked out; 'closed' is set instead when the stall is closed that day"),
             @ApiResponse(responseCode = "400", description = "Date not from today up to 7 days ahead, or buffer not 0 to 100", content = @Content),
@@ -68,7 +70,8 @@ public class RecipeController {
     @GetMapping("/prep-list")
     public PrepListResponse prepList(@AuthenticationPrincipal AuthenticatedUser user,
                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                     @RequestParam(required = false) PrepListResponse.Rule rule,
                                      @RequestParam(required = false) Integer bufferPercent) {
-        return prepListService.prepList(user.id(), date, bufferPercent);
+        return prepListService.prepList(user.id(), date, rule, bufferPercent);
     }
 }

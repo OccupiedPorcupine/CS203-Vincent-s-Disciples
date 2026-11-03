@@ -65,7 +65,7 @@
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "prep-date", "description": "Day to prepare for, from today up to 7 days ahead. Starts on tomorrow." },
-        { "guideId": "prep-buffer", "description": "How many portions to prepare: the top of each dish's likely range (the default), the forecast only, or the forecast plus 10, 20 or 30%." },
+        { "guideId": "prep-buffer", "description": "How many portions to prepare. Best for profit (the default) uses each dish's price and cost: a dish with a wide margin is prepared generously, a thin one more tightly, accepting more sell-outs to waste less. Dishes without a price and cost get the top of their likely range. The other choices are the top of the likely range for every dish (fewer sell-outs), the forecast only, or the forecast plus 10, 20 or 30%." },
         { "guideId": "share-prep", "description": "Shares the prep list as plain text (e.g. to WhatsApp) on a phone, or copies it on a computer." },
         { "guideId": "prep-portions", "description": "Portions to prepare of each dish sold in the last 4 weeks, with its forecast, likely range and how it was worked out." },
         { "guideId": "prep-ingredients", "description": "Total of each ingredient for those portions, from the recipes, and which dishes use it. Dishes without a recipe are named underneath." },
@@ -142,7 +142,7 @@
       "summary": "See how many portions to prepare for tomorrow (or another day) and how much of each ingredient that needs, and share the list.",
       "steps": [
         { "page": "prep", "guideId": "prep-date", "message": "Pick the day you're preparing for. It starts on tomorrow." },
-        { "page": "prep", "guideId": "prep-portions", "message": "These are the portions to prepare of each dish, from its forecast with a safety margin." },
+        { "page": "prep", "guideId": "prep-portions", "message": "These are the portions to prepare of each dish, from its forecast and, if you've set them, its price and cost." },
         { "page": "prep", "guideId": "prep-ingredients", "message": "And this is how much of each ingredient they need, from your recipes." },
         { "page": "prep", "guideId": "share-prep", "message": "Press Share list to send it to WhatsApp or copy it." }
       ]

@@ -171,3 +171,24 @@ What this suggests:
 5. **The app is only slightly ahead of the owners' habit (81.8% vs 80.2%).** The headroom up to 85.6% is what better forecasts (#87) and real sell-out data (#50, #88) have to win.
 
 These numbers measure our assumptions, not real stalls (#6). Use them to compare methods and catch mistakes. For claims about real demand, use pilot data (#88).
+
+## The margin rule in the app (#86)
+
+The prep list now prepares each dish with a price and cost by the margin rule. It measures that rule's percentile on the baseline's errors over the last **56** days (`BaselineForecaster.MARGIN_BACKTEST_DAYS`); the likely range the app shows still uses 12. `AppBaseline` in `backtest.py` does the same.
+
+This is how the rules compared over four simulations (24 stalls each, last 182 days), as a share of the best possible profit:
+
+| Rule | Seed 7 | 11 | 23 | 42 | Mean |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Best possible (reference) | 85.6 | 85.6 | 86.3 | 86.0 | 85.9 |
+| **Margin rule, 56-day errors (now the default)** | **82.1** | **82.1** | **83.0** | **82.5** | **82.4** |
+| Forecast + 20% | 81.8 | 81.9 | 82.7 | 82.3 | 82.2 |
+| Top of the 12-day range (the old default) | 81.6 | 81.7 | 82.9 | 82.1 | 82.1 |
+| Margin rule, 56-day errors, sell-out setting on | 81.4 | 81.4 | 82.2 | 81.8 | 81.7 |
+| Top of a 56-day range | 80.2 | 80.5 | 81.9 | 81.1 | 80.9 |
+| Margin rule, 12-day errors | 75.6 | 76.6 | 77.9 | 79.1 | 77.3 |
+
+- **The new default wins in every run, but only by a few tenths of a point.** What changes most is the mix. In seed 7 it leaves 12.8% of demand over instead of 21.0%, and sells out on 41% of days instead of 26%.
+- **The simulator doesn't count customers who leave annoyed by a sell-out.** So the prep page explains the rule for each dish, and keeps "Top of the likely range (fewer sell-outs)" one tap away.
+- **`app.forecast.count-sold-out-demand` (#50) stays off.** With it on, every rule earns less, the margin rule included.
+

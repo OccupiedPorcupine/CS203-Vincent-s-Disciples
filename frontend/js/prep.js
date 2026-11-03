@@ -92,7 +92,7 @@ function renderPrepList(list) {
     portionList.replaceChildren(...list.dishes.map(dish => listRow(
       dish.dish,
       `${dish.portions} portions`,
-      `Forecast ${dish.expected} (likely ${dish.low}–${dish.high}) · ${dish.basis}`
+      `Forecast ${dish.expected} (likely ${dish.low}–${dish.high}) · ${dish.basis}${dish.reason ? ` · ${dish.reason}` : ""}`
     )), ...skipped);
   }
 
@@ -126,9 +126,12 @@ async function loadPrepList() {
   showStatus("", null, prepStatus);
   portionList.replaceChildren(emptyState("Working out the forecasts…"));
   ingredientList.replaceChildren(emptyState("Loading…"));
-  const buffer = prepBuffer.value === "" ? "" : `&bufferPercent=${prepBuffer.value}`;
+  // "": the margin rule (the server's default); RANGE: the top of the likely range; a number: a buffer.
+  const choice = prepBuffer.value === "" ? ""
+    : prepBuffer.value === "RANGE" ? "&rule=RANGE"
+    : `&bufferPercent=${prepBuffer.value}`;
   try {
-    renderPrepList(await apiRequest(`/api/prep-list?date=${prepDate.value}${buffer}`));
+    renderPrepList(await apiRequest(`/api/prep-list?date=${prepDate.value}${choice}`));
   } catch (error) {
     if (error.status === 401) {
       window.location.href = "index.html";

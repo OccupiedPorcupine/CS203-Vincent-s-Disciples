@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -103,5 +104,50 @@ class BaselineForecasterTest {
         assertFalse(range.rough());
         assertEquals(0, range.low(), 1e-9);
         assertTrue(range.high() >= 3);
+    }
+
+    @Test
+    void theMarginQuantileMeasuresEightWeeksOfErrors() {
+        Random random = new Random(7);
+        List<Observation> history = new ArrayList<>();
+        for (int daysAgo = 100; daysAgo >= 1; daysAgo--) {
+            history.add(new Observation(TARGET.minusDays(daysAgo), 30 + random.nextInt(30)));
+        }
+
+        // The same thing written out directly: re-forecast each of the last 56 days from the days
+        // before it (the mean of up to 4 same weekdays), and take the 70th percentile of the errors.
+        List<Double> errors = new ArrayList<>();
+        for (int index = history.size() - 56; index < history.size(); index++) {
+            List<Double> sameWeekday = new ArrayList<>();
+            for (int earlier = index - 7; earlier >= 0 && sameWeekday.size() < 4; earlier -= 7) {
+                sameWeekday.add(history.get(earlier).quantity());
+            }
+            double estimate = sameWeekday.stream().mapToDouble(Double::doubleValue).average().orElseThrow();
+            errors.add(history.get(index).quantity() - estimate);
+        }
+        errors.sort(null);
+        double position = 0.7 * (errors.size() - 1);
+        int below = (int) Math.floor(position);
+        double expected = 40 + errors.get(below) + (errors.get(below + 1) - errors.get(below)) * (position - below);
+
+        assertEquals(expected, BaselineForecaster.quantile(history, 40, 0.7), 1e-9);
+    }
+
+    @Test
+    void theMarginQuantileFollowsTheRoughRangeWithFewErrorsAndIsNeverNegative() {
+        List<Observation> history = List.of(
+                new Observation(TARGET.minusDays(3), 30),
+                new Observation(TARGET.minusDays(2), 40),
+                new Observation(TARGET.minusDays(1), 50));
+
+        assertEquals(50, BaselineForecaster.quantile(history, 40, 0.9), 1e-9);
+        assertEquals(30, BaselineForecaster.quantile(history, 40, 0.1), 1e-9);
+        assertEquals(40, BaselineForecaster.quantile(history, 40, 0.5), 1e-9);
+
+        List<Observation> falling = new ArrayList<>();
+        for (int daysAgo = 70; daysAgo >= 1; daysAgo--) {
+            falling.add(new Observation(TARGET.minusDays(daysAgo), daysAgo));
+        }
+        assertEquals(0, BaselineForecaster.quantile(falling, 1, 0.1), 1e-9);
     }
 }

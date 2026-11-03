@@ -369,7 +369,7 @@ public class AssistantTools {
     // Only what a spoken answer needs, to keep the model's input short.
     private JsonNode getPrepList(JsonNode arguments, TurnContext context) {
         PrepListResponse prepList = prepListService.prepList(context.ownerId,
-                LocalDate.parse(arguments.path("date").asString()), null);
+                LocalDate.parse(arguments.path("date").asString()), null, null);
         ObjectNode output = jsonMapper.createObjectNode();
         output.put("date", prepList.date().toString());
         if (prepList.closed() != null) {
@@ -380,7 +380,8 @@ public class AssistantTools {
         ArrayNode dishes = output.putArray("dishes");
         List<String> withoutRecipe = new ArrayList<>();
         for (PrepListResponse.Dish dish : prepList.dishes()) {
-            dishes.addObject().put("dish", dish.dish()).put("portions", dish.portions()).put("forecast", dish.expected());
+            dishes.addObject().put("dish", dish.dish()).put("portions", dish.portions()).put("forecast", dish.expected())
+                    .put("rule", dish.rule().name());
             if (!dish.hasRecipe()) withoutRecipe.add(dish.dish());
         }
         ArrayNode ingredients = output.putArray("ingredients");

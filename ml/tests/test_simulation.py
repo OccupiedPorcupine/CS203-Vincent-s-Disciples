@@ -83,18 +83,22 @@ def test_app_baseline_falls_back_to_recent_days_and_a_rough_range():
     assert forecast.quantile(0.1) == pytest.approx(30 * 0.75)
 
 
-def test_app_baseline_range_comes_from_its_last_twelve_errors():
+def test_app_baseline_range_comes_from_its_last_twelve_errors_and_the_margin_rule_from_56():
     rng = np.random.default_rng(1)
-    sold = list(rng.integers(30, 70, 49).astype(float))
+    sold = list(rng.integers(30, 70, 98).astype(float))
     history = history_from(sold)
-    forecast = AppBaseline().forecast(history, target(date(2025, 4, 21)))
+    forecast = AppBaseline().forecast(history, target(date(2025, 6, 9)))
 
-    # BaselineForecaster.range, written out directly.
-    errors = []
-    for index in range(len(sold) - 12, len(sold)):
-        same = [sold[j] for j in range(index) if j % 7 == index % 7][-4:]
-        errors.append(sold[index] - np.mean(same))
-    assert forecast.quantile(0.9) == pytest.approx(forecast.point + np.quantile(sorted(errors), 0.9))
+    # BaselineForecaster.range and .quantile, written out directly.
+    def errors(days):
+        found = []
+        for index in range(len(sold) - days, len(sold)):
+            same = [sold[j] for j in range(index) if j % 7 == index % 7][-4:]
+            found.append(sold[index] - np.mean(same))
+        return sorted(found)
+
+    assert forecast.shown_range(0.9) == pytest.approx(forecast.point + np.quantile(errors(12), 0.9))
+    assert forecast.quantile(0.64) == pytest.approx(forecast.point + np.quantile(errors(56), 0.64))
 
 
 def test_sell_out_times_raise_the_estimate():

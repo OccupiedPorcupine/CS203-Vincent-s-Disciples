@@ -48,6 +48,8 @@ class Forecast:
     # Portions at probability p of the likely demand, e.g. quantile(0.9) is the top of an
     # 80% range.
     quantile: Callable[[float], float]
+    # The range the app shows, when it's measured differently from `quantile` (AppBaseline).
+    shown_range: Callable[[float], float] | None = None
 
 
 class Forecaster(Protocol):
@@ -59,35 +61,41 @@ class Forecaster(Protocol):
 class AppBaseline:
     """backend/src/main/java/app/service/BaselineForecaster.java, line for line: the mean of the
     last 4 same weekdays (or of the last 7 days), with a range from its own errors on the last
-    12 days, or +/- 25% when it has fewer than 5 of them."""
+    12 days, or +/- 25% when it has fewer than 5 of them. The margin rule's quantile comes from
+    the errors on the last MARGIN_BACKTEST_DAYS days instead (#86)."""
 
     name = "App baseline"
     SAME_WEEKDAYS = 4
     RECENT_DAYS = 7
     BACKTEST_DAYS = 12
+    MARGIN_BACKTEST_DAYS = 56
     MIN_BACKTEST_ERRORS = 5
     ROUGH_SPREAD = 0.25
 
     def forecast(self, history: History, target: Target) -> Forecast | None:
-        # The estimate needs at most 4 same weekdays and the range 12 more days: 60 rows covers
-        # both, even across rest days and closures.
-        dates, sold = history.dates[-60:], history.sold[-60:]
+        # The errors re-forecast the last N days, each from up to 4 same weekdays before it: this
+        # many rows covers that, even across rest days and closures (60 for 12 days).
+        window = max(self.BACKTEST_DAYS, self.MARGIN_BACKTEST_DAYS) + 48
+        dates, sold = history.dates[-window:], history.sold[-window:]
         weekdays = _weekdays(dates)
         point = self._estimate(weekdays, sold, len(sold), _weekdays(np.array([target.date]))[0])
         if point is None:
             return None
+        return Forecast(point, self._quantile(weekdays, sold, point, self.MARGIN_BACKTEST_DAYS),
+                        shown_range=self._quantile(weekdays, sold, point, self.BACKTEST_DAYS))
 
+    def _quantile(self, weekdays: np.ndarray, sold: np.ndarray, point: float, days: int) -> Callable[[float], float]:
         errors = []
-        for index in range(max(1, len(sold) - self.BACKTEST_DAYS), len(sold)):
+        for index in range(max(1, len(sold) - days), len(sold)):
             estimate = self._estimate(weekdays, sold, index, weekdays[index])
             if estimate is not None:
                 errors.append(sold[index] - estimate)
 
         if len(errors) < self.MIN_BACKTEST_ERRORS:
             # The app's rough range is forecast * (1 +/- 25%) for its 10%-90% range.
-            return Forecast(point, lambda p: point * (1 + self.ROUGH_SPREAD * (p - 0.5) / 0.4))
+            return lambda p: point * (1 + self.ROUGH_SPREAD * (p - 0.5) / 0.4)
         errors = np.sort(np.array(errors))
-        return Forecast(point, lambda p: point + float(np.quantile(errors, p)))
+        return lambda p: point + float(np.quantile(errors, p))
 
     def _estimate(self, weekdays: np.ndarray, sold: np.ndarray, end: int, weekday: int) -> float | None:
         same = np.flatnonzero(weekdays[:end] == weekday)
@@ -141,7 +149,8 @@ class AppSoldOutBaseline(AppBaseline):
         if recorded is None or demand is None:
             return demand
         shift = demand.point - recorded.point
-        return Forecast(demand.point, lambda p: recorded.quantile(p) + shift)
+        return Forecast(demand.point, lambda p: recorded.quantile(p) + shift,
+                        shown_range=lambda p: recorded.shown_range(p) + shift)
 
 
 def _weekdays(dates: np.ndarray) -> np.ndarray:
@@ -181,7 +190,7 @@ POLICIES: dict[str, Policy] = {
     "Forecast only": lambda f, price, cost: _round_up(f.point - 0.5),
     "Forecast + 20%": lambda f, price, cost: _round_up(f.point * 1.2),
     # PrepListService without a buffer: the top of the forecast's likely range.
-    "Top of likely range (app default)": lambda f, price, cost: _round_up(max(f.quantile(0.9), f.point)),
+    "Top of likely range (app default)": lambda f, price, cost: _round_up(max((f.shown_range or f.quantile)(0.9), f.point)),
     "Margin rule": lambda f, price, cost: _round_up(f.quantile(critical_ratio(price, cost))),
 }
 

@@ -54,6 +54,7 @@ class PrepListApiTest {
         jdbc.update("DELETE FROM ingredients WHERE owner_id IN (" + owners + ")");
         jdbc.update("DELETE FROM daily_sales WHERE dish_id IN (SELECT id FROM dishes WHERE owner_id IN (" + owners + "))");
         jdbc.update("DELETE FROM closed_dates WHERE owner_id IN (" + owners + ")");
+        jdbc.update("DELETE FROM dish_prices WHERE owner_id IN (" + owners + ")");
         jdbc.update("DELETE FROM dishes WHERE owner_id IN (" + owners + ")");
     }
 
@@ -81,6 +82,28 @@ class PrepListApiTest {
     }
 
     @Test
+    void dishesWithAPriceAndCostArePreparedToTheirMarginByDefault() throws Exception {
+        Session session = signUp("margin@prep.test");
+        long chickenRice = dishSelling(session, "Chicken rice", 40);
+        dishSelling(session, "Laksa", 20);
+        HttpResponse<String> price = session.send("PUT", "/api/dishes/" + chickenRice + "/price", "{\"price\":4.50,\"unitCost\":1.60}");
+        assertEquals(200, price.statusCode(), price.body());
+
+        JsonNode prep = json.readTree(session.get("/api/prep-list?date=" + tomorrow).body());
+
+        assertEquals("MARGIN", prep.path("rule").asString());
+        assertEquals(List.of("Chicken rice 40 MARGIN", "Laksa 20 RANGE"), rows(prep.path("dishes"), "dish", "portions", "rule"));
+        assertEquals("Enough for about 64% of days: running out loses $2.90 profit a plate, a leftover wastes $1.60.",
+                prep.path("dishes").get(0).path("reason").asString());
+        assertTrue(prep.path("dishes").get(1).path("reason").asString().contains("Add a price and cost"));
+
+        JsonNode range = json.readTree(session.get("/api/prep-list?date=" + tomorrow + "&rule=RANGE").body());
+        assertEquals(List.of("Chicken rice RANGE", "Laksa RANGE"), rows(range.path("dishes"), "dish", "rule"));
+        assertTrue(range.path("dishes").get(0).path("reason").isNull());
+        assertEquals(400, session.get("/api/prep-list?date=" + tomorrow + "&rule=LUCKY").statusCode());
+    }
+
+    @Test
     void aBufferAddsPercentToTheForecast() throws Exception {
         Session session = signUp("buffer@prep.test");
         long chickenRice = dishSelling(session, "Chicken rice", 40);
@@ -89,6 +112,7 @@ class PrepListApiTest {
         JsonNode prep = json.readTree(session.get("/api/prep-list?date=" + tomorrow + "&bufferPercent=15").body());
 
         assertEquals(46, prep.path("dishes").get(0).path("portions").asInt());
+        assertEquals("BUFFER", prep.path("rule").asString());
         assertEquals("6900", prep.path("ingredients").get(0).path("quantity").asString());
         assertEquals(400, session.get("/api/prep-list?date=" + tomorrow + "&bufferPercent=101").statusCode());
     }
