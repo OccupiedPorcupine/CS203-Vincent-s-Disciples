@@ -13,6 +13,8 @@ import app.dto.AssistantMessageResponse;
 import app.dto.ConfirmProposalRequest;
 import app.dto.ProposalEntryInput;
 import app.dto.SetDishPriceRequest;
+import app.holiday.PublicHoliday;
+import app.holiday.PublicHolidayRepository;
 import app.price.DishPriceRepository;
 import app.price.DishPriceService;
 import app.price.PriceBook;
@@ -96,6 +98,7 @@ class AssistantServiceTest {
     @Autowired ClosedDateRepository closedDateRepository;
     @Autowired RestDayRepository restDayRepository;
     @Autowired TradingHoursRepository tradingHoursRepository;
+    @Autowired PublicHolidayRepository holidayRepository;
 
     static final LocalDate TODAY = LocalDate.of(2026, 10, 29);
     Long owner;
@@ -186,7 +189,7 @@ class AssistantServiceTest {
     }
 
     private AssistantMessageResponse say(Long user, String text) {
-        return assistant.handleMessage(user, new AssistantMessageRequest(null, text, "dashboard", "text", null));
+        return assistant.handleMessage(user, new AssistantMessageRequest(null, text, "dashboard", "text", null, null));
     }
 
     @Test
@@ -474,6 +477,64 @@ class AssistantServiceTest {
         assertNull(response.proposal());
         assertNull(response.guide());
         assertEquals("Prepare Chicken rice 40. Add recipes on the Prep list page to see the ingredients.", response.reply());
+    }
+
+    @Test
+    void askingWhyExplainsTheForecastOnScreenFromItsInputs() {
+        // The last 4 Fridays, oldest first. Too little history for the model, so it is their average.
+        LocalDate friday = TODAY.plusDays(1);
+        int[] sold = {52, 48, 44, 40};
+        for (int week = 0; week < sold.length; week++) {
+            dailySaleService.setSale(chickenRice.getId(), owner, friday.minusWeeks(sold.length - week), sold[week]);
+        }
+
+        var response = assistant.handleMessage(owner, new AssistantMessageRequest(null, "why so high?", "forecast", "text", null,
+                new AssistantMessageRequest.ShownForecast(chickenRice.getId(), friday)));
+
+        assertNull(response.proposal());
+        assertNull(response.guide());
+        assertTrue(response.reply().startsWith("Average of your last 4 Fridays: 52, 48, 44 and 40. It expects about 46, usually "),
+                response.reply());
+    }
+
+    @Test
+    void explainForecastGivesOnlyTheInputsTheForecastUsed() {
+        LocalDate friday = TODAY.plusDays(1);
+        for (int week = 1; week <= 4; week++) {
+            dailySaleService.setSale(chickenRice.getId(), owner, friday.minusWeeks(week), 40);
+        }
+        dailySaleService.setSale(chickenRice.getId(), owner, TODAY, 30);
+        PublicHoliday holiday = holidayRepository.findByDate(friday).isPresent() ? null
+                : holidayRepository.save(new PublicHoliday(friday, "Test Day"));
+        var context = new AssistantTools.TurnContext(owner, TODAY, "forecast", java.util.Set.of());
+        var jsonMapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        java.util.function.BiFunction<Long, LocalDate, tools.jackson.databind.JsonNode> explain = (dishId, date) ->
+                jsonMapper.readTree(assistantTools.execute(new AssistantModelClient.ToolCall("c1", AssistantTools.EXPLAIN_FORECAST,
+                        jsonMapper.readTree("{\"dish_id\": " + dishId + ", \"date\": \"" + date + "\"}")), context));
+
+        try {
+            var explanation = explain.apply(chickenRice.getId(), friday);
+            assertEquals(40, explanation.path("forecast").asInt());
+            assertEquals("Average of your last 4 Fridays", explanation.path("basis").asString());
+            assertEquals(4, explanation.path("same_weekday_sales").size());
+            assertEquals(List.of(friday.minusWeeks(1).toString(), TODAY.toString()),
+                    explanation.path("last_7_days_sales").valueStream().map(sale -> sale.path("date").asString()).toList());
+            // The baseline uses sales only: the holiday is named but not used, and there's no weather.
+            assertFalse(explanation.path("public_holiday").isNull());
+            assertFalse(explanation.path("public_holiday_used").asBoolean());
+            assertFalse(explanation.path("weather_used").asBoolean());
+            assertTrue(explanation.path("weather_forecast").isNull());
+        } finally {
+            if (holiday != null) holidayRepository.delete(holiday);
+        }
+
+        Long otherOwner = newUser();
+        Dish otherDish = dishService.createDish("Laksa", otherOwner);
+        assertTrue(explain.apply(otherDish.getId(), friday).path("error").asString().contains("not found"));
+
+        closureService.closeDate(owner, friday, "Holiday");
+        assertTrue(explain.apply(chickenRice.getId(), friday).has("closed"));
+        assertTrue(explain.apply(chickenRice.getId(), TODAY.plusDays(8)).path("error").asString().startsWith("Invalid arguments"));
     }
 
     @Test

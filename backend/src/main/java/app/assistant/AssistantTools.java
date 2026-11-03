@@ -9,15 +9,24 @@ import app.dish.Dish;
 import app.dish.DishAlias;
 import app.dish.DishAliasRepository;
 import app.dish.DishRepository;
+import app.dto.ForecastResponse;
 import app.dto.PrepListResponse;
 import app.dto.ProposalEntryInput;
 import app.exception.InvalidForecastDateException;
+import app.exception.StallClosedException;
+import app.holiday.PublicHoliday;
+import app.holiday.PublicHolidayRepository;
 import app.price.DishPriceService;
 import app.price.PriceBook;
+import app.sale.DailySale;
 import app.sale.DailySaleRepository;
+import app.service.ForecastService;
+import app.service.NeaWeatherForecastService;
 import app.service.PrepListService;
 import app.service.StallClosureService;
 import app.service.StallClosureService.StallClosures;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -36,12 +45,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Predicate;
 
 // The functions the language model may call. None of them write to the database: the most the
 // model can do is propose sales and closed days, which the user then confirms. The user's ID comes from the
 // session (TurnContext), never from the model.
 @Component
 public class AssistantTools {
+
+    private static final Logger log = LoggerFactory.getLogger(AssistantTools.class);
 
     static final String LIST_DISHES = "list_dishes";
     static final String GET_SALES = "get_sales";
@@ -56,6 +68,10 @@ public class AssistantTools {
     static final int MAX_CLOSURE_DAYS_AHEAD = 365;
     private static final int MAX_CLOSURES = 31;
     static final String GET_PREP_LIST = "get_prep_list";
+    static final String EXPLAIN_FORECAST = "explain_forecast";
+    // explain_forecast lists the dish's sales on this many earlier same weekdays, and on the days just before.
+    private static final int EXPLAIN_SAME_WEEKDAYS = 4;
+    private static final int EXPLAIN_RECENT_DAYS = 7;
     private static final int MAX_SALES_DAYS = 120;
     private static final int MAX_GUIDE_STEPS = 8;
     private static final int MAX_STEP_MESSAGE = 240;
@@ -67,6 +83,9 @@ public class AssistantTools {
     private final DishPriceService priceService;
     private final StallClosureService stallClosureService;
     private final PrepListService prepListService;
+    private final ForecastService forecastService;
+    private final NeaWeatherForecastService weatherService;
+    private final PublicHolidayRepository holidayRepository;
     private final AppGuide appGuide;
     private final JsonMapper jsonMapper;
     private final List<ToolSpec> specs;
@@ -111,7 +130,9 @@ public class AssistantTools {
     public AssistantTools(DishRepository dishRepository, DishAliasRepository dishAliasRepository,
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
                           DishPriceService priceService, StallClosureService stallClosureService,
-                          PrepListService prepListService, AppGuide appGuide, JsonMapper jsonMapper) {
+                          PrepListService prepListService, ForecastService forecastService,
+                          NeaWeatherForecastService weatherService, PublicHolidayRepository holidayRepository,
+                          AppGuide appGuide, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
@@ -119,6 +140,9 @@ public class AssistantTools {
         this.priceService = priceService;
         this.stallClosureService = stallClosureService;
         this.prepListService = prepListService;
+        this.forecastService = forecastService;
+        this.weatherService = weatherService;
+        this.holidayRepository = holidayRepository;
         this.appGuide = appGuide;
         this.jsonMapper = jsonMapper;
         this.specs = List.of(
@@ -235,6 +259,18 @@ public class AssistantTools {
                                  "properties": {"date": {"type": "string", "description": "YYYY-MM-DD"}},
                                  "required": ["date"],
                                  "additionalProperties": false}
+                                """)),
+                new ToolSpec(EXPLAIN_FORECAST,
+                        "Get one dish's forecast for a day (today up to 7 days ahead) with everything that went into it: "
+                                + "how it was worked out, the past sales it used, and whether the weather forecast and a "
+                                + "public holiday were used. Use it to answer why a forecast is what it is.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {
+                                   "dish_id": {"type": "integer"},
+                                   "date": {"type": "string", "description": "YYYY-MM-DD"}},
+                                 "required": ["dish_id", "date"],
+                                 "additionalProperties": false}
                                 """)));
     }
 
@@ -257,6 +293,7 @@ public class AssistantTools {
                         .orElseGet(() -> error("No guide section " + call.arguments().path("id").asString()));
                 case GUIDE_USER -> guideUser(call.arguments(), context);
                 case GET_PREP_LIST -> getPrepList(call.arguments(), context);
+                case EXPLAIN_FORECAST -> explainForecast(call.arguments(), context);
                 default -> error("Unknown tool " + call.name());
             };
             return jsonMapper.writeValueAsString(result);
@@ -391,6 +428,83 @@ public class AssistantTools {
         output.set("dishes_without_recipe", jsonMapper.valueToTree(withoutRecipe));
         output.set("not_forecast", jsonMapper.valueToTree(prepList.skipped()));
         return output;
+    }
+
+    // The forecast the user sees, and only the facts it was made from, so the model has nothing to
+    // explain it with but the real inputs. The model can't attribute its number to each input, so for
+    // a MODEL forecast the output lists what was used, not how much each one counted.
+    private JsonNode explainForecast(JsonNode arguments, TurnContext context) {
+        long dishId = arguments.path("dish_id").asLong();
+        LocalDate date = LocalDate.parse(arguments.path("date").asString());
+        if (dishRepository.findByIdAndOwnerId(dishId, context.ownerId).isEmpty()) {
+            return error("Dish " + dishId + " not found");
+        }
+
+        ForecastResponse forecast;
+        try {
+            forecast = forecastService.forecast(dishId, date, context.ownerId);
+        } catch (StallClosedException exception) {
+            return jsonMapper.createObjectNode().put("closed", exception.getMessage());
+        } catch (IllegalArgumentException exception) {
+            return error(exception.getMessage());
+        }
+        boolean usedModel = forecast.method() == ForecastResponse.Method.MODEL;
+
+        ObjectNode output = jsonMapper.createObjectNode();
+        output.put("dish", forecast.dish());
+        output.put("date", date.toString());
+        output.put("weekday", date.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH));
+        output.put("forecast", Math.round(forecast.predictedDemand()));
+        output.put("likely_low", forecast.low());
+        output.put("likely_high", forecast.high());
+        // How BaselineForecaster.range works, in words.
+        output.put("range_basis", forecast.roughRange()
+                ? "Too few past days to measure how far forecasts are usually off, so the range is a rough 25% either "
+                        + "side. It narrows as more sales are recorded."
+                : "How far an average of past sales was off on recent days (the middle 80% of those misses), "
+                        + "applied to this forecast. A dish whose sales swing more has a wider range.");
+        output.put("method", usedModel ? "the forecast model" : "an average of the dish's own past sales");
+        output.put("basis", forecast.basis());
+        output.put("why_not_model", forecast.note());
+
+        List<DailySale> before = dailySaleRepository.findByDishIdOrderBySaleDateAsc(dishId).stream()
+                .filter(sale -> sale.getSaleDate().isBefore(date))
+                .toList();
+        output.set("same_weekday_sales", sales(before, sale -> sale.getSaleDate().getDayOfWeek() == date.getDayOfWeek(),
+                EXPLAIN_SAME_WEEKDAYS));
+        output.set("last_7_days_sales", sales(before, sale -> !sale.getSaleDate().isBefore(date.minusDays(EXPLAIN_RECENT_DAYS)),
+                EXPLAIN_RECENT_DAYS));
+
+        // Only the model takes the weather and holidays into account; the baseline is sales only.
+        String holiday = holidayRepository.findByDate(date).map(PublicHoliday::getName).orElse(null);
+        output.put("public_holiday", holiday);
+        output.put("public_holiday_used", usedModel && holiday != null);
+        output.put("weather_used", usedModel);
+        String weather = null;
+        if (usedModel) {
+            try {
+                weather = weatherService.describe(date);
+            } catch (RuntimeException exception) {
+                log.warn("Couldn't describe NEA's forecast for {}: {}", date, exception.toString());
+            }
+        }
+        output.put("weather_forecast", weather);
+        output.put("note", "These are the only inputs. Explain the forecast from them alone, and say any other "
+                + "reason the user suggests isn't taken into account.");
+        return output;
+    }
+
+    // The latest few of the sales that match, oldest first.
+    private ArrayNode sales(List<DailySale> sales, Predicate<DailySale> filter, int limit) {
+        List<DailySale> matching = sales.stream().filter(filter).toList();
+        ArrayNode list = jsonMapper.createArrayNode();
+        matching.subList(Math.max(0, matching.size() - limit), matching.size()).forEach(sale -> list.addObject()
+                .put("date", sale.getSaleDate().toString())
+                .put("weekday", sale.getSaleDate().getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH))
+                .put("quantity", sale.getQuantitySold())
+                .put("sold_out_at", sale.getSoldOutAt() == null ? null : sale.getSoldOutAt().toString())
+                .put("leftover", sale.getLeftoverQuantity()));
+        return list;
     }
 
     private JsonNode proposePriceChange(JsonNode arguments, TurnContext context) {

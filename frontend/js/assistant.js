@@ -29,6 +29,8 @@
   // Today's assistant use and allowance (issue #65), from the status and each reply.
   let usage = null;
   let speechLimitShown = false;
+  // The forecast on screen ({ dishId, date }), set by js/forecast.js, so "why so high?" refers to it.
+  let shownForecast = null;
 
   const bubble = element("button", "assistant-bubble", {
     type: "button",
@@ -81,8 +83,12 @@
       return false;
     });
 
-  // Used by js/guide.js to read tour steps aloud.
-  window.chickyAssistant = { speak, stopSpeaking };
+  // Used by js/guide.js to read tour steps aloud, and by js/forecast.js to say which forecast is on screen.
+  window.chickyAssistant = {
+    speak,
+    stopSpeaking,
+    setForecast: forecast => { shownForecast = forecast; }
+  };
 
   init();
 
@@ -117,6 +123,7 @@
     setMuted(muted);
 
     connectDashboardChatBox();
+    connectAskCards();
   }
 
   // The dashboard's chat box is the large version of this widget: it sends through the same
@@ -150,6 +157,31 @@
     chatMic.addEventListener("click", () => {
       setOpen(true);
       toggleRecording();
+    });
+  }
+
+  // Cards marked data-assistant-ask (the forecast page's "Ask about this forecast") send a typed
+  // question, or a suggestion button's data-question, through this conversation and open the panel.
+  function connectAskCards() {
+    document.querySelectorAll("[data-assistant-ask]").forEach(card => {
+      const askForm = card.querySelector("form");
+      const askInput = askForm.querySelector("input, textarea");
+      card.querySelectorAll("input, button").forEach(control => {
+        control.disabled = !status.available;
+      });
+
+      askForm.addEventListener("submit", event => {
+        event.preventDefault();
+        setOpen(true);
+        sendFromInput(askInput);
+      });
+      card.querySelectorAll("[data-question]").forEach(button => {
+        button.addEventListener("click", () => {
+          if (busy || !status.available) return;
+          setOpen(true);
+          send(button.dataset.question);
+        });
+      });
     });
   }
 
@@ -214,7 +246,7 @@
     try {
       const response = await apiRequest("/api/assistant/messages", {
         method: "POST",
-        body: JSON.stringify({ conversationId, text, page: PAGE, inputMode, pageContext: describePage() })
+        body: JSON.stringify({ conversationId, text, page: PAGE, inputMode, pageContext: describePage(), forecast: shownForecast })
       });
       conversationId = response.conversationId;
       writeStored(CONVERSATION_KEY, conversationId);

@@ -12,8 +12,8 @@ final class AssistantPrompt {
     private static final String TEMPLATE = """
             You are Chicky's assistant. Chicky helps hawker stall owners in Singapore record daily sales \
             and forecast demand. You help the user record how many portions of each dish they sold and which \
-            days the stall is closed, change their dish prices, tell them what to prepare for a day, and answer \
-            questions about their sales and about using Chicky.
+            days the stall is closed, change their dish prices, tell them what to prepare for a day, explain their \
+            forecasts, and answer questions about their sales and about using Chicky.
 
             Today is %1$s (%2$s) in Singapore. Yesterday was %3$s. Tomorrow is %8$s. The user is on the "%4$s" page.
 
@@ -78,6 +78,21 @@ final class AssistantPrompt {
             has the full list. If the stall is closed that day, just say so.
             - If they want to see it, call guide_user with task_id plan-prep.
 
+            Explaining forecasts
+            The forecast on the user's screen (JSON, null if none): %10$s
+            - When the user asks why a forecast is what it is ("why so high?", "why only 30?", 为什么这么多) or what \
+            it is based on, call explain_forecast. "This forecast" means the one on the screen; if there is none and \
+            the dish or day is unclear, ask which.
+            - Explain only from explain_forecast's output: how it was worked out (basis), the past sales it lists, \
+            how the likely range was worked out (range_basis), and whether the weather forecast and a public holiday \
+            were used. Quote its numbers; don't work out new ones.
+            - Never give a reason that isn't in the output (events, school holidays, promotions, paydays, the \
+            economy), and never say weather or a holiday made a difference when the output says it wasn't used. If the \
+            user suggests a reason Chicky doesn't use, say the forecast doesn't take it into account.
+            - When the model was used, it can't say how much each input moved the number: say what it used, not \
+            how much each one mattered.
+            - Two or three short sentences, e.g. "Your last 4 Saturdays were 52, 48, 55 and 50, so it expects about 51."
+
             Guiding the user
             App guide index, with the current page in full under current_page (JSON):
             %6$s
@@ -100,9 +115,9 @@ final class AssistantPrompt {
     }
 
     static String build(LocalDate today, String page, String dishesJson, String guideJson, String pageElementsJson,
-                        String closuresJson) {
+                        String closuresJson, String shownForecastJson) {
         String weekday = today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
         return TEMPLATE.formatted(today, weekday, today.minusDays(1), page == null ? "unknown" : page, dishesJson,
-                guideJson, pageElementsJson, today.plusDays(1), closuresJson);
+                guideJson, pageElementsJson, today.plusDays(1), closuresJson, shownForecastJson);
     }
 }

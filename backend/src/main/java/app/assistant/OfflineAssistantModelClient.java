@@ -19,10 +19,10 @@ import java.util.regex.Pattern;
 // A rule-based stand-in for the language model (ASSISTANT_PROVIDER=offline), for demos,
 // development and tests without an OpenAI key. It is not AI: it only understands typed sales
 // like "yesterday chicken rice 42, char siew 30" (with "sold out at 12:40" or "3 left over"), closures like "closed tomorrow" (today,
-// tomorrow or yesterday only), "what do I prep for tomorrow?", and "how do I ..." questions that
-// share words with a task in the app guide. It drives the same tools a real model would (list_dishes
-// then propose_sales_entry and/or propose_closure, get_prep_list, or guide_user), so the rest of the
-// pipeline is real.
+// tomorrow or yesterday only), "what do I prep for tomorrow?", "why ...?" about the forecast on screen,
+// and "how do I ..." questions that share words with a task in the app guide. It drives the same tools
+// a real model would (list_dishes then propose_sales_entry and/or propose_closure, get_prep_list,
+// explain_forecast, or guide_user), so the rest of the pipeline is real.
 public class OfflineAssistantModelClient implements AssistantModelClient {
 
     private static final Pattern TODAY = Pattern.compile("Today is (\\d{4}-\\d{2}-\\d{2})");
@@ -50,6 +50,9 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             "(\\d+)\\s*(?:left ?over|left)\\b|\\bleft ?overs?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern PREP = Pattern.compile("\\b(prep|prepare)\\b|准备|备料", Pattern.CASE_INSENSITIVE);
+    private static final Pattern WHY = Pattern.compile("\\bwhy\\b|为什么|为何", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SHOWN_FORECAST = Pattern.compile(
+            "The forecast on the user's screen \\(JSON, null if none\\): \\{\"dish_id\":(\\d+),\"date\":\"([\\d-]+)\"}");
     private static final Pattern TODAY_WORD = Pattern.compile("\\btoday\\b|今天|今日", Pattern.CASE_INSENSITIVE);
     private static final Pattern QUESTION = Pattern.compile(
             "\\b(how|where|show me|help|guide)\\b|\\?|怎么|哪里|如何", Pattern.CASE_INSENSITIVE);
@@ -63,7 +66,8 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     private static final String GUIDE_MARKER = "App guide index, with the current page in full under current_page (JSON):";
 
     private static final String HELP = "Offline demo mode: I only understand typed sales such as \"chicken rice 42, char siew rice 30\", "
-            + "closures such as \"closed tomorrow\", \"what do I prep for tomorrow?\", or questions like \"how do I upload data?\".";
+            + "closures such as \"closed tomorrow\", \"what do I prep for tomorrow?\", \"why?\" about a forecast on screen, "
+            + "or questions like \"how do I upload data?\".";
 
     private final JsonMapper jsonMapper;
     private final AtomicLong callIds = new AtomicLong();
@@ -109,6 +113,13 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
                 ObjectNode arguments = jsonMapper.createObjectNode();
                 arguments.put("date", find(TODAY_WORD.matcher(text).find() ? TODAY : TOMORROW, instructions));
                 return call(AssistantTools.GET_PREP_LIST, arguments);
+            }
+            Matcher shown = SHOWN_FORECAST.matcher(instructions);
+            if (WHY.matcher(text).find() && shown.find()) {
+                ObjectNode arguments = jsonMapper.createObjectNode();
+                arguments.put("dish_id", Long.parseLong(shown.group(1)));
+                arguments.put("date", shown.group(2));
+                return call(AssistantTools.EXPLAIN_FORECAST, arguments);
             }
             String taskId = EVERY_WEEKDAY.matcher(text).find() && CLOSED.matcher(text).find() ? "set-opening-days"
                     : QUESTION.matcher(text).find() ? matchTask(text, instructions) : null;
@@ -159,6 +170,9 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         if (AssistantTools.GET_PREP_LIST.equals(toolName)) {
             return message(prepListReply(output));
         }
+        if (AssistantTools.EXPLAIN_FORECAST.equals(toolName)) {
+            return message(explanationReply(output));
+        }
 
         if (output.path("ok").asBoolean()) {
             return message(AssistantTools.GUIDE_USER.equals(toolName) ? "Let me show you."
@@ -183,6 +197,22 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
                 + ingredient.path("quantity").asString() + " " + ingredient.path("unit").asString()));
         return "Prepare " + String.join(", ", dishes) + "."
                 + (ingredients.isEmpty() ? " Add recipes on the Prep list page to see the ingredients." : " You need " + String.join(", ", ingredients) + ".");
+    }
+
+    // "Average of your last 4 Saturdays: 40, 44, 48 and 52. It expects about 46, usually 41 to 51."
+    private static String explanationReply(JsonNode explanation) {
+        if (explanation.has("error")) return explanation.path("error").asString();
+        if (explanation.has("closed")) return explanation.path("closed").asString();
+
+        JsonNode sameWeekday = explanation.path("same_weekday_sales");
+        List<String> quantities = new ArrayList<>();
+        (sameWeekday.isEmpty() ? explanation.path("last_7_days_sales") : sameWeekday)
+                .forEach(sale -> quantities.add(sale.path("quantity").asString()));
+        String sold = quantities.size() < 2 ? String.join("", quantities)
+                : String.join(", ", quantities.subList(0, quantities.size() - 1)) + " and " + quantities.getLast();
+        return explanation.path("basis").asString() + (sold.isEmpty() ? "" : ": " + sold) + ". It expects about "
+                + explanation.path("forecast").asString() + ", usually " + explanation.path("likely_low").asString()
+                + " to " + explanation.path("likely_high").asString() + ".";
     }
 
     private ArrayNode parseSales(String text, JsonNode dishes, String instructions) {

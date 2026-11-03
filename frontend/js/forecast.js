@@ -201,6 +201,7 @@ forecastForm.addEventListener("submit", async (event) => {
     forecastButton.textContent = "Generating…";
     showStatus("Working out expected demand…");
     showForecastDetails(null);
+    window.chickyAssistant?.setForecast(null);
 
     try {
         const result = await requestForecast(dishId, forecastDate);
@@ -208,6 +209,8 @@ forecastForm.addEventListener("submit", async (event) => {
         predictedDemand.textContent =
             Math.round(result.predictedDemand);
         showForecastDetails(result);
+        // So "why so high?" in the assistant refers to this forecast.
+        window.chickyAssistant?.setForecast({ dishId, date: forecastDate });
 
         const formattedDate = new Date(
             `${forecastDate}T00:00:00`
