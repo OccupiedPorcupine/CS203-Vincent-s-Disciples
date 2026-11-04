@@ -262,7 +262,8 @@ function showForecastDetails(result) {
     const factorText = !result
         ? "Included in forecast model"
         : usedModel ? "Included in this forecast" : "Not used in this forecast";
-    weatherContext.textContent = factorText;
+    // Which NEA forecast the model used, e.g. "NEA's 4-day outlook: Thundery Showers, 24 to 33°C".
+    weatherContext.textContent = result?.weather ?? factorText;
     holidayContext.textContent = factorText;
 }
 

@@ -21,12 +21,9 @@ import app.price.PriceBook;
 import app.sale.DailySale;
 import app.sale.DailySaleRepository;
 import app.service.ForecastService;
-import app.service.NeaWeatherForecastService;
 import app.service.PrepListService;
 import app.service.StallClosureService;
 import app.service.StallClosureService.StallClosures;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -52,8 +49,6 @@ import java.util.function.Predicate;
 // session (TurnContext), never from the model.
 @Component
 public class AssistantTools {
-
-    private static final Logger log = LoggerFactory.getLogger(AssistantTools.class);
 
     static final String LIST_DISHES = "list_dishes";
     static final String GET_SALES = "get_sales";
@@ -84,7 +79,6 @@ public class AssistantTools {
     private final StallClosureService stallClosureService;
     private final PrepListService prepListService;
     private final ForecastService forecastService;
-    private final NeaWeatherForecastService weatherService;
     private final PublicHolidayRepository holidayRepository;
     private final AppGuide appGuide;
     private final JsonMapper jsonMapper;
@@ -131,8 +125,7 @@ public class AssistantTools {
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
                           DishPriceService priceService, StallClosureService stallClosureService,
                           PrepListService prepListService, ForecastService forecastService,
-                          NeaWeatherForecastService weatherService, PublicHolidayRepository holidayRepository,
-                          AppGuide appGuide, JsonMapper jsonMapper) {
+                          PublicHolidayRepository holidayRepository, AppGuide appGuide, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
@@ -141,7 +134,6 @@ public class AssistantTools {
         this.stallClosureService = stallClosureService;
         this.prepListService = prepListService;
         this.forecastService = forecastService;
-        this.weatherService = weatherService;
         this.holidayRepository = holidayRepository;
         this.appGuide = appGuide;
         this.jsonMapper = jsonMapper;
@@ -465,7 +457,8 @@ public class AssistantTools {
                 ? "Too few past days to measure how far forecasts are usually off, so the range is a rough 25% either "
                         + "side. It narrows as more sales are recorded."
                 : "How far an average of past sales was off on recent days (the middle 80% of those misses), "
-                        + "applied to this forecast. A dish whose sales swing more has a wider range.");
+                        + "when worked out as many days ahead as this one, applied to this forecast. A dish whose sales "
+                        + "swing more, or a date further from the last recorded sales, has a wider range.");
         output.put("method", usedModel ? "the forecast model" : "an average of the dish's own past sales");
         output.put("basis", forecast.basis());
         output.put("why_not_model", forecast.note());
@@ -482,16 +475,8 @@ public class AssistantTools {
         String holiday = holidayRepository.findByDate(date).map(PublicHoliday::getName).orElse(null);
         output.put("public_holiday", holiday);
         output.put("public_holiday_used", usedModel && holiday != null);
-        output.put("weather_used", usedModel);
-        String weather = null;
-        if (usedModel) {
-            try {
-                weather = weatherService.describe(date);
-            } catch (RuntimeException exception) {
-                log.warn("Couldn't describe NEA's forecast for {}: {}", date, exception.toString());
-            }
-        }
-        output.put("weather_forecast", weather);
+        output.put("weather_used", forecast.weatherSource() != null);
+        output.put("weather_forecast", forecast.weather());
         output.put("note", "These are the only inputs. Explain the forecast from them alone, and say any other "
                 + "reason the user suggests isn't taken into account.");
         return output;
