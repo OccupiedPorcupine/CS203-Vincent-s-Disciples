@@ -68,7 +68,9 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `GET /api/closures/hawker-centres`, `PUT /api/closures/hawker-centre` — NEA's hawker centres, and `{hawkerCentreId}` (null to unlink) to pick the stall's
 - `PUT /api/closures/nea-days` — `{from, to, open}` marks NEA's closed days in a range as open anyway, or closed again
 - `GET /api/chat-links` — chat apps set up on this server, each with the account's linked chat; `POST /api/chat-links/{channel}` → `{code, link, expiresAt}`, a one-time code (10 minutes) that links the chat it is sent from; `DELETE /api/chat-links/{id}` unlinks
+- `PUT /api/chat-links/{id}/reminders` with `{salesReminderAt, prepListAt}` (`"21:00"` or `null` for off) — the linked chat's evening messages
 - `POST /api/channels/telegram/webhook` — Telegram's updates for the bot; only with the `X-Telegram-Bot-Api-Secret-Token` header (see "Telegram bot")
+- `POST /api/channels/jobs/run` — sends the chat reminders that are due; only with `Authorization: Bearer <CRON_SECRET>`, for the hourly GitHub Action
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)
@@ -107,7 +109,7 @@ to quote only those and to say that any other reason the user suggests isn't tak
 
 ### Telegram bot
 
-Owners can record sales from Telegram (issues #99 and #100): they link the chat on the **Account** page, then send sales as a message or a voice note and tap **Confirm** in the chat. `/today`, `/prep` and `/forecast` answer from the account's data without the language model. The bot is off unless `TELEGRAM_BOT_TOKEN` is set.
+Owners can record sales from Telegram (issues #99 and #100): they link the chat on the **Account** page, then send sales as a message or a voice note and tap **Confirm** in the chat. `/today`, `/prep`, `/forecast` and `/remind` answer from the account's data without the language model. The bot is off unless `TELEGRAM_BOT_TOKEN` is set.
 
 To turn it on:
 
@@ -116,6 +118,8 @@ To turn it on:
 3. Telegram must be able to reach the backend over HTTPS at `APP_BASE_URL`. Register the webhook once per environment by calling `POST /api/admin/telegram/webhook` as an admin. It also sets the bot's command menu.
 
 Telegram calls `POST /api/channels/telegram/webhook` with each update, and the backend refuses any call without the secret. A bot has one webhook, so each environment needs its own bot. Only private chats are handled; group chats are ignored. Replies are plain text, and a voice note gets a spoken reply too, which counts against the daily spoken replies.
+
+**Evening messages (#101).** A linked chat can get a reminder to send the day's sales and tomorrow's prep list, each at an hour from 12 pm to 11 pm Singapore time. Both start off; the owner turns them on under **Chat apps** on the Account page, or with `/remind sales 9pm` and `/remind prep 8pm` in the chat. The reminder is skipped once that day's sales are in or when the stall is closed, and the prep list on a weekly rest day; a one-off closure (a closed date, NEA cleaning) is sent as a short note instead. The texts come from the database, not the language model. The backend can scale to zero, so it doesn't run them on a timer: `.github/workflows/chat-reminders.yml` calls `POST /api/channels/jobs/run` at five past each of those hours with `Authorization: Bearer <CRON_SECRET>`, and each run sends what has come due today and not gone out yet. Set the same random `CRON_SECRET` on the backend and as a repository secret; without it the job refuses every call and nothing is sent.
 
 ### Demo data
 

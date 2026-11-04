@@ -12,9 +12,11 @@ import org.springframework.stereotype.Component;
 public class TelegramConnector implements ChatConnector {
 
     private final TelegramSettings settings;
+    private final TelegramBotClient bot;
 
-    public TelegramConnector(TelegramSettings settings) {
+    public TelegramConnector(TelegramSettings settings, TelegramBotClient bot) {
         this.settings = settings;
+        this.bot = bot;
     }
 
     @Override
@@ -25,5 +27,10 @@ public class TelegramConnector implements ChatConnector {
     @Override
     public String linkFor(String code) {
         return "https://t.me/" + settings.username() + "?start=" + code;
+    }
+
+    @Override
+    public void send(String externalId, String text) {
+        bot.sendMessage(externalId, text, null);
     }
 }

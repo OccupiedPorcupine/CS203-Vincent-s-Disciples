@@ -247,6 +247,10 @@ public class StallClosureService {
         return getClosures(ownerId);
     }
 
+    public boolean isRestDay(Long ownerId, LocalDate date) {
+        return restDays(ownerId).contains(date.getDayOfWeek());
+    }
+
     // Why the stall is closed on this date, in words for the user; empty when it is open.
     public Optional<String> closureMessage(Long ownerId, LocalDate date) {
         Optional<ClosedDate> closedDate = closedDateRepository.findByOwnerIdAndClosedDate(ownerId, date);

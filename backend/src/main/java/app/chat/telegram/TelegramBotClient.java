@@ -2,6 +2,7 @@ package app.chat.telegram;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -39,6 +40,9 @@ public class TelegramBotClient {
     private final String token;
     private final JsonMapper jsonMapper;
 
+    // Marked for Spring, which can't choose between two constructors and would otherwise look for
+    // a no-argument one: with TELEGRAM_BOT_TOKEN set, the backend failed to start.
+    @Autowired
     public TelegramBotClient(TelegramSettings settings, JsonMapper jsonMapper) {
         this(RestClient.builder().requestFactory(requestFactory()), settings.apiBaseUrl(), settings.token(), jsonMapper);
     }

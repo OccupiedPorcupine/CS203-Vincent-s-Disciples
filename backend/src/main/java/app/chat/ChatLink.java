@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.UUID;
 
 // A chat in a chat app, linked to the account whose sales it records. See V29__chat_links.sql.
@@ -37,6 +39,16 @@ public class ChatLink {
     private String conversationId;
 
     private Instant lastMessageAt;
+
+    // When to send the sales reminder and tomorrow's prep list (#101); null while off. See V34.
+    private LocalTime salesReminderAt;
+
+    private LocalTime prepListAt;
+
+    // Set only through ChatLinkRepository's claims, so two runs of the job can't both send.
+    private LocalDate salesReminderSentOn;
+
+    private LocalDate prepListSentOn;
 
     protected ChatLink() {
     }
@@ -71,6 +83,19 @@ public class ChatLink {
 
     public Instant getLinkedAt() {
         return linkedAt;
+    }
+
+    public LocalTime getSalesReminderAt() {
+        return salesReminderAt;
+    }
+
+    public LocalTime getPrepListAt() {
+        return prepListAt;
+    }
+
+    public void setReminders(LocalTime salesReminderAt, LocalTime prepListAt) {
+        this.salesReminderAt = salesReminderAt;
+        this.prepListAt = prepListAt;
     }
 
     // The conversation a new message continues: the same one until the chat has been quiet for

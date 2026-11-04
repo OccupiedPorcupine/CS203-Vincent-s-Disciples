@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +32,13 @@ public class ChatLinkService {
     private static final Logger log = LoggerFactory.getLogger(ChatLinkService.class);
 
     static final Duration CODE_LIFETIME = Duration.ofMinutes(10);
+
+    // Reminder and prep list times (#101) are Singapore time, on the hour, from noon to 11 pm:
+    // the job that sends them runs hourly at five past (.github/workflows/chat-reminders.yml).
+    static final LocalTime EARLIEST_REMINDER = LocalTime.NOON;
+    static final LocalTime LATEST_REMINDER = LocalTime.of(23, 0);
+    static final LocalTime DEFAULT_REMINDER = LocalTime.of(21, 0);
+    static final String REMINDER_TIMES = "Reminders can be sent on the hour, from 12 pm to 11 pm.";
 
     private final ChatLinkRepository links;
     private final AppUserRepository users;
@@ -53,7 +61,8 @@ public class ChatLinkService {
         return new ChatLinksResponse(connectors.keySet().stream()
                 .map(channel -> new ChatLinksResponse.Channel(channel, channel.label(),
                         links.findByOwner_IdAndChannel(ownerId, channel)
-                                .map(link -> new ChatLinksResponse.LinkedChat(link.getId(), link.getDisplayName(), link.getLinkedAt()))
+                                .map(link -> new ChatLinksResponse.LinkedChat(link.getId(), link.getDisplayName(), link.getLinkedAt(),
+                                        link.getSalesReminderAt(), link.getPrepListAt()))
                                 .orElse(null)))
                 .toList());
     }
@@ -87,10 +96,27 @@ public class ChatLinkService {
 
     @Transactional
     public void unlink(Long ownerId, Long linkId) {
-        ChatLink link = links.findByIdAndOwner_Id(linkId, ownerId).orElseThrow(() ->
-                new AssistantException(HttpStatus.NOT_FOUND, "CHAT_LINK_NOT_FOUND", "That chat isn't linked to your account."));
+        ChatLink link = links.findByIdAndOwner_Id(linkId, ownerId).orElseThrow(ChatLinkService::notLinked);
         links.delete(link);
         log.info("User {} unlinked their {} chat", ownerId, link.getChannel());
+    }
+
+    // Turns the sales reminder and the evening prep list on (at a time) or off (null) for a linked chat.
+    @Transactional
+    public ChatLinksResponse setReminders(Long ownerId, Long linkId, LocalTime salesReminderAt, LocalTime prepListAt) {
+        ChatLink link = links.findByIdAndOwner_Id(linkId, ownerId).orElseThrow(ChatLinkService::notLinked);
+        if (!isReminderTime(salesReminderAt) || !isReminderTime(prepListAt)) {
+            throw new AssistantException(HttpStatus.BAD_REQUEST, "INVALID_REMINDER_TIME", REMINDER_TIMES);
+        }
+        link.setReminders(salesReminderAt, prepListAt);
+        log.info("User {} set their {} reminders: sales {}, prep list {}", ownerId, link.getChannel(), salesReminderAt, prepListAt);
+        return list(ownerId);
+    }
+
+    // Null is off, which is always allowed.
+    static boolean isReminderTime(LocalTime time) {
+        return time == null || (time.getMinute() == 0 && time.getSecond() == 0 && time.getNano() == 0
+                && !time.isBefore(EARLIEST_REMINDER) && !time.isAfter(LATEST_REMINDER));
     }
 
     // From the chat itself, e.g. Telegram's /unlink. False if the chat wasn't linked.
@@ -115,6 +141,10 @@ public class ChatLinkService {
                     channel.label() + " isn't set up on this server.");
         }
         return connector;
+    }
+
+    private static AssistantException notLinked() {
+        return new AssistantException(HttpStatus.NOT_FOUND, "CHAT_LINK_NOT_FOUND", "That chat isn't linked to your account.");
     }
 
     private static String truncate(String name) {

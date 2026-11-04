@@ -17,9 +17,17 @@
 .chat-app-name { font-weight: 500; }
 .chat-connect { display: grid; grid-column: 1 / -1; gap: 12px; justify-items: start; }
 .chat-qr { width: 180px; }
+
+/* A linked chat's evening messages (#101): a switch and an hour for each. */
+.chat-reminders { display: grid; grid-column: 1 / -1; gap: 8px; padding: 12px 16px; border-radius: var(--radius-md); background: var(--neutral-soft); }
+.chat-reminders-title { font-size: var(--text-sm); font-weight: 500; }
+.chat-reminder { display: grid; grid-template-columns: 1fr 112px; gap: 12px; align-items: center; }
+.chat-reminder-toggle { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: var(--text-sm); cursor: pointer; }
+.chat-reminder-toggle input { width: 18px; height: 18px; accent-color: var(--teal-strong); }
 .chat-qr svg { display: block; width: 100%; height: auto; }
 
 /* On a phone the link opens the app directly; the QR code is for scanning from a computer. */
 @media (max-width: 760px) {
   .chat-qr { display: none; }
+  .chat-reminder { grid-template-columns: 1fr 96px; }
 }

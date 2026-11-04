@@ -44,6 +44,7 @@ Set these in the Vercel project under **Settings → Environment Variables**, or
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | An SMTP account (see below); the password as a sensitive variable | The same |
 | `SWAGGER_ENABLED` | Optional: `true` to serve the API docs at `/swagger-ui.html` | Unset (the docs stay private) |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` | Unset: previews sit behind Vercel's login, so Telegram can't reach them | The bot's settings (see below); the token and secret as sensitive variables |
+| `CRON_SECRET` | Unset | A long random string, as a sensitive variable; the same value as the repository secret `CRON_SECRET`, for the evening chat reminders (see below) |
 | `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project (Seoul, `ap-northeast-2`) | The **Production** Supabase project (Singapore, `ap-southeast-1`) |
 
 Use each project's **Session pooler** address from Supabase's **Connect** panel, as `jdbc:postgresql://<host>:5432/postgres?sslmode=require`. The direct address is IPv6-only, and Vercel can't reach it. Put any new Supabase project in an Asian region, because of the startup limit above.
@@ -55,6 +56,8 @@ Only the live site uses the Production project. Don't point a local `backend/.en
 **Email.** Password reset and email verification links are sent over SMTP. Without a domain of your own, Brevo's free plan (300 emails a day) sends from a single verified address; Resend needs a verified domain to send to anyone but you. Locally, without `MAIL_HOST`, the emails are written to the backend log instead.
 
 **Telegram.** The bot (see `backend/README.md`, "Telegram bot") runs on Production only. Previews need Vercel's login, which Telegram can't get past, and a bot has a single webhook, so a preview would take the bot away from the live site. After setting the three variables and redeploying, sign in as an admin and call `POST /api/admin/telegram/webhook` once. Telegram resends an update when the reply is slow, as it can be on a cold start; the backend handles each update once.
+
+The evening sales reminders and prep lists (#101) are sent by `.github/workflows/chat-reminders.yml`, which calls the backend hourly from 12:05 to 23:05 Singapore time. Make a random value (`openssl rand -hex 32`), set it as `CRON_SECRET` on Vercel Production and redeploy, then add it as a repository secret of the same name (GitHub → Settings → Secrets and variables → Actions). Run the workflow once by hand to check it: it should print `200`.
 
 **Previews share Staging, so migrations can reach it out of order.** Each branch's preview applies its own migrations: one PR's V25 can land before another PR's V23. So Preview, and only Preview, also sets:
 - `SPRING_FLYWAY_OUTOFORDER=true`, which applies a lower-numbered migration that arrives later;

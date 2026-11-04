@@ -39,6 +39,7 @@ public class TelegramUpdateHandler {
             new TelegramBotClient.Command("today", "Sales recorded today"),
             new TelegramBotClient.Command("prep", "What to prepare tomorrow"),
             new TelegramBotClient.Command("forecast", "Tomorrow's forecast"),
+            new TelegramBotClient.Command("remind", "Evening sales reminder and prep list"),
             new TelegramBotClient.Command("help", "What I can do"),
             new TelegramBotClient.Command("unlink", "Disconnect this chat from Chicky"));
 
@@ -49,6 +50,7 @@ public class TelegramUpdateHandler {
             /today – sales recorded today
             /prep – what to prepare tomorrow
             /forecast – tomorrow's forecast
+            /remind – a reminder to send the day's sales, and tomorrow's prep list, each evening
             /unlink – disconnect this chat from Chicky""";
 
     static final String LINKED = "Linked to your Chicky account. Send me your sales any time, like \"chicken rice 42, char siew 30\".";
@@ -114,6 +116,7 @@ public class TelegramUpdateHandler {
             case "today" -> commands.today(CHANNEL, chatId);
             case "prep" -> commands.prep(CHANNEL, chatId);
             case "forecast" -> commands.forecast(CHANNEL, chatId);
+            case "remind" -> commands.remind(CHANNEL, chatId, argument);
             default -> HELP;
         };
         bot.sendMessage(chatId, answer, null);

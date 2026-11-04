@@ -5,6 +5,9 @@ const chatList = document.getElementById("chat-list");
 const chatStatus = document.getElementById("chat-status");
 const time = new Intl.DateTimeFormat("en-SG", { hour: "numeric", minute: "2-digit" });
 const day = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" });
+// Reminder times the backend accepts: on the hour from 12 pm to 11 pm, when its hourly job runs (#101).
+const REMINDER_HOURS = Array.from({ length: 12 }, (_, index) => index + 12);
+const DEFAULT_REMINDER = "21:00";
 // While a code is showing, check every few seconds whether the phone has used it.
 const POLL_MS = 3000;
 let polling = null;
@@ -65,7 +68,67 @@ function chatRow(channel) {
   button.addEventListener("click", () => linked ? disconnect(channel, button) : startLink(channel, button, connect));
 
   row.append(text, button, connect);
+  if (linked) row.append(reminderControls(linked));
   return row;
+}
+
+// The evening messages a linked chat can get (#101): each on or off, at an hour.
+function reminderControls(linked) {
+  const box = element("div", "chat-reminders");
+  box.append(element("p", "chat-reminders-title", "Evening messages"));
+  const sales = reminderRow("Remind me to send the day’s sales", "sales reminder", linked.salesReminderAt);
+  const prep = reminderRow("Send tomorrow’s prep list", "prep list", linked.prepListAt);
+  box.append(sales.row, prep.row,
+    element("p", "muted-text", "The reminder isn’t sent once your sales are in, or when the stall is closed."));
+
+  const save = async () => {
+    showStatus("");
+    try {
+      await apiRequest(`/api/chat-links/${linked.id}/reminders`, {
+        method: "PUT",
+        body: JSON.stringify({ salesReminderAt: sales.value(), prepListAt: prep.value() })
+      });
+      showStatus("Saved.", "success");
+    } catch (error) {
+      showStatus(error.message || "Couldn’t save. Try again.", "error");
+      loadChats();
+    }
+  };
+  sales.onChange(save);
+  prep.onChange(save);
+  return box;
+}
+
+function reminderRow(label, name, at) {
+  const row = element("div", "chat-reminder");
+  const toggle = element("label", "chat-reminder-toggle");
+  const checkbox = element("input");
+  checkbox.type = "checkbox";
+  checkbox.checked = Boolean(at);
+  toggle.append(checkbox, ` ${label}`);
+
+  const wrap = element("div", "select-wrap");
+  const select = element("select", "input");
+  select.setAttribute("aria-label", `Time for the ${name}`);
+  REMINDER_HOURS.forEach(hour => {
+    const option = element("option", null, `${hour % 12 || 12} pm`);
+    option.value = `${hour}:00`;
+    select.append(option);
+  });
+  select.value = at || DEFAULT_REMINDER;
+  select.disabled = !at;
+  wrap.append(select);
+  checkbox.addEventListener("change", () => { select.disabled = !checkbox.checked; });
+  row.append(toggle, wrap);
+
+  return {
+    row,
+    value: () => (checkbox.checked ? select.value : null),
+    onChange: handler => {
+      checkbox.addEventListener("change", handler);
+      select.addEventListener("change", handler);
+    }
+  };
 }
 
 async function startLink(channel, button, connect) {
