@@ -17,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Chat apps", description = "Link a Telegram or WhatsApp chat to the account, to record sales from the chat app.")
+@Tag(name = "Chat apps", description = "Link a Telegram chat to the account, to record sales from the chat app.")
 @RestController
 @RequestMapping("/api/chat-links")
 public class ChatLinkController {

@@ -183,10 +183,8 @@ class ChatLinkApiTest {
         Session owner = signUp("channels@chat.test");
 
         String listed = owner.get("/api/chat-links").body();
-        assertTrue(listed.contains("TELEGRAM") && !listed.contains("WHATSAPP"), listed);
-        HttpResponse<String> whatsapp = owner.send("POST", "/api/chat-links/whatsapp", null);
-        assertEquals(404, whatsapp.statusCode());
-        assertTrue(whatsapp.body().contains("CHANNEL_NOT_CONFIGURED"), whatsapp.body());
+        assertTrue(listed.contains("TELEGRAM"), listed);
+        assertEquals(404, owner.send("POST", "/api/chat-links/whatsapp", null).statusCode());
         assertEquals(404, owner.send("POST", "/api/chat-links/carrier-pigeon", null).statusCode());
         assertEquals(401, new Session().get("/api/chat-links").statusCode());
     }
@@ -204,7 +202,6 @@ class ChatLinkApiTest {
     void aResentMessageIsHandledOnce() {
         assertTrue(chatMessages.firstDelivery(CHANNEL, "update-1"));
         assertFalse(chatMessages.firstDelivery(CHANNEL, "update-1"));
-        assertTrue(chatMessages.firstDelivery(ChatChannel.WHATSAPP, "update-1"), "IDs are per channel");
     }
 
     @Test
