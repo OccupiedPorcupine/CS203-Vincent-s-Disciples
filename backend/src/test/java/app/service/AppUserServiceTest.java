@@ -10,9 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.time.Instant;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 // Runs against the real JPA stack: each repository call gets its own persistence context,
 // which is what exposed returning Google users being mistaken for someone else.
@@ -47,11 +51,27 @@ class AppUserServiceTest {
     }
 
     @Test
-    void differentGoogleAccountWithExistingEmailStillNeedsLinking() {
-        appUserRepository.save(AppUser.localUser("person@example.com", "{pbkdf2}hash", "Person"));
+    void differentGoogleAccountWithAConfirmedEmailStillNeedsLinking() {
+        AppUser local = AppUser.localUser("person@example.com", "{pbkdf2}hash", "Person");
+        local.markEmailVerified(Instant.now());
+        appUserRepository.save(local);
 
         assertThrows(AccountLinkingRequiredException.class, () ->
                 appUserService.findOrCreateUser(googlePayload("google-sub-2", "person@example.com", "Person")));
+    }
+
+    @Test
+    void googleUserTakesOverAnAccountThatNeverConfirmedTheirEmail() {
+        AppUser local = appUserRepository.save(AppUser.localUser("person@example.com", "{pbkdf2}hash", "Someone else"));
+
+        AppUser claimed = appUserService.findOrCreateUser(googlePayload("google-sub-4", "person@example.com", "Person"));
+
+        assertEquals(local.getId(), claimed.getId());
+        assertEquals("google-sub-4", claimed.getGoogleId());
+        assertFalse(claimed.hasPassword());
+        assertTrue(claimed.isEmailVerified());
+        assertEquals("Person", claimed.getName());
+        assertEquals(1, appUserRepository.count());
     }
 
     @Test

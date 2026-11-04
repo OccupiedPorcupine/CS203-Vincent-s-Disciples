@@ -3,6 +3,7 @@ package app.service;
 import app.user.*;
 import app.exception.AccountLinkingRequiredException;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,9 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AppUserService {
 
     private final AppUserRepository appUserRepository;
+    private final FindByIndexNameSessionRepository<?> sessions;
 
-    public AppUserService(AppUserRepository appUserRepository) {
+    public AppUserService(AppUserRepository appUserRepository, FindByIndexNameSessionRepository<?> sessions) {
         this.appUserRepository = appUserRepository;
+        this.sessions = sessions;
     }
 
     // One transaction for the lookups and the save, so they see a consistent view of the user.
@@ -52,11 +55,20 @@ public class AppUserService {
             String name,
             String pictureUrl
     ) {
-        // Matching email alone is not sufficient proof to link two login methods.
-        if (appUserRepository.findByEmailIgnoreCase(email).isPresent()) {
+        AppUser emailOwner = appUserRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (emailOwner == null) {
+            return appUserRepository.save(new AppUser(googleId, email, name, pictureUrl));
+        }
+        // Anyone can sign up with an address they don't own (#117). Google has verified that
+        // this person owns it, so an account that never confirmed the address is theirs: its
+        // password goes and whoever made it is signed out. A confirmed account still needs
+        // linking, since matching email alone is not sufficient proof to link two login methods.
+        if (emailOwner.isEmailVerified() || emailOwner.getGoogleId() != null) {
             throw new AccountLinkingRequiredException();
         }
-        return appUserRepository.save(new AppUser(googleId, email, name, pictureUrl));
+        emailOwner.claimWithGoogle(googleId, email, name, pictureUrl);
+        sessions.findByPrincipalName(String.valueOf(emailOwner.getId())).keySet().forEach(sessions::deleteById);
+        return appUserRepository.save(emailOwner);
     }
 
     private String normalizeEmail(String email) {
