@@ -9,15 +9,8 @@ import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Locale;
 
 // Password reset and email verification by emailed link (issue #49). A link carries a random
@@ -31,15 +24,14 @@ public class AccountService {
     private static final String EXPIRED = "This link has expired or has already been used. Ask for a new one.";
 
     private final AppUserRepository appUserRepository;
-    private final AccountTokenRepository tokens;
+    private final AccountTokens tokens;
     private final PasswordEncoder passwordEncoder;
     private final EmailSender emailSender;
     private final FindByIndexNameSessionRepository<?> sessions;
     private final Clock clock;
     private final String baseUrl;
-    private final SecureRandom random = new SecureRandom();
 
-    public AccountService(AppUserRepository appUserRepository, AccountTokenRepository tokens, PasswordEncoder passwordEncoder,
+    public AccountService(AppUserRepository appUserRepository, AccountTokens tokens, PasswordEncoder passwordEncoder,
                           EmailSender emailSender, FindByIndexNameSessionRepository<?> sessions, Clock clock,
                           @Value("${app.base-url}") String baseUrl) {
         this.appUserRepository = appUserRepository;
@@ -56,7 +48,7 @@ public class AccountService {
     @Transactional
     public void requestPasswordReset(String email) {
         appUserRepository.findByEmailIgnoreCase(email.strip().toLowerCase(Locale.ROOT)).ifPresent(user -> {
-            String token = issue(user, Purpose.PASSWORD_RESET, RESET_LINK_LIFETIME);
+            String token = tokens.issue(user, Purpose.PASSWORD_RESET, RESET_LINK_LIFETIME);
             emailSender.send(user.getEmail(), "Reset your Chicky password", """
                     Hi %s,
 
@@ -84,7 +76,7 @@ public class AccountService {
         if (user.isEmailVerified()) {
             return;
         }
-        String token = issue(user, Purpose.EMAIL_VERIFICATION, VERIFICATION_LINK_LIFETIME);
+        String token = tokens.issue(user, Purpose.EMAIL_VERIFICATION, VERIFICATION_LINK_LIFETIME);
         emailSender.send(user.getEmail(), "Confirm your email for Chicky", """
                 Hi %s,
 
@@ -106,32 +98,8 @@ public class AccountService {
         consume(token, Purpose.EMAIL_VERIFICATION).markEmailVerified(clock.instant());
     }
 
-    // A new link replaces any earlier unused one, so only the latest email works.
-    private String issue(AppUser user, Purpose purpose, Duration lifetime) {
-        Instant now = clock.instant();
-        tokens.findByUserIdAndPurposeAndUsedAtIsNull(user.getId(), purpose).forEach(old -> old.use(now));
-        byte[] bytes = new byte[32];
-        random.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        tokens.save(new AccountToken(user, purpose, hash(token), now, now.plus(lifetime)));
-        return token;
-    }
-
     private AppUser consume(String token, Purpose purpose) {
-        Instant now = clock.instant();
-        AccountToken found = tokens.findByTokenHash(hash(token))
-                .filter(candidate -> candidate.getPurpose() == purpose && candidate.isUsable(now))
-                .orElseThrow(() -> new InvalidAccountTokenException(EXPIRED));
-        found.use(now);
-        return found.getUser();
-    }
-
-    static String hash(String token) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException(exception);
-        }
+        return tokens.consume(token, purpose).orElseThrow(() -> new InvalidAccountTokenException(EXPIRED));
     }
 
     private static String greeting(AppUser user) {

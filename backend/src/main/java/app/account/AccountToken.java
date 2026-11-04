@@ -5,13 +5,13 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
-// A single-use link sent by email: a password reset or an email verification. Only the token's
-// SHA-256 hash is stored. See V19__account_tokens.sql.
+// A single-use token: a password reset or email verification link, or a code that links a chat
+// app (ChatLinkService). Only the token's SHA-256 hash is stored. See V19__account_tokens.sql.
 @Entity
 @Table(name = "account_tokens")
 public class AccountToken {
 
-    public enum Purpose { PASSWORD_RESET, EMAIL_VERIFICATION }
+    public enum Purpose { PASSWORD_RESET, EMAIL_VERIFICATION, CHAT_LINK }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
