@@ -83,9 +83,13 @@
       return false;
     });
 
-  // Used by js/guide.js to read tour steps aloud, and by js/forecast.js to say which forecast is on screen.
+  // Used by js/guide.js to read tour steps aloud, by js/forecast.js to say which forecast is on screen,
+  // and by js/dashboard.js to play the weekly summary.
   window.chickyAssistant = {
     speak,
+    // A Play button the user pressed, so it plays even when spoken replies are muted.
+    play: text => speak(text, { evenIfMuted: true }),
+    voiceAvailable: async () => await statusLoaded && Boolean(status.voice),
     stopSpeaking,
     setForecast: forecast => { shownForecast = forecast; }
   };
@@ -288,14 +292,15 @@
     if (muted) stopSpeaking();
   }
 
-  // Reads text aloud. Optional: the text is always shown, so failures (no audio support,
-  // autoplay blocked after moving page) are ignored.
-  async function speak(text) {
+  // Reads text aloud, resolving to whether it played. Optional: the text is always shown, so failures
+  // (no audio support, autoplay blocked after moving page) are ignored.
+  async function speak(text, { evenIfMuted = false } = {}) {
     stopSpeaking();
     const request = speechRequest;
-    if (!await statusLoaded || muted || !status.voice || !text) {
-      debug("not speaking:", muted ? "muted" : !status.voice ? "voice unavailable" : "nothing to say");
-      return;
+    const silenced = () => muted && !evenIfMuted;
+    if (!await statusLoaded || silenced() || !status.voice || !text) {
+      debug("not speaking:", silenced() ? "muted" : !status?.voice ? "voice unavailable" : "nothing to say");
+      return false;
     }
 
     try {
@@ -304,9 +309,9 @@
         body: JSON.stringify({ text: text.slice(0, 500) }),
         responseType: "blob"
       });
-      if (request !== speechRequest || muted) {
+      if (request !== speechRequest || silenced()) {
         debug("speech arrived after it was stopped; not playing");
-        return;
+        return false;
       }
 
       const url = URL.createObjectURL(audio);
@@ -314,6 +319,7 @@
       currentAudio.addEventListener("ended", () => URL.revokeObjectURL(url));
       await currentAudio.play();
       debug("playing speech", { bytes: audio.size, type: audio.type });
+      return true;
     } catch (error) {
       // Text only. NotAllowedError means the browser blocked playback without a recent tap.
       warn("speech failed:", error.name, error.status ?? "", error.code ?? "", error.message);
@@ -323,6 +329,7 @@
         speechLimitShown = true;
         addMessage("assistant", error.message);
       }
+      return false;
     }
   }
 

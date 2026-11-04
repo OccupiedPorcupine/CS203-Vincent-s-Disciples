@@ -18,6 +18,7 @@ import app.holiday.PublicHoliday;
 import app.holiday.PublicHolidayRepository;
 import app.price.DishPriceService;
 import app.price.PriceBook;
+import app.price.WeeklySummaryService;
 import app.sale.DailySale;
 import app.sale.DailySaleRepository;
 import app.service.ForecastService;
@@ -67,6 +68,7 @@ public class AssistantTools {
     // explain_forecast lists the dish's sales on this many earlier same weekdays, and on the days just before.
     private static final int EXPLAIN_SAME_WEEKDAYS = 4;
     private static final int EXPLAIN_RECENT_DAYS = 7;
+    static final String GET_WEEKLY_SUMMARY = "get_weekly_summary";
     private static final int MAX_SALES_DAYS = 120;
     private static final int MAX_GUIDE_STEPS = 8;
     private static final int MAX_STEP_MESSAGE = 240;
@@ -79,6 +81,7 @@ public class AssistantTools {
     private final StallClosureService stallClosureService;
     private final PrepListService prepListService;
     private final ForecastService forecastService;
+    private final WeeklySummaryService weeklySummaryService;
     private final PublicHolidayRepository holidayRepository;
     private final AppGuide appGuide;
     private final JsonMapper jsonMapper;
@@ -125,7 +128,7 @@ public class AssistantTools {
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
                           DishPriceService priceService, StallClosureService stallClosureService,
                           PrepListService prepListService, ForecastService forecastService,
-                          PublicHolidayRepository holidayRepository, AppGuide appGuide, JsonMapper jsonMapper) {
+                          WeeklySummaryService weeklySummaryService, PublicHolidayRepository holidayRepository, AppGuide appGuide, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
@@ -134,6 +137,7 @@ public class AssistantTools {
         this.stallClosureService = stallClosureService;
         this.prepListService = prepListService;
         this.forecastService = forecastService;
+        this.weeklySummaryService = weeklySummaryService;
         this.holidayRepository = holidayRepository;
         this.appGuide = appGuide;
         this.jsonMapper = jsonMapper;
@@ -263,6 +267,13 @@ public class AssistantTools {
                                    "date": {"type": "string", "description": "YYYY-MM-DD"}},
                                  "required": ["dish_id", "date"],
                                  "additionalProperties": false}
+                                """)),
+                new ToolSpec(GET_WEEKLY_SUMMARY,
+                        "Get the summary of the user's latest 7 days of sales, as on the dashboard: portions against the "
+                                + "week before, revenue, the best-selling dish, leftovers and sell-outs, with the summary "
+                                + "already written in English (text.en) and Chinese (text.zh).",
+                        schema("""
+                                {"type": "object", "properties": {}, "required": [], "additionalProperties": false}
                                 """)));
     }
 
@@ -289,6 +300,7 @@ public class AssistantTools {
                 case GUIDE_USER -> guideUser(call.arguments(), context);
                 case GET_PREP_LIST -> getPrepList(call.arguments(), context);
                 case EXPLAIN_FORECAST -> explainForecast(call.arguments(), context);
+                case GET_WEEKLY_SUMMARY -> jsonMapper.valueToTree(weeklySummaryService.weekly(context.ownerId));
                 default -> error("Unknown tool " + call.name());
             };
             return jsonMapper.writeValueAsString(result);

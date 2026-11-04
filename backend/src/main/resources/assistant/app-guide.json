@@ -12,7 +12,7 @@
       "id": "dashboard",
       "title": "Dashboard",
       "url": "dashboard.html",
-      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, revenue and gross profit for those days, the dishes that earn the most, leftovers and sell-outs, and a box to talk to the assistant.",
+      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, a weekly summary to read or play aloud, revenue and gross profit for those days, the dishes that earn the most, leftovers and sell-outs, and a box to talk to the assistant.",
       "elements": [
         { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Prep list, Data ingestion and Dishes pages." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
@@ -22,6 +22,7 @@
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "demand-chart", "description": "Line chart and total of portions sold per day, all dishes combined, for the 7 days ending on the latest recorded sale." },
         { "guideId": "dish-chart", "description": "Bar chart of portions sold per dish over the same 7 days." },
+        { "guideId": "week-summary", "description": "Your week: the same 7 days in a few sentences (portions against the week before, revenue, the best seller, leftovers and sell-outs). Play reads it aloud in English, 播放中文 in Mandarin. Asking the assistant \"how was my week?\" gives the same summary." },
         { "guideId": "revenue-card", "description": "Revenue for the same 7 days as the charts, with gross profit and margin. Dishes without a price are named here and not counted as $0; the Set prices link goes to the Dishes page." },
         { "guideId": "top-dishes", "description": "The dishes that made the most gross profit in those 7 days, with the margin per plate." },
         { "guideId": "waste-card", "description": "Leftover portions for the same 7 days, and what that food cost at each dish's unit cost (dishes without a cost are left out)." },

@@ -20,6 +20,8 @@ public interface DailySaleRepository extends JpaRepository<DailySale, Long> {
 
     Optional<DailySale> findFirstByDishOwnerIdOrderBySaleDateAsc(Long ownerId);
 
+    Optional<DailySale> findFirstByDishOwnerIdOrderBySaleDateDesc(Long ownerId);
+
     boolean existsByDishIdAndSaleDate(Long dishId, LocalDate saleDate);
 
     Optional<DailySale> findByDishIdAndSaleDate(Long dishId, LocalDate saleDate);

@@ -390,6 +390,39 @@ heatmap.addEventListener("pointerover", event => {
 });
 heatmap.addEventListener("pointerleave", () => { heatmapTooltip.hidden = true; });
 
+// ---- The week in a few sentences, played aloud (issue #56) ----
+
+const weekText = document.getElementById("week-summary-text");
+const weekButtons = document.getElementById("week-summary-buttons");
+const weekStatus = document.getElementById("week-summary-status");
+let weekSummary = null;
+
+async function loadWeekSummary() {
+  try {
+    weekSummary = await apiRequest("/api/summary/weekly");
+    showWeekSummary("en");
+    // Play needs the server's voice (an OpenAI key); without it the summary is still there to read.
+    weekButtons.hidden = !weekSummary.from || !await window.chickyAssistant?.voiceAvailable();
+  } catch (error) {
+    if (error.status !== 401) weekText.textContent = "The summary could not be loaded.";
+  }
+}
+
+function showWeekSummary(language) {
+  weekText.textContent = weekSummary.text[language];
+  weekText.lang = language;
+}
+
+weekButtons.addEventListener("click", async event => {
+  const button = event.target.closest("button[data-language]");
+  if (!button || !weekSummary) return;
+  const language = button.dataset.language;
+  showWeekSummary(language);
+  weekStatus.textContent = language === "zh" ? "正在准备语音…" : "Getting the audio…";
+  const played = await window.chickyAssistant?.play(weekSummary.text[language]);
+  weekStatus.textContent = played ? "" : "It couldn’t be played just now, but the summary is above.";
+});
+
 // ---- Actions needed (issue #53) ----
 
 const actionList = document.getElementById("action-list");
@@ -584,6 +617,7 @@ function refreshDashboard() {
     showEmpty("Could not load sales. Is the backend running?");
   });
   loadActions();
+  loadWeekSummary();
   loadHeatmap().catch(error => {
     console.error(error);
     document.getElementById("heatmap-note").textContent = "Revenue by day could not be loaded.";
