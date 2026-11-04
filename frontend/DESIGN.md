@@ -1,8 +1,5 @@
 # Chicky design language
 
-The Account page's Sign-in duration card uses shared fields and form actions. Users can save
-idle and absolute session limits or restore the defaults; changes apply on their next sign-in.
-
 How Chicky looks and why, so new screens match the existing ones. If you are adding UI, read
 [the checklist](#checklist-for-new-ui) at the end first.
 

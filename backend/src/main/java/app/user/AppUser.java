@@ -38,20 +38,6 @@ public class AppUser {
     @Column(nullable = false, length = 20)
     private String plan = "FREE";
 
-    @Column(nullable = false)
-    private int sessionIdleMinutes = 60;
-
-    @Column(nullable = false)
-    private int sessionAbsoluteMinutes = 480;
-
-    public int getSessionIdleMinutes() { return sessionIdleMinutes; }
-    public int getSessionAbsoluteMinutes() { return sessionAbsoluteMinutes; }
-
-    public void changeSessionTimeouts(int idleMinutes, int absoluteMinutes) {
-        this.sessionIdleMinutes = idleMinutes;
-        this.sessionAbsoluteMinutes = absoluteMinutes;
-    }
-
     // When the user proved they own the email address; null until then. See V19__account_tokens.sql.
     private Instant emailVerifiedAt;
 

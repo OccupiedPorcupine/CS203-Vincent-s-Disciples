@@ -64,27 +64,6 @@
       <p id="details-email" class="muted-text"></p>
     </section>
 
-    <section class="card session-settings" aria-labelledby="session-heading" data-guide-id="session-settings">
-      <div class="headline"><h2 id="session-heading" class="card-title">Sign-in duration</h2></div>
-      <p class="muted-text" id="session-help">Choose when to sign out automatically. Changes apply the next time you sign in, on any device. Longer durations leave your account accessible for longer on a shared device.</p>
-      <form id="session-settings-form" aria-describedby="session-help">
-        <div class="session-fields">
-          <label for="session-idle">Sign out after inactivity (minutes)
-            <input class="input" id="session-idle" type="number" min="5" max="1440" step="1" required disabled>
-          </label>
-          <label for="session-absolute">Maximum time signed in (hours)
-            <input class="input" id="session-absolute" type="number" min="1" max="168" step="1" required disabled>
-          </label>
-        </div>
-        <p class="muted-text">Defaults: 60 minutes inactive, or 8 hours from sign-in. Inactivity means no requests to Chicky; background requests also count. Choose 5–1,440 minutes and 1–168 hours. Inactivity cannot exceed the maximum duration.</p>
-        <div class="form-actions">
-          <p id="session-status" class="status-text" role="status" aria-live="polite">Loading settings…</p>
-          <button class="secondary-button" id="session-defaults" type="button" disabled>Use defaults</button>
-          <button class="primary-button" id="session-save" type="submit" disabled>Save settings</button>
-        </div>
-      </form>
-    </section>
-
     <section class="card chat-apps" aria-labelledby="chat-heading" data-guide-id="chat-apps">
       <h2 id="chat-heading" class="card-title">Chat apps</h2>
       <p class="muted-text">Send your sales to Chicky from a chat app, by text or voice note, and confirm them there. Nothing is saved until you tap Confirm.</p>
