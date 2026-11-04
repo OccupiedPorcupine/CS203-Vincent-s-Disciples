@@ -12,23 +12,26 @@ newest images in each repository and deletes the rest, except images a deploymen
 An image's tag is the first 12 characters of the Git commit it was built from, which is how
 images are matched to deployments. If the deployments can't be listed, nothing is deleted.
 
-    VERCEL_TOKEN=... python3 scripts/prune_container_images.py --dry-run
-    VERCEL_TOKEN=... python3 scripts/prune_container_images.py
+    python3 scripts/prune_container_images.py --dry-run     # then without --dry-run
 
-Runs daily from .github/workflows/prune-container-images.yml. Uses the Vercel CLI (VERCEL_CMD,
-default a pinned npx vercel) and only the Python standard library. The CLI reads the token from
-VERCEL_TOKEN, so it never appears on a command line or in the log.
+Runs daily from .github/workflows/prune-container-images.yml, which sets VERCEL_TOKEN. With a token
+it calls Vercel's REST API directly, because the CLI looks up the token's user first, and with the
+team token that failed ("User not found", 4 Nov). The token is only sent in
+the Authorization header, never printed. Without a token, it goes through the signed-in Vercel CLI
+(`vercel api`), for running it from a terminal. Uses only the Python standard library.
 """
 
 import argparse
 import json
 import os
-import shlex
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 
-DEFAULT_VERCEL = "npx --yes vercel@65.8.0"
+API = "https://api.vercel.com"
 TAG_LENGTH = 12
 
 
@@ -37,37 +40,52 @@ class VercelError(RuntimeError):
 
 
 class Vercel:
-    def __init__(self, command, scope, project):
-        self.command = shlex.split(command)
+    def __init__(self, token, scope, project):
+        self.token = token
         self.scope = scope
         self.project = project
 
-    def run(self, *args):
-        result = subprocess.run([*self.command, *args, "--scope", self.scope],
-                                capture_output=True, text=True, env={**os.environ, "VERCEL_TELEMETRY_DISABLED": "1"})
-        if result.returncode != 0:
-            # The CLI's error says what went wrong (e.g. a missing or expired token); it never contains the token.
-            raise VercelError(f"vercel {' '.join(args[:3])} failed: {result.stderr.strip()[-500:]}")
-        return result.stdout
-
-    def json(self, *args):
-        return json.loads(self.run(*args, "--json"))
+    def request(self, method, path, **params):
+        query = urllib.parse.urlencode({"projectId": self.project, **params})
+        if self.token:
+            request = urllib.request.Request(f"{API}{path}?{query}&teamId={self.scope}", method=method,
+                                             headers={"Authorization": f"Bearer {self.token}"})
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    body = response.read()
+            except urllib.error.HTTPError as error:
+                # Vercel's error body says why (e.g. a missing permission); it never contains the token.
+                raise VercelError(f"{method} {path}: HTTP {error.code} {error.read().decode('utf-8', 'replace')[:300]}")
+            except urllib.error.URLError as error:
+                raise VercelError(f"{method} {path}: {error.reason}")
+        else:
+            result = subprocess.run(["vercel", "api", f"{path}?{query}", "-X", method, "--scope", self.scope,
+                                     *(["--dangerously-skip-permissions"] if method == "DELETE" else [])],
+                                    capture_output=True, text=True, env={**os.environ, "VERCEL_TELEMETRY_DISABLED": "1"})
+            if result.returncode != 0:
+                raise VercelError(f"vercel api {method} {path} failed: {result.stderr.strip()[-300:]}")
+            body = result.stdout
+        return json.loads(body) if body and body.strip() else {}
 
     def images(self, repository):
         images, cursor = [], None
         while True:
-            page = self.json("vcr", "image", "ls", repository, "--project", self.project, "-n", "100",
-                             *(["--next", cursor] if cursor else []))
+            # The cursor parameter is "cursor"; "next" is silently ignored and returns the first page again.
+            page = self.request("GET", f"/v1/vcr/repository/{repository}/images", limit=100,
+                                **({"cursor": cursor} if cursor else {}))
             images += page["images"]
-            cursor = (page.get("pagination") or {}).get("next")
+            cursor = page.get("nextCursor")
             if not cursor:
                 return images
 
-    def deployments(self, *filters, limit):
-        return self.json("ls", self.project, *filters, "-n", str(limit))["deployments"]
+    def production_deployments(self, limit):
+        return self.request("GET", "/v7/deployments", target="production", state="READY", limit=limit)["deployments"]
+
+    def deployments_since(self, since_ms):
+        return self.request("GET", "/v7/deployments", since=int(since_ms), limit=100)["deployments"]
 
     def delete(self, repository, image_id):
-        self.run("vcr", "image", "delete", repository, image_id, "--project", self.project, "--yes")
+        self.request("DELETE", f"/v1/vcr/repository/{repository}/images/{image_id}")
 
 
 def commit_tag(deployment):
@@ -77,9 +95,10 @@ def commit_tag(deployment):
 
 def tags_in_use(vercel, production_keep, recent_hours, now):
     """Image tags of the last few production deployments and of every recent deployment."""
-    production = vercel.deployments("--environment", "production", "--status", "READY", limit=production_keep)
+    production = vercel.production_deployments(production_keep)
     since = (now - timedelta(hours=recent_hours)).timestamp() * 1000
-    recent = [deployment for deployment in vercel.deployments(limit=100) if deployment["createdAt"] >= since]
+    recent = [deployment for deployment in vercel.deployments_since(since)
+              if (deployment.get("createdAt") or deployment.get("created")) >= since]
     return {tag for tag in map(commit_tag, production[:production_keep] + recent) if tag}
 
 
@@ -109,10 +128,11 @@ def main():
     args = parser.parse_args()
     if args.keep < 1:
         parser.error("--keep must be at least 1")
-    if not os.environ.get("VERCEL_TOKEN"):
-        print("VERCEL_TOKEN isn't set; using the CLI's own login.", file=sys.stderr)
+    token = os.environ.get("VERCEL_TOKEN")
+    if not token:
+        print("VERCEL_TOKEN isn't set, so this uses the signed-in Vercel CLI.", file=sys.stderr)
 
-    vercel = Vercel(os.environ.get("VERCEL_CMD", DEFAULT_VERCEL), args.scope, args.project)
+    vercel = Vercel(token, args.scope, args.project)
     try:
         protected = tags_in_use(vercel, args.production_keep, args.recent_hours, datetime.now(timezone.utc))
     except (VercelError, KeyError, ValueError) as error:
