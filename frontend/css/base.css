@@ -44,7 +44,8 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-pill: 999px;
-  --shadow-card: 2px 3px 3px rgb(0 0 0 / 22%);
+  --shadow-card: 0 1px 2px rgb(66 86 100 / 7%), 0 6px 20px rgb(66 86 100 / 8%);
+  --shadow-card-hover: 0 2px 4px rgb(66 86 100 / 8%), 0 14px 32px rgb(66 86 100 / 14%);
   --shadow-menu: 0 8px 24px rgb(66 86 100 / 13%);
   --shadow-float: 0 8px 24px rgb(0 0 0 / 18%);
   --control-height: 40px;
@@ -170,7 +171,7 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 .card {
   padding: 20px 24px;
   border: 1px solid #f0ece4;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-card);
 }

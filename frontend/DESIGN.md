@@ -141,8 +141,8 @@ white text on it. Use `--teal-strong` instead.
 | Token | Value | Use for |
 | --- | --- | --- |
 | `--radius-sm` | 6px | Things nested inside a control (segmented buttons, menu items) |
-| `--radius-md` | 8px | Cards, buttons, inputs, menus |
-| `--radius-lg` | 12px | Chat bubbles, drop zones, the tour bubble, cards inside the assistant |
+| `--radius-md` | 8px | Buttons, inputs, menus |
+| `--radius-lg` | 12px | Cards, chat bubbles, drop zones, the tour bubble, cards inside the assistant |
 | `--radius-xl` | 16px | Floating panels and the dashboard chat box |
 | `--radius-pill` | 999px | Tags; circles use `50%` |
 
@@ -150,7 +150,8 @@ white text on it. Use `--teal-strong` instead.
 
 | Token | Use for |
 | --- | --- |
-| `--shadow-card` | Cards sitting on the page |
+| `--shadow-card` | Cards sitting on the page: a soft, layered shadow tinted with `--ink` |
+| `--shadow-card-hover` | A card under the pointer, and cards floating over a picture (sign-in page) |
 | `--shadow-menu` | Drop-down menus |
 | `--shadow-float` | Things floating above everything: assistant panel and bubble, tour bubble |
 
