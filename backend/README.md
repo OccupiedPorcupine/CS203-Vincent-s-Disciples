@@ -2,7 +2,7 @@
 
 New sign-ins default to 60 minutes idle and 8 hours absolute lifetime. Account → Sign-in duration
 lets each user save 5–1,440 idle minutes and 1–168 absolute hours (idle cannot exceed absolute).
-Preferences are stored on `app_users` by migration V33 and apply to subsequent sign-ins on all devices.
+Preferences are stored on `app_users` by migration V35 and apply to subsequent sign-ins on all devices.
 Existing sessions keep their original limits; saving preferences never resets the sign-in clock.
 Spring Session JDBC enforces inactivity since the last request, including background requests.
 The absolute deadline is persisted in the session at authentication and checked before security
