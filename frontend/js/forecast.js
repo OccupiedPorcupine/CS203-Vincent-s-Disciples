@@ -9,7 +9,6 @@ const forecastStatus = document.getElementById("forecast-status");
 const forecastRange = document.getElementById("forecast-range");
 const forecastBasis = document.getElementById("forecast-basis");
 const forecastFallback = document.getElementById("forecast-fallback");
-const weatherContext = document.getElementById("weather-context");
 const holidayContext = document.getElementById("holiday-context");
 
 // The backend forecasts from today up to this many days ahead (Singapore time).
@@ -247,7 +246,8 @@ forecastForm.addEventListener("submit", async (event) => {
     }
 });
 
-// The likely range, how the number was worked out, and whether weather and holidays were used.
+// The likely range, how the number was worked out, and whether holidays were used. Neither the model
+// nor the baseline uses the weather, so its factor always says "Not used yet".
 // Passing null clears them.
 function showForecastDetails(result) {
     forecastRange.textContent = !result
@@ -262,8 +262,6 @@ function showForecastDetails(result) {
     const factorText = !result
         ? "Included in forecast model"
         : usedModel ? "Included in this forecast" : "Not used in this forecast";
-    // Which NEA forecast the model used, e.g. "NEA's 4-day outlook: Thundery Showers, 24 to 33°C".
-    weatherContext.textContent = result?.weather ?? factorText;
     holidayContext.textContent = factorText;
 }
 

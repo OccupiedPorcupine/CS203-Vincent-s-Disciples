@@ -5,3 +5,6 @@ pandas==2.3.3
 catboost==1.2.10
 fastapi==0.162.0
 uvicorn==0.54.0
+# Chronos-2 for POST /forecast (#106). ml/Dockerfile installs PyTorch's CPU-only build first
+# (requirements-torch.txt), so this doesn't pull in the much larger CUDA one.
+chronos-forecasting==2.3.2

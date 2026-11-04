@@ -259,8 +259,8 @@ public class AssistantTools {
                                 """)),
                 new ToolSpec(EXPLAIN_FORECAST,
                         "Get one dish's forecast for a day (today up to 7 days ahead) with everything that went into it: "
-                                + "how it was worked out, the past sales it used, and whether the weather forecast and a "
-                                + "public holiday were used. Use it to answer why a forecast is what it is.",
+                                + "how it was worked out, the past sales it used, and whether a public holiday was used. "
+                                + "Use it to answer why a forecast is what it is.",
                         schema("""
                                 {"type": "object",
                                  "properties": {
@@ -467,14 +467,20 @@ public class AssistantTools {
         output.put("forecast", Math.round(forecast.predictedDemand()));
         output.put("likely_low", forecast.low());
         output.put("likely_high", forecast.high());
-        // How BaselineForecaster.range works, in words.
-        output.put("range_basis", forecast.roughRange()
+        // How the range was worked out, in words: by the model (ForecastService) or BaselineForecaster.range.
+        output.put("range_basis", usedModel
+                ? "The model's own range: it expects sales to be below the low end on about 1 day in 10 like this "
+                        + "one, and above the high end on about 1 in 10. A dish whose sales swing more, or a date further "
+                        + "from the last recorded sales, has a wider range."
+                : forecast.roughRange()
                 ? "Too few past days to measure how far forecasts are usually off, so the range is a rough 25% either "
                         + "side. It narrows as more sales are recorded."
                 : "How far an average of past sales was off on recent days (the middle 80% of those misses), "
                         + "when worked out as many days ahead as this one, applied to this forecast. A dish whose sales "
                         + "swing more, or a date further from the last recorded sales, has a wider range.");
-        output.put("method", usedModel ? "the forecast model" : "an average of the dish's own past sales");
+        output.put("method", usedModel
+                ? "the forecast model (Chronos-2, a pretrained model that forecasts from the dish's own daily sales)"
+                : "an average of the dish's own past sales");
         output.put("basis", forecast.basis());
         output.put("why_not_model", forecast.note());
 
@@ -486,12 +492,10 @@ public class AssistantTools {
         output.set("last_7_days_sales", sales(before, sale -> !sale.getSaleDate().isBefore(date.minusDays(EXPLAIN_RECENT_DAYS)),
                 EXPLAIN_RECENT_DAYS));
 
-        // Only the model takes the weather and holidays into account; the baseline is sales only.
+        // Only the model takes holidays into account; the baseline is sales only. Neither uses the weather.
         String holiday = holidayRepository.findByDate(date).map(PublicHoliday::getName).orElse(null);
         output.put("public_holiday", holiday);
         output.put("public_holiday_used", usedModel && holiday != null);
-        output.put("weather_used", forecast.weatherSource() != null);
-        output.put("weather_forecast", forecast.weather());
         output.put("note", "These are the only inputs. Explain the forecast from them alone, and say any other "
                 + "reason the user suggests isn't taken into account.");
         return output;

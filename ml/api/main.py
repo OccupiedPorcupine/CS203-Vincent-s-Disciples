@@ -2,17 +2,21 @@ import hmac
 import os
 from contextlib import asynccontextmanager
 
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from ml.api.schemas import (
+    ForecastRequest,
+    ForecastResponse,
     HealthResponse,
     ModelInfoResponse,
     PredictionRequest,
     PredictionResponse,
 )
 from ml.src.features.feature_builder import build_features
+from ml.src.models import chronos_model
 from ml.src.models.inference import (
     load_feature_schema,
     load_model,
@@ -27,6 +31,8 @@ async def lifespan(app: FastAPI):
     app.state.model = load_model()
     app.state.schema = load_feature_schema()
     app.state.metadata = load_model_metadata()
+    app.state.chronos = chronos_model.LoadingModel()
+    app.state.chronos.start()
 
     yield
 
@@ -60,6 +66,7 @@ async def require_shared_secret(request: Request, call_next):
 def health() -> HealthResponse:
     return HealthResponse(
         status="ok",
+        forecast_model=app.state.chronos.status,
     )
 
 
@@ -128,4 +135,42 @@ def predict(
         dish=request.dish,
         forecast_date=request.forecast_date,
         predicted_demand=prediction,
+    )
+
+
+# How long a forecast waits for Chronos-2 to finish loading after a cold start, before giving up
+# so the backend can use its baseline instead. The backend waits a little longer than this.
+LOAD_WAIT_SECONDS = float(os.environ.get("CHRONOS_LOAD_WAIT_SECONDS", "15"))
+
+
+@app.post(
+    "/forecast",
+    response_model=ForecastResponse,
+)
+def forecast(request: ForecastRequest) -> ForecastResponse:
+    pipeline = app.state.chronos.wait(LOAD_WAIT_SECONDS)
+    if pipeline is None:
+        status = app.state.chronos.status
+        return JSONResponse(
+            status_code=503,
+            content={"code": "MODEL_LOADING" if status == "loading" else "MODEL_UNAVAILABLE",
+                     "message": f"Chronos-2 is {status}"},
+        )
+    try:
+        quantiles = chronos_model.forecast(
+            pipeline,
+            [(record.date, record.demand) for record in request.sales_history],
+            request.forecast_date,
+            set(request.holidays),
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    median = float(np.interp(0.5, chronos_model.QUANTILE_LEVELS, quantiles))
+    return ForecastResponse(
+        forecast_date=request.forecast_date,
+        model=chronos_model.MODEL_NAME,
+        quantile_levels=chronos_model.QUANTILE_LEVELS,
+        quantiles=quantiles,
+        median=median,
     )
