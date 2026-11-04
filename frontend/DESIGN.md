@@ -50,7 +50,9 @@ assistant bubble   added by js/assistant.js, bottom right
 | --- | --- |
 | ![Data ingestion](design/screenshots/data.png) | ![Sign in](design/screenshots/login.png) |
 
-The sign-in page is the exception: no header, one centred card on the soft brand gradient.
+The sign-in page is the exception: no header, one centred card on the soft brand gradient. Its
+left half is a decorative picture of what Chicky does: a sales line that draws itself, the dashed
+teal forecast continuing it, and two cards (tomorrow's forecast, a prep-list nudge) floating over it.
 
 ### Getting around
 
@@ -352,6 +354,10 @@ the assistant panel grows from the bubble, the Record sales dialog rises with a 
 and a dismissed action slides right, fades and folds its row away (`chickyMotion.leave(element)`).
 Status lines settle in when they report a result.
 
+**Ambient motion** is kept to two places and is very slow: the header's gradient drifts between
+teal and sand over 28 seconds, and the sign-in page's picture (a chart drawing itself, then two
+cards floating over it) has gently drifting colour. It pauses during the guided tour.
+
 **The guided tour wins.** Entrance animations are off while a tour is running (`.guide-active`):
 the tour measures where things are and must not chase a card that is still rising.
 
@@ -502,7 +508,8 @@ The script mocks the API, so no backend or login is needed.
 
 ## Known gaps
 
-- The sign-in page's left panel is still a "PLACEHOLDER" block waiting for artwork.
+- The sign-in page's picture is drawn in HTML and SVG (a sample chart and two sample cards), not
+  real data. Swap it for artwork or a real screenshot once there is a logo and brand imagery.
 - Dashboard "Actions needed" items, the forecast "Ask about this forecast" card (disabled) and its
   "Local events" factor are placeholders that aren't connected yet. When they are, keep the
   components above.
