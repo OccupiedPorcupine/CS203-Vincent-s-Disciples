@@ -314,6 +314,23 @@ Motion explains where something came from or went; it is never decoration. Every
 | `--ease-out` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Things appearing or arriving |
 | `--ease-in-out` | `cubic-bezier(0.65, 0, 0.35, 1)` | Things moving from one place to another |
 | `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | Small things popping in with a slight overshoot (send button, assistant bubble) |
+| `--duration-enter` | 520ms | Cards and rows rising in when a page loads |
+| `--stagger` | 70ms | The gap between one card and the next as they rise in |
+
+**Arriving on a page.** Content rises 14px and fades in, in reading order: the page heading,
+then each card, `--stagger` apart (cards inside a grid wrapper such as the dashboard's `.overview`
+follow their wrapper's place). The order comes from CSS `nth-child` in `base.css`, so new pages
+get it for free as long as their content sits in `.page-heading`, `.card` and `.section`. Rows in
+lists and tables (`li`, `tr` inside `.page`) rise in a shorter sequence whenever they are added,
+so a list filled by a fetch arrives row by row. The revenue heatmap fills week by week.
+
+**Key figures count up.** When a page script writes a figure into `.headline .number` ("838",
+"$4,210"), [js/motion.js](js/motion.js) counts it up from zero, keeping the prefix, decimals and
+thousands separators. Nothing to wire up: set `textContent` as usual.
+
+**Loading text shimmers.** A `.note`, `.status-text`, `.empty-state` or `.lede` whose text starts with
+"Loading" or "Checking" gets `.is-loading`, a slow light sweep across the text; a card's `--`
+figure shimmers with it. Still no spinners.
 
 **Feedback on interaction.**
 
@@ -326,6 +343,11 @@ Motion explains where something came from or went; it is never decoration. Every
 | Avatar, assistant bubble, icon buttons | Grow slightly | Shrink slightly |
 
 Cards that hold a form don't lift: a card that moves while you type in it is unsettling.
+
+**The guided tour wins.** Entrance animations are off while a tour is running (`.guide-active`):
+the tour measures where things are and must not chase a card that is still rising.
+
+Load `js/motion.js` on every page, after `base.css` and before the page's own script.
 
 **Moving between pages.** Pages cross-fade using the browser's View Transitions: the header stays
 still while the old content lifts away and the new content rises in. Every page opts in with an
@@ -377,7 +399,9 @@ between steps, even across pages. Three pieces make that work, and each page nee
 
 **Reduced motion.** With `prefers-reduced-motion`, every transition and animation in `base.css`
 collapses to an instant change, page cross-fades are off, and the tour jumps straight to each step.
-Any new animation must do the same.
+Entrance, ambient and chart animations are written inside `@media (prefers-reduced-motion:
+no-preference)` (or checked in JS), so they don't exist at all, and figures appear without
+counting. Any new animation must do the same.
 
 ## Phones
 
