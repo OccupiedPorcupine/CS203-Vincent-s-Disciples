@@ -1,0 +1,66 @@
+# Deletes old images from Vercel's container registry, so builds don't fail when a repository
+# reaches Vercel's cap of 50 images (issue #121). Keeps the newest 20 per repository, plus any image
+# a recent or production deployment uses. See scripts/prune_container_images.py and deploy/README.md.
+#
+# Needs the repository secret VERCEL_TOKEN: a Vercel access token scoped to the team.
+name: Prune container images
+
+on:
+  schedule:
+    # Daily at 03:17 Singapore time (19:17 UTC), when nobody is deploying.
+    - cron: "17 19 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only list what would be deleted
+        type: boolean
+        default: false
+      keep:
+        description: Newest images to keep in each repository
+        default: "20"
+
+permissions:
+  contents: read
+
+# Never two at once; a second run waits for the first.
+concurrency:
+  group: prune-container-images
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    name: Prune container images
+    runs-on: ubuntu-latest
+    # Forks have no token, and shouldn't touch this project's registry.
+    if: github.repository == 'OccupiedPorcupine/CS203-Vincent-s-Disciples'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Check the token is set
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::The VERCEL_TOKEN secret isn't set. See deploy/README.md, 'Container registry'."
+            exit 1
+          fi
+      # Inputs go through env, not straight into the command, and --keep must be a number.
+      - name: Prune
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          KEEP: ${{ inputs.keep || '20' }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python3 scripts/prune_container_images.py --keep "$KEEP" $DRY_RUN
+      - name: Check production still answers
+        if: ${{ !inputs.dry_run }}
+        # Three tries, because the first request after an idle spell starts the backend.
+        run: |
+          for attempt in 1 2 3; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 https://chicky-zeta.vercel.app/api/health)
+            echo "GET /api/health: $status"
+            [ "$status" = 200 ] && exit 0
+            sleep 20
+          done
+          exit 1

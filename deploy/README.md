@@ -79,6 +79,31 @@ Previews are protected by Vercel login. To call a protected preview from a scrip
 - **The production model** is committed under `ml/artifacts/production/`, so deployments can serve it. To ship a newly trained model, run `python -m ml.train_production` and commit the three files.
 - **Local development is unchanged.** Run `node frontend/server.mjs` and the backend on port 8080, as in `LOCAL_RUN_GUIDE.md`. `.vercelignore` keeps `frontend/server.mjs` out of deployments, because otherwise Vercel treats `frontend/` as a Node app.
 
+## Container registry
+
+Vercel builds the `backend` and `ml` services as container images. It keeps every image in the project's container registry, previews included, and caps each repository at **50 images**. When a repository is full, every build fails at the push with `repository has reached the maximum allowed number of images`. Production deploys fail too, and production keeps serving the previous build. On 3 November that happened after about four days of normal activity.
+
+**`.github/workflows/prune-container-images.yml`** clears old images every day at 03:17 Singapore time. It runs `scripts/prune_container_images.py`, which keeps:
+- the newest 20 images in each repository;
+- the images of the last 3 production deployments, so a rollback still works;
+- the images of every deployment from the last 24 hours, so open previews keep working.
+
+It deletes the rest. An image's tag is the first 12 characters of the commit it was built from, which is how images are matched to deployments. If the deployments can't be listed, it deletes nothing and the run fails. After deleting, it checks that `/api/health` on production still returns 200.
+
+**Running it by hand:** GitHub → Actions → Prune container images → Run workflow. Tick "Only list what would be deleted" to see the plan first. From a terminal signed in to Vercel:
+
+```bash
+VERCEL_CMD=vercel python3 scripts/prune_container_images.py --dry-run   # then without --dry-run
+```
+
+**The token.** The workflow needs the repository secret `VERCEL_TOKEN`:
+1. In Vercel: Account settings → Tokens → Create. Scope it to the team that owns `chicky`, and give it an expiry date.
+2. In GitHub: the repository's Settings → Secrets and variables → Actions → New repository secret. Name it `VERCEL_TOKEN`.
+
+Without it, the scheduled run fails with an error that points here. When the token expires, create a new one and replace the secret.
+
+**To check the count:** `vercel vcr image ls backend --project chicky --scope team_kjkwGmp3oI9Akf8OGmoFqxDr -n 100` (and the same for `ml`).
+
 ## Assistant costs and limits
 
 Every assistant message, voice recording and spoken reply is a paid OpenAI call, and the site is public, so each account has daily allowances (issue #65). Days run from midnight to midnight, Singapore time.

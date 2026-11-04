@@ -103,4 +103,5 @@ jobs:
           cache-dependency-path: ml/requirements.txt
       - run: pip install -r ml/requirements.txt
       # Tests that need the trained model skip themselves, because ml/artifacts is not in Git.
-      - run: python -m pytest ml/tests
+      # scripts/tests covers scripts/prune_container_images.py's choice of images (no Vercel calls).
+      - run: python -m pytest ml/tests scripts/tests
