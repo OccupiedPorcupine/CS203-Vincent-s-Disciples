@@ -3,6 +3,7 @@ package app.recipe;
 import app.user.AppUser;
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Locale;
 
@@ -38,6 +39,13 @@ public class Ingredient {
     @Column(nullable = false)
     private Instant createdAt;
 
+    // Cooked or usable weight ÷ purchased weight, in percent; null for the default (IngredientDefaults).
+    @Column(precision = 4, scale = 1)
+    private BigDecimal yieldPercent;
+
+    // Bought for each day (true) or kept in stock (false); null for the default.
+    private Boolean perishable;
+
     protected Ingredient() {
     }
 
@@ -67,5 +75,18 @@ public class Ingredient {
 
     public void setUnit(String unit) {
         this.unit = unit;
+    }
+
+    public BigDecimal getYieldPercent() {
+        return yieldPercent;
+    }
+
+    public Boolean getPerishable() {
+        return perishable;
+    }
+
+    public void setHandling(BigDecimal yieldPercent, Boolean perishable) {
+        this.yieldPercent = yieldPercent;
+        this.perishable = perishable;
     }
 }

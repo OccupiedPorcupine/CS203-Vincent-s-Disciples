@@ -12,7 +12,7 @@
       "id": "dashboard",
       "title": "Dashboard",
       "url": "dashboard.html",
-      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, revenue and gross profit for those days, the dishes that earn the most, leftovers and sell-outs, and a box to talk to the assistant.",
+      "summary": "Home page: total portions sold in the latest 7 days, sales by dish, a weekly summary to read or play aloud, revenue and gross profit for those days, the dishes that earn the most, leftovers and sell-outs, and a box to talk to the assistant.",
       "elements": [
         { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Prep list, Data ingestion and Dishes pages." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
@@ -22,6 +22,7 @@
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "demand-chart", "description": "Line chart and total of portions sold per day, all dishes combined, for the 7 days ending on the latest recorded sale." },
         { "guideId": "dish-chart", "description": "Bar chart of portions sold per dish over the same 7 days." },
+        { "guideId": "week-summary", "description": "Your week: the same 7 days in a few sentences (portions against the week before, revenue, the best seller, leftovers and sell-outs). Play reads it aloud in English, 播放中文 in Mandarin. Asking the assistant \"how was my week?\" gives the same summary." },
         { "guideId": "revenue-card", "description": "Revenue for the same 7 days as the charts, with gross profit and margin. Dishes without a price are named here and not counted as $0; the Set prices link goes to the Dishes page." },
         { "guideId": "top-dishes", "description": "The dishes that made the most gross profit in those 7 days, with the margin per plate." },
         { "guideId": "waste-card", "description": "Leftover portions for the same 7 days, and what that food cost at each dish's unit cost (dishes without a cost are left out)." },
@@ -57,7 +58,7 @@
       "id": "prep",
       "title": "Prep list",
       "url": "prep.html",
-      "summary": "What to prepare for a day: portions of each dish from its forecast plus a safety margin, the total of each ingredient from the recipes, a Share button, and each dish's recipe.",
+      "summary": "What to prepare for a day: portions of each dish from its forecast plus a safety margin, how much of each ingredient to buy or take from stock, a Share button, each dish's recipe, and each ingredient's yield and whether it is bought daily.",
       "elements": [
         { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Data ingestion and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
@@ -69,8 +70,9 @@
         { "guideId": "prep-buffer", "description": "How many portions to prepare: Best for your margins (the default: each dish by its price and cost, enough for more days when a plate earns a lot and costs little; dishes without a price and cost get the top of the range), the top of the likely range, the forecast only, or the forecast plus 10, 20 or 30%." },
         { "guideId": "share-prep", "description": "Shares the prep list as plain text (e.g. to WhatsApp) on a phone, or copies it on a computer." },
         { "guideId": "prep-portions", "description": "Portions to prepare of each dish sold in the last 4 weeks, with its forecast, likely range and how it was worked out." },
-        { "guideId": "prep-ingredients", "description": "Total of each ingredient for those portions, from the recipes, and which dishes use it. Dishes without a recipe are named underneath." },
-        { "guideId": "recipe-list", "description": "Recipes section: one row per dish. Opening a row shows its ingredients, each with an amount per portion and a unit (g, ml, pcs), with Add ingredient, Remove and Save recipe." }
+        { "guideId": "prep-ingredients", "description": "Each ingredient for those portions, as the raw amount to buy (the recipes' cooked amount ÷ the ingredient's yield), under To buy for food bought each day and From stock for food kept in stock. Dishes without a recipe are named underneath." },
+        { "guideId": "recipe-list", "description": "Recipes section: one row per dish. Opening a row shows its ingredients, each with a cooked amount per portion and a unit (g, ml, pcs), with Add ingredient, Remove and Save recipe." },
+        { "guideId": "ingredient-buying", "description": "Buying section: one row per ingredient with its yield in percent (how much of what is bought is left once cooked; it starts from USDA's cooking yield for meats and 100% for the rest), whether it is bought each day or kept in stock, Save and Use defaults." }
       ]
     },
     {
@@ -126,6 +128,7 @@
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "account-details", "description": "The name and email the user signed in with." },
+        { "guideId": "session-settings", "description": "Sign-in duration settings: idle timeout in minutes and maximum sign-in duration in hours. Defaults are 60 minutes and 8 hours. Save settings applies them on the next sign-in, across devices; Use defaults fills in the defaults before saving." },
         { "guideId": "chat-apps", "description": "Chat apps set up on this server, such as Telegram, each with Connect or Disconnect. Connect shows a link (and a QR code on a computer) that opens the chat app; after tapping Start there, the user can send sales by text or voice note and confirm them in the chat." }
       ]
     }
@@ -171,6 +174,13 @@
       "summary": "Enter what one portion of a dish uses (ingredients and amounts), so the prep list can add up ingredients.",
       "steps": [
         { "page": "prep", "guideId": "recipe-list", "message": "Open a dish, type each ingredient with its amount per portion and unit, like chicken 150 g, then press Save recipe." }
+      ]
+    },
+    {
+      "id": "set-ingredient-yields",
+      "summary": "Say how much of an ingredient is left after cooking (its yield), or that it is kept in stock, so the prep list says how much raw to buy.",
+      "steps": [
+        { "page": "prep", "guideId": "ingredient-buying", "message": "Type how much of each ingredient is left once cooked, like 70% for chicken, and whether you buy it each day or keep it in stock, then press Save." }
       ]
     },
     {

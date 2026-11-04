@@ -26,7 +26,8 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 // What to prepare for a day (issue #45): portions of each dish the stall has sold recently, and
-// the ingredients those portions need according to the recipes.
+// the ingredients those portions need according to the recipes. Recipes give cooked amounts; each
+// ingredient's yield turns them into the raw amount to buy (issue #89).
 //
 // By default each dish is prepared to its margin (issue #86, the newsvendor rule). Running out
 // loses a plate's profit (price − cost); a leftover loses its cost. Preparing enough for
@@ -149,8 +150,12 @@ public class PrepListService {
 
         List<PrepListResponse.Ingredient> ingredients = ingredientsById.values().stream()
                 .sorted(Comparator.comparing(RecipeService.Line::ingredient, String.CASE_INSENSITIVE_ORDER))
-                .map(line -> new PrepListResponse.Ingredient(line.ingredient(), line.unit(),
-                        RecipeService.plain(totals.get(line.ingredientId())), List.copyOf(usedBy.get(line.ingredientId()))))
+                .map(line -> {
+                    BigDecimal cooked = totals.get(line.ingredientId());
+                    return new PrepListResponse.Ingredient(line.ingredient(), line.unit(), RecipeService.plain(cooked),
+                            List.copyOf(usedBy.get(line.ingredientId())), RecipeService.plain(line.yieldPercent()),
+                            RecipeService.plain(RecipeService.toBuy(cooked, line.yieldPercent())), line.perishable());
+                })
                 .toList();
         return new PrepListResponse(date, null, bufferPercent, dishes, ingredients, skipped);
     }

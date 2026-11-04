@@ -17,6 +17,14 @@
 }
 .graph .chart { position: relative; flex: 1; min-height: 0; margin-top: 16px; }
 
+/* The weekly summary: a few sentences with Play buttons in English and Chinese. */
+.week-summary { margin-top: 32px; }
+.week-summary-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.week-summary-buttons { display: flex; gap: 8px; }
+.week-summary-buttons[hidden] { display: none; }
+.week-summary-text { margin-top: 12px; max-width: 70ch; font-size: var(--text-lg); line-height: 1.5; }
+.week-summary .note { margin-top: 8px; color: var(--muted); font-size: var(--text-sm); }
+
 .money { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 3fr); gap: 32px 48px; margin-top: 32px; }
 .money .note { color: var(--muted); font-size: var(--text-sm); }
 .money-warning { margin-top: 12px; color: var(--warning); font-size: var(--text-sm); }
@@ -177,6 +185,8 @@
   .demand { grid-row: 2; }
   .by-dish { grid-row: 3; }
   .money { grid-template-columns: 1fr; gap: 24px; }
+  .week-summary { margin-top: 24px; }
+  .week-summary-text { font-size: var(--text-md); }
   .action-item { flex-wrap: wrap; }
   .action-buttons { width: 100%; justify-content: flex-end; }
 }

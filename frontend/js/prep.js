@@ -1,5 +1,5 @@
-// Prep list page: portions and ingredients to prepare for a day, and each dish's recipe
-// (issue #45). Needs js/api.js.
+// Prep list page: portions and ingredients to prepare for a day, each dish's recipe (issue #45),
+// and each ingredient's yield and whether it's bought daily (issue #89). Needs js/api.js.
 
 const prepDate = document.getElementById("prep-date");
 const prepBuffer = document.getElementById("prep-buffer");
@@ -11,6 +11,8 @@ const missingRecipes = document.getElementById("missing-recipes");
 const recipeList = document.getElementById("recipe-list");
 const recipeStatus = document.getElementById("recipe-status");
 const ingredientNames = document.getElementById("ingredient-names");
+const buyingList = document.getElementById("buying-list");
+const buyingStatus = document.getElementById("buying-status");
 
 // The backend works out prep lists from today up to this many days ahead (Singapore time).
 const MAX_DAYS_AHEAD = 7;
@@ -99,9 +101,13 @@ function renderPrepList(list) {
   if (!list.ingredients.length) {
     ingredientList.replaceChildren(emptyState("Add recipes below to see how much of each ingredient you need."));
   } else {
-    ingredientList.replaceChildren(...list.ingredients.map(item => listRow(
-      item.ingredient, formatAmount(item.quantity, item.unit), `For ${item.dishes.join(", ")}`
-    )));
+    // What to buy for the day first, then what comes out of stock.
+    const groups = [["To buy", list.ingredients.filter(item => item.perishable)],
+      ["From stock", list.ingredients.filter(item => !item.perishable)]].filter(([, items]) => items.length);
+    ingredientList.replaceChildren(...groups.flatMap(([title, items]) => [
+      groupHeading(title),
+      ...items.map(item => listRow(item.ingredient, formatAmount(item.toBuy, item.unit), ingredientNote(item)))
+    ]));
   }
 
   const withoutRecipe = list.dishes.filter(dish => !dish.hasRecipe).map(dish => dish.dish);
@@ -110,14 +116,30 @@ function renderPrepList(list) {
   }
 }
 
+function groupHeading(text) {
+  const heading = document.createElement("h3");
+  heading.className = "prep-group";
+  heading.textContent = text;
+  return heading;
+}
+
+// "7.2 kg cooked at 70% yield · For Chicken rice", or just the dishes when cooking doesn't change it.
+function ingredientNote(item) {
+  const dishes = `For ${item.dishes.join(", ")}`;
+  if (Number(item.yieldPercent) === 100) return dishes;
+  return `${formatAmount(item.quantity, item.unit)} cooked at ${round(Number(item.yieldPercent))}% yield · ${dishes}`;
+}
+
 // Plain text that reads well in WhatsApp.
 function prepListText(list) {
   const lines = [`Prep for ${formatDay(list.date)}`, ""];
   list.dishes.forEach(dish => lines.push(`${dish.dish}: ${dish.portions}`));
-  if (list.ingredients.length) {
-    lines.push("", "Ingredients");
-    list.ingredients.forEach(item => lines.push(`${item.ingredient}: ${formatAmount(item.quantity, item.unit)}`));
-  }
+  [["To buy", list.ingredients.filter(item => item.perishable)],
+    ["From stock", list.ingredients.filter(item => !item.perishable)]].forEach(([title, items]) => {
+    if (!items.length) return;
+    lines.push("", title);
+    items.forEach(item => lines.push(`${item.ingredient}: ${formatAmount(item.toBuy, item.unit)}`));
+  });
   return lines.join("\n");
 }
 
@@ -263,7 +285,7 @@ function recipeRow(recipe) {
       text.textContent = recipeSummary(saved);
       fill(saved.items);
       showStatus(`Saved the recipe for ${recipe.dish}.`, "success", recipeStatus);
-      loadIngredientNames();
+      loadIngredients();
       loadPrepList();
     } catch (error) {
       showStatus(error.message || "The recipe could not be saved.", "error", recipeStatus);
@@ -290,7 +312,95 @@ async function loadRecipes() {
   }
 }
 
-async function loadIngredientNames() {
+// One ingredient's yield and whether it's bought for each day or kept in stock.
+function buyingRow(ingredient) {
+  const row = document.createElement("div");
+  row.className = "buying-row";
+
+  const label = document.createElement("div");
+  label.className = "buying-name";
+  const name = document.createElement("span");
+  name.className = "recipe-dish";
+  name.textContent = `${ingredient.name} (${ingredient.unit})`;
+  label.append(name);
+  if (ingredient.defaultYieldBasis) {
+    const note = document.createElement("span");
+    note.className = "prep-caption";
+    note.textContent = `Usually ${round(Number(ingredient.defaultYieldPercent))}%: ${ingredient.defaultYieldBasis}`;
+    label.append(note);
+  }
+
+  const yieldField = document.createElement("label");
+  yieldField.className = "buying-yield";
+  const yieldInput = document.createElement("input");
+  yieldInput.className = "input";
+  yieldInput.type = "number";
+  yieldInput.min = "1";
+  yieldInput.max = "500";
+  yieldInput.step = "0.1";
+  yieldInput.inputMode = "decimal";
+  yieldInput.value = round(Number(ingredient.yieldPercent)).replace(/,/g, "");
+  yieldInput.setAttribute("aria-label", `Yield of ${ingredient.name}, in percent`);
+  const percent = document.createElement("span");
+  percent.textContent = "% yield";
+  percent.setAttribute("aria-hidden", "true");
+  yieldField.append(yieldInput, percent);
+
+  const bought = document.createElement("div");
+  bought.className = "select-wrap";
+  const boughtSelect = document.createElement("select");
+  boughtSelect.className = "input";
+  boughtSelect.setAttribute("aria-label", `How ${ingredient.name} is bought`);
+  [["true", "Bought each day"], ["false", "Kept in stock"]].forEach(([value, text]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    boughtSelect.append(option);
+  });
+  boughtSelect.value = String(ingredient.perishable);
+  bought.append(boughtSelect);
+
+  const actions = document.createElement("div");
+  actions.className = "buying-actions";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "secondary-button";
+  save.textContent = "Save";
+  save.setAttribute("aria-label", `Save ${ingredient.name}`);
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.className = "text-button";
+  reset.textContent = "Use defaults";
+  reset.hidden = !ingredient.customised;
+
+  const send = async body => {
+    save.disabled = true;
+    try {
+      const saved = await apiRequest(`/api/ingredients/${ingredient.id}`, { method: "PUT", body: JSON.stringify(body) });
+      row.replaceWith(buyingRow(saved));
+      showStatus(`Saved ${ingredient.name}.`, "success", buyingStatus);
+      loadPrepList();
+    } catch (error) {
+      save.disabled = false;
+      showStatus(error.message || `${ingredient.name} could not be saved.`, "error", buyingStatus);
+    }
+  };
+  save.addEventListener("click", () => {
+    const value = Number(yieldInput.value);
+    if (!(value > 0 && value <= 500)) {
+      showStatus(`${ingredient.name}'s yield needs to be above 0 and at most 500%.`, "error", buyingStatus);
+      return;
+    }
+    send({ yieldPercent: value, perishable: boughtSelect.value === "true" });
+  });
+  reset.addEventListener("click", () => send({ yieldPercent: null, perishable: null }));
+
+  actions.append(save, reset);
+  row.append(label, yieldField, bought, actions);
+  return row;
+}
+
+async function loadIngredients() {
   try {
     const ingredients = await apiRequest("/api/ingredients");
     ingredientNames.replaceChildren(...ingredients.map(ingredient => {
@@ -299,8 +409,11 @@ async function loadIngredientNames() {
       option.dataset.unit = ingredient.unit;
       return option;
     }));
+    buyingList.replaceChildren(...(ingredients.length
+      ? ingredients.map(buyingRow)
+      : [emptyState("Ingredients appear here once you add a recipe.")]));
   } catch (error) {
-    // Suggestions only; the editor works without them.
+    if (error.status !== 401) buyingList.replaceChildren(emptyState("Ingredients could not be loaded."));
   }
 }
 
@@ -330,4 +443,4 @@ window.addEventListener("chicky:sales-saved", loadPrepList);
 
 loadPrepList();
 loadRecipes();
-loadIngredientNames();
+loadIngredients();

@@ -87,11 +87,16 @@ async function micCovers(page) {
 }
 
 // Lets entrance animations (cards and rows rising in, see DESIGN.md "Motion") finish, so sizes
-// are measured where things end up rather than mid-flight. Endless ones (shimmer, header) are skipped.
+// are measured where things end up rather than mid-flight. Endless ones (shimmer, header) are skipped,
+// and so are finished ones: WebKit can leave a table row's `finished` promise unresolved after its
+// row-in has ended. Gives up after 15s, longer than any entrance (the sign-in ring pulse is 12.4s).
 async function settle(page) {
-  await page.evaluate(() => Promise.all(document.getAnimations()
-    .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
-    .map(animation => animation.finished.catch(() => {}))));
+  await page.evaluate(() => Promise.race([
+    Promise.all(document.getAnimations()
+      .filter(animation => animation.playState !== "finished" && animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map(animation => animation.finished.catch(() => {}))),
+    new Promise(resolve => setTimeout(resolve, 15000))
+  ]));
 }
 
 async function mockApi(context) {
@@ -152,8 +157,8 @@ async function mockApi(context) {
         { dishId: 2, dish: "Char siew rice", portions: 36, expected: 31, low: 26, high: 36, method: "BASELINE", basis: "Average of your last 4 Saturdays", hasRecipe: false }
       ],
       ingredients: [
-        { ingredient: "Rice", unit: "g", quantity: 7950, dishes: ["Chicken rice"] },
-        { ingredient: "Roast chicken", unit: "g", quantity: 6360, dishes: ["Chicken rice"] }
+        { ingredient: "Rice", unit: "g", quantity: 7950, dishes: ["Chicken rice"], yieldPercent: 100, toBuy: 7950, perishable: false },
+        { ingredient: "Roast chicken", unit: "g", quantity: 6360, dishes: ["Chicken rice"], yieldPercent: 78, toBuy: 8153.847, perishable: true }
       ],
       skipped: []
     });
@@ -161,7 +166,10 @@ async function mockApi(context) {
       { dishId: 1, dish: "Chicken rice", items: [{ ingredient: "Rice", unit: "g", quantity: 150 }, { ingredient: "Roast chicken", unit: "g", quantity: 120 }] },
       { dishId: 2, dish: "Char siew rice", items: [] }
     ]);
-    if (path === "/api/ingredients") return json(route, [{ name: "Rice", unit: "g" }, { name: "Roast chicken", unit: "g" }]);
+    if (path === "/api/ingredients") return json(route, [
+      { id: 1, name: "Rice", unit: "g", yieldPercent: 100, defaultYieldPercent: 100, defaultYieldBasis: null, perishable: false, customised: false },
+      { id: 2, name: "Roast chicken", unit: "g", yieldPercent: 78, defaultYieldPercent: 78, defaultYieldBasis: "USDA cooking yield for whole chicken with skin, roasted", perishable: true, customised: false }
+    ]);
     if (path === "/api/closures") return json(route, {
       restDays: ["TUESDAY"],
       closedDates: [{ date: day(14), reason: "Family wedding", source: "OWNER" }, { date: day(21), reason: "Centre cleaning (NEA)", source: "NEA" }],

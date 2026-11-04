@@ -211,3 +211,74 @@ async function disconnect(channel, button) {
 
 loadProfile();
 loadChats();
+
+const sessionForm = document.getElementById("session-settings-form");
+const idleInput = document.getElementById("session-idle");
+const absoluteInput = document.getElementById("session-absolute");
+const sessionSave = document.getElementById("session-save");
+const sessionDefaults = document.getElementById("session-defaults");
+const sessionStatus = document.getElementById("session-status");
+let savedSessionSettings = null;
+let savingSessionSettings = false;
+
+function sessionValues() {
+  return { idleMinutes: Number(idleInput.value), absoluteMinutes: Number(absoluteInput.value) * 60 };
+}
+
+function updateSessionForm() {
+  const values = sessionValues();
+  idleInput.setCustomValidity(values.idleMinutes > values.absoluteMinutes
+    ? "Inactivity must not exceed the maximum sign-in duration." : "");
+  sessionSave.disabled = savingSessionSettings || !savedSessionSettings || !sessionForm.checkValidity()
+    || (values.idleMinutes === savedSessionSettings.idleMinutes
+      && values.absoluteMinutes === savedSessionSettings.absoluteMinutes);
+}
+
+sessionForm.addEventListener("input", updateSessionForm);
+sessionDefaults.addEventListener("click", () => {
+  idleInput.value = 60;
+  absoluteInput.value = 8;
+  updateSessionForm();
+});
+
+sessionForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (sessionSave.disabled || !sessionForm.reportValidity()) return;
+  const values = sessionValues();
+  savingSessionSettings = true;
+  idleInput.disabled = absoluteInput.disabled = sessionDefaults.disabled = true;
+  updateSessionForm();
+  sessionStatus.className = "status-text";
+  sessionStatus.textContent = "Saving…";
+  try {
+    savedSessionSettings = await apiRequest("/api/account/session-settings", {
+      method: "PUT", body: JSON.stringify(values)
+    });
+    sessionStatus.className = "status-text is-success";
+    sessionStatus.textContent = "Saved. These durations apply next time you sign in.";
+  } catch (error) {
+    if (error.status === 401) { window.location.href = "index.html"; return; }
+    sessionStatus.className = "status-text is-error";
+    sessionStatus.textContent = error.message || "Couldn’t save settings. Try again.";
+  } finally {
+    savingSessionSettings = false;
+    idleInput.disabled = absoluteInput.disabled = sessionDefaults.disabled = false;
+    updateSessionForm();
+  }
+});
+
+async function loadSessionSettings() {
+  try {
+    savedSessionSettings = await apiRequest("/api/account/session-settings");
+    idleInput.value = savedSessionSettings.idleMinutes;
+    absoluteInput.value = savedSessionSettings.absoluteMinutes / 60;
+    idleInput.disabled = absoluteInput.disabled = sessionDefaults.disabled = false;
+    sessionStatus.textContent = "";
+    updateSessionForm();
+  } catch (error) {
+    if (error.status === 401) { window.location.href = "index.html"; return; }
+    sessionStatus.className = "status-text is-error";
+    sessionStatus.textContent = "Couldn’t load sign-in settings. Reload the page to try again.";
+  }
+}
+loadSessionSettings();

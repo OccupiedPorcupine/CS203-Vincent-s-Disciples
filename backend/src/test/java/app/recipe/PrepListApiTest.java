@@ -81,6 +81,58 @@ class PrepListApiTest {
         assertEquals("[\"Char siew rice\",\"Chicken rice\"]", prep.path("ingredients").get(4).path("dishes").toString());
     }
 
+    // Issue #89: recipes give the cooked amount, so 60 plates of 120 g of chicken at a 70% yield
+    // is 7.2 kg cooked and about 10.3 kg to buy.
+    @Test
+    void anIngredientsYieldTurnsTheCookedAmountIntoWhatToBuy() throws Exception {
+        Session session = signUp("yield@prep.test");
+        long chickenRice = dishSelling(session, "Chicken rice", 60);
+        setRecipe(session, chickenRice, "[" + item("Chicken", "120", "g") + "," + item("Rice", "200", "g") + "]");
+        JsonNode chicken = ingredient(session, "Chicken");
+
+        HttpResponse<String> set = session.send("PUT", "/api/ingredients/" + chicken.path("id").asLong(),
+                "{\"yieldPercent\":70,\"perishable\":null}");
+        assertEquals(200, set.statusCode(), set.body());
+        assertEquals("70 75 true true", String.join(" ", rows(json.readTree("[" + set.body() + "]"),
+                "yieldPercent", "defaultYieldPercent", "perishable", "customised")));
+
+        JsonNode prep = json.readTree(session.get("/api/prep-list?date=" + tomorrow).body());
+        assertEquals(List.of("Chicken 7200 70 10285.715 true", "Rice 12000 100 12000 false"),
+                rows(prep.path("ingredients"), "ingredient", "quantity", "yieldPercent", "toBuy", "perishable"));
+    }
+
+    @Test
+    void ingredientsStartFromUsdaYieldsAndStaplesKeep() throws Exception {
+        Session session = signUp("defaults@prep.test");
+        long chickenRice = dishSelling(session, "Chicken rice", 40);
+        setRecipe(session, chickenRice, "[" + item("Chicken", "150", "g") + "," + item("Rice", "120", "g") + ","
+                + item("Chicken stock", "200", "ml") + "," + item("Cucumber", "20", "g") + "]");
+
+        JsonNode ingredients = json.readTree(session.get("/api/ingredients").body());
+
+        assertEquals(List.of("Chicken 75 true false", "Chicken stock 100 true false", "Cucumber 100 true false", "Rice 100 false false"),
+                rows(ingredients, "name", "yieldPercent", "perishable", "customised"));
+        assertEquals("USDA cooking yield for whole chicken with skin, simmered", ingredients.get(0).path("defaultYieldBasis").asString());
+        assertTrue(ingredients.get(2).path("defaultYieldBasis").isNull());
+    }
+
+    @Test
+    void anIngredientGoesBackToItsDefaultsAndBelongsToItsOwner() throws Exception {
+        Session session = signUp("reset@prep.test");
+        long chickenRice = dishSelling(session, "Chicken rice", 40);
+        setRecipe(session, chickenRice, "[" + item("Rice", "200", "g") + "]");
+        long rice = ingredient(session, "Rice").path("id").asLong();
+
+        String raw = session.send("PUT", "/api/ingredients/" + rice, "{\"yieldPercent\":280,\"perishable\":true}").body();
+        assertTrue(raw.contains("\"yieldPercent\":280,") && raw.contains("\"perishable\":true,"), raw);
+        String reset = session.send("PUT", "/api/ingredients/" + rice, "{\"yieldPercent\":null,\"perishable\":null}").body();
+        assertTrue(reset.contains("\"yieldPercent\":100,") && reset.contains("\"perishable\":false,\"customised\":false"), reset);
+
+        assertEquals(400, session.send("PUT", "/api/ingredients/" + rice, "{\"yieldPercent\":0}").statusCode());
+        assertEquals(400, session.send("PUT", "/api/ingredients/" + rice, "{\"yieldPercent\":501}").statusCode());
+        assertEquals(400, signUp("reset-other@prep.test").send("PUT", "/api/ingredients/" + rice, "{\"yieldPercent\":50}").statusCode());
+    }
+
     @Test
     void aBufferAddsPercentToTheForecast() throws Exception {
         Session session = signUp("buffer@prep.test");
@@ -150,7 +202,7 @@ class PrepListApiTest {
 
         // With no other dish using it, the unit can change.
         setRecipe(session, chickenRice, "[" + item("Chicken", "0.15", "kg") + "]");
-        assertEquals("[{\"name\":\"Chicken\",\"unit\":\"kg\"}]", session.get("/api/ingredients").body());
+        assertEquals(List.of("Chicken kg"), rows(json.readTree(session.get("/api/ingredients").body()), "name", "unit"));
     }
 
     @Test
@@ -162,7 +214,7 @@ class PrepListApiTest {
         String saved = setRecipe(session, chickenRice, "[" + item("Chicken", "160", "g") + "]");
 
         assertEquals("{\"dishId\":" + chickenRice + ",\"dish\":\"Chicken rice\",\"items\":[{\"ingredient\":\"Chicken\",\"unit\":\"g\",\"quantity\":160}]}", saved);
-        assertEquals("[{\"name\":\"Chicken\",\"unit\":\"g\"}]", session.get("/api/ingredients").body());
+        assertEquals(List.of("Chicken g"), rows(json.readTree(session.get("/api/ingredients").body()), "name", "unit"));
         setRecipe(session, chickenRice, "[]");
         assertEquals("[]", session.get("/api/ingredients").body());
     }
@@ -208,6 +260,13 @@ class PrepListApiTest {
         HttpResponse<String> response = session.send("PUT", "/api/dishes/" + dishId + "/recipe", "{\"items\":" + items + "}");
         assertEquals(200, response.statusCode(), response.body());
         return response.body();
+    }
+
+    private JsonNode ingredient(Session session, String name) throws Exception {
+        for (JsonNode ingredient : json.readTree(session.get("/api/ingredients").body())) {
+            if (ingredient.path("name").asString().equals(name)) return ingredient;
+        }
+        throw new AssertionError(name + " isn't an ingredient");
     }
 
     private static String item(String ingredient, String quantity, String unit) {

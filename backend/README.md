@@ -1,3 +1,16 @@
+## Session expiry
+
+New sign-ins default to 60 minutes idle and 8 hours absolute lifetime. Account → Sign-in duration
+lets each user save 5–1,440 idle minutes and 1–168 absolute hours (idle cannot exceed absolute).
+Preferences are stored on `app_users` by migration V35 and apply to subsequent sign-ins on all devices.
+Existing sessions keep their original limits; saving preferences never resets the sign-in clock.
+Spring Session JDBC enforces inactivity since the last request, including background requests.
+The absolute deadline is persisted in the session at authentication and checked before security
+loads the session. At the deadline, the next protected request is refused; no browser timer is required.
+Older sessions without a deadline expire eight hours after their original creation time.
+Settings are available through authenticated, CSRF-protected GET/PUT `/api/account/session-settings`
+with `{ "idleMinutes": 60, "absoluteMinutes": 480 }` (GET does not require a CSRF token).
+
 ## Requirements
 
 - Java 21+
@@ -59,6 +72,7 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `GET /api/dishes/{dishId}/sales`, `POST /api/dishes/{dishId}/sales` — lists sales, or adds new days (rejects days that already have a record)
 - `PUT /api/dishes/{dishId}/sales/{date}` — sets one day's quantity, replacing any existing record; returns `previousQuantity`
 - `POST /api/forecast` — `{dishId, forecastDate}`, from today up to 7 days ahead → expected portions, the likely `low`–`high` range, `method` (`MODEL` or `BASELINE`), `basis` and `note`. The model uses NEA's 24-hour forecast for today and the 4-day outlook for the next 4 days; `weatherSource` and `weather` say which one (both null when no weather was used). Later dates use the baseline. The range is measured on estimates made as far after the last recorded sale as this date, so it widens when the latest sales are old
+- `GET /api/summary/weekly` — the 7 days ending on the latest recorded sale, as on the dashboard: portions against the 7 days before (`changePercent`), revenue, the best-selling dish, leftovers and the dish that sold out most, with `text.en` and `text.zh` to read aloud. The figures are those of `GET /api/revenue` and `GET /api/waste`; the sentences are templates, not written by the model
 - `GET /api/dishes/{dishId}/aliases`, `POST /api/dishes/{dishId}/aliases` — other names for a dish (e.g. `鸡饭`); matching ignores case and spacing, and each name points to one dish per user (409 `ALIAS_IN_USE` otherwise)
 - `GET /api/assistant/status` — whether the voice assistant and voice input are available
 - `POST /api/assistant/transcribe` — multipart `audio` (under a minute) → `{text, languages}`; audio is not stored
@@ -71,6 +85,7 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `PUT /api/chat-links/{id}/reminders` with `{salesReminderAt, prepListAt}` (`"21:00"` or `null` for off) — the linked chat's evening messages
 - `POST /api/channels/telegram/webhook` — Telegram's updates for the bot; only with the `X-Telegram-Bot-Api-Secret-Token` header (see "Telegram bot")
 - `POST /api/channels/jobs/run` — sends the chat reminders that are due; only with `Authorization: Bearer <CRON_SECRET>`, for the hourly GitHub Action
+- `GET /api/ingredients`, `PUT /api/ingredients/{id}` — the recipes' ingredients, each with its yield (cooked ÷ purchased weight) and whether it's bought daily; `{yieldPercent, perishable}` sets them, null for the default (USDA's cooking yield for the name, see `IngredientDefaults`, or 100% and perishable). `GET /api/prep-list` gives each ingredient's cooked `quantity` and the raw `toBuy`
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)

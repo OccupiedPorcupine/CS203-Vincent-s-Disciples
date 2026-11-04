@@ -3,6 +3,7 @@ package app.controller;
 import app.dto.IngredientResponse;
 import app.dto.PrepListResponse;
 import app.dto.RecipeResponse;
+import app.dto.SetIngredientRequest;
 import app.dto.SetRecipeRequest;
 import app.recipe.RecipeService;
 import app.service.PrepListService;
@@ -53,13 +54,30 @@ public class RecipeController {
         return recipeService.setRecipe(user.id(), dishId, request.items());
     }
 
-    @Operation(summary = "List ingredients", description = "Every ingredient used in a recipe, with its unit, sorted by name.")
+    @Operation(summary = "List ingredients", description = "Every ingredient used in a recipe, sorted by name, with its unit, "
+            + "its yield (cooked ÷ purchased weight) and whether it is bought for each day. Those that the owner hasn't set come from USDA's "
+            + "cooking yields for the ingredient's name, or 100% and perishable.")
     @GetMapping("/ingredients")
     public List<IngredientResponse> ingredients(@AuthenticationPrincipal AuthenticatedUser user) {
         return recipeService.ingredients(user.id());
     }
 
-    @Operation(summary = "Prep list for a day", description = "Portions to prepare of each dish sold in the last 28 days, and the ingredients they need. "
+    @Operation(summary = "Set an ingredient's yield and perishability", description = "yieldPercent is cooked or usable weight ÷ purchased "
+            + "weight (above 100 for rice and other food that gains weight); perishable is whether it is bought for each day. Null in either "
+            + "goes back to the default.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Saved"),
+            @ApiResponse(responseCode = "400", description = "Unknown ingredient, or a yield not above 0 and up to 500%", content = @Content),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @PutMapping("/ingredients/{ingredientId}")
+    public IngredientResponse setIngredient(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long ingredientId,
+                                            @Valid @RequestBody SetIngredientRequest request) {
+        return recipeService.setIngredient(user.id(), ingredientId, request);
+    }
+
+    @Operation(summary = "Prep list for a day", description = "Portions to prepare of each dish sold in the last 28 days, and the ingredients they need "
+            + "(cooked, and raw to buy by each ingredient's yield). "
             + "Each dish is prepared by its margin: enough for (price − cost) / price of likely days. Dishes without a price "
             + "and cost, or every dish with rule=top, get the top of the likely range; bufferPercent gives the forecast plus that many percent.")
     @ApiResponses({

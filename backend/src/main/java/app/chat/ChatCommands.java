@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -76,8 +77,15 @@ public class ChatCommands {
             text.append("\n\nAdd recipes on the Prep list page to see the ingredients too.");
         } else {
             text.append("\n\nIngredients:");
-            list.ingredients().forEach(ingredient -> text.append("\n• ").append(ingredient.ingredient()).append(' ')
-                    .append(amount(ingredient.quantity())).append(' ').append(ingredient.unit()));
+            list.ingredients().forEach(ingredient -> {
+                text.append("\n• ").append(ingredient.ingredient()).append(' ')
+                        .append(amount(ingredient.quantity())).append(' ').append(ingredient.unit());
+                // Recipes give cooked amounts; say what to buy when cooking changes the weight (#89).
+                if (ingredient.toBuy().compareTo(ingredient.quantity()) != 0) {
+                    text.append(", buy ").append(amount(rounded(ingredient.toBuy()))).append(' ').append(ingredient.unit());
+                }
+                if (!ingredient.perishable()) text.append(" (from stock)");
+            });
         }
         return text.toString();
     }
@@ -168,5 +176,10 @@ public class ChatCommands {
 
     private static String amount(BigDecimal quantity) {
         return quantity.stripTrailingZeros().toPlainString();
+    }
+
+    // 10285.715 g to buy is 10286 g; 0.428 kg is 0.43 kg. Always up, so it's never short.
+    private static BigDecimal rounded(BigDecimal quantity) {
+        return quantity.setScale(quantity.compareTo(BigDecimal.valueOf(100)) >= 0 ? 0 : 2, RoundingMode.UP);
     }
 }

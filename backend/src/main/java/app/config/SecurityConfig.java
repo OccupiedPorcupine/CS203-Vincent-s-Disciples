@@ -32,12 +32,15 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import app.chat.telegram.TelegramWebhookController;
 import app.controller.ChatJobController;
+import app.account.SessionExpiryFilter;
+import java.time.Clock;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 @Configuration
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository,
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository, Clock clock,
                                                    @Value("${app.security.require-https:false}") boolean requireHttps,
                                                    @Value("${spring.h2.console.enabled:false}") boolean h2ConsoleEnabled) throws Exception {
 
@@ -54,6 +57,7 @@ public class SecurityConfig {
         // var h2Console = PathRequest.toH2Console();
 
         http
+                .addFilterBefore(new SessionExpiryFilter(clock), SecurityContextHolderFilter.class)
                 .cors(Customizer.withDefaults())
 
                 .csrf(csrf -> csrf
@@ -145,7 +149,8 @@ public class SecurityConfig {
                         .logoutUrl("/api/auth/logout")
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)
-                        .deleteCookies("JSESSIONID")
+                        // Spring Session names the login cookie SESSION, not the servlet default JSESSIONID.
+                        .deleteCookies("SESSION")
                         .logoutSuccessHandler((request, response, authentication) ->
                                 response.setStatus(HttpServletResponse.SC_NO_CONTENT))
                 );

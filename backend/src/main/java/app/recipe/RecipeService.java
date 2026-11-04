@@ -5,10 +5,12 @@ import app.dish.DishRepository;
 import app.dto.IngredientResponse;
 import app.dto.RecipeItemInput;
 import app.dto.RecipeResponse;
+import app.dto.SetIngredientRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -51,21 +53,57 @@ public class RecipeService {
 
     @Transactional(readOnly = true)
     public List<IngredientResponse> ingredients(Long ownerId) {
-        return ingredients.findByOwnerIdOrderByNameAsc(ownerId).stream()
-                .map(ingredient -> new IngredientResponse(ingredient.getName(), ingredient.getUnit()))
-                .toList();
+        return ingredients.findByOwnerIdOrderByNameAsc(ownerId).stream().map(RecipeService::toResponse).toList();
+    }
+
+    // Sets an ingredient's yield and whether it is perishable; null in either goes back to the default.
+    @Transactional
+    public IngredientResponse setIngredient(Long ownerId, Long ingredientId, SetIngredientRequest request) {
+        Ingredient ingredient = ingredients.findByIdAndOwnerId(ingredientId, ownerId)
+                .orElseThrow(() -> new IllegalArgumentException("Ingredient not found"));
+        ingredient.setHandling(request.yieldPercent(), request.perishable());
+        return toResponse(ingredient);
     }
 
     // One line of a recipe, detached from the database so it can be used outside a transaction.
-    public record Line(Long ingredientId, String ingredient, String unit, BigDecimal quantity) {}
+    // yieldPercent and perishable are the ones in force, the owner's or the defaults.
+    public record Line(Long ingredientId, String ingredient, String unit, BigDecimal quantity,
+                       BigDecimal yieldPercent, boolean perishable) {}
 
     // Every recipe of the owner's, by dish ID.
     @Transactional(readOnly = true)
     public Map<Long, List<Line>> lines(Long ownerId) {
         return dishIngredients.findByOwnerId(ownerId).stream()
-                .collect(Collectors.groupingBy(item -> item.getDish().getId(), Collectors.mapping(item -> new Line(
-                        item.getIngredient().getId(), item.getIngredient().getName(), item.getIngredient().getUnit(),
-                        item.getQuantity()), Collectors.toList())));
+                .collect(Collectors.groupingBy(item -> item.getDish().getId(), Collectors.mapping(item -> {
+                    Ingredient ingredient = item.getIngredient();
+                    return new Line(ingredient.getId(), ingredient.getName(), ingredient.getUnit(), item.getQuantity(),
+                            yieldPercent(ingredient), perishable(ingredient));
+                }, Collectors.toList())));
+    }
+
+    // How much to buy to end up with this cooked amount: 7200 g at 70% is 10285.715 g.
+    public static BigDecimal toBuy(BigDecimal cooked, BigDecimal yieldPercent) {
+        return cooked.multiply(IngredientDefaults.FULL).divide(yieldPercent, 3, RoundingMode.UP);
+    }
+
+    static BigDecimal yieldPercent(Ingredient ingredient) {
+        return ingredient.getYieldPercent() != null ? ingredient.getYieldPercent() : defaultYield(ingredient).percent();
+    }
+
+    static boolean perishable(Ingredient ingredient) {
+        return ingredient.getPerishable() != null ? ingredient.getPerishable() : IngredientDefaults.perishable(ingredient.getName());
+    }
+
+    private static IngredientDefaults.Yield defaultYield(Ingredient ingredient) {
+        return IngredientDefaults.yield(ingredient.getName(), ingredient.getUnit())
+                .orElse(new IngredientDefaults.Yield(IngredientDefaults.FULL, null));
+    }
+
+    private static IngredientResponse toResponse(Ingredient ingredient) {
+        IngredientDefaults.Yield usual = defaultYield(ingredient);
+        return new IngredientResponse(ingredient.getId(), ingredient.getName(), ingredient.getUnit(),
+                plain(yieldPercent(ingredient)), plain(usual.percent()), usual.basis(), perishable(ingredient),
+                ingredient.getYieldPercent() != null || ingredient.getPerishable() != null);
     }
 
     // Replaces a dish's recipe. An ingredient keeps one unit across dishes; its unit can only be
