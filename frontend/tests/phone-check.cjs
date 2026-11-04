@@ -86,6 +86,14 @@ async function micCovers(page) {
   });
 }
 
+// Lets entrance animations (cards and rows rising in, see DESIGN.md "Motion") finish, so sizes
+// are measured where things end up rather than mid-flight. Endless ones (shimmer, header) are skipped.
+async function settle(page) {
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+    .map(animation => animation.finished.catch(() => {}))));
+}
+
 async function mockApi(context) {
   let signedIn = false;
   const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -174,6 +182,7 @@ async function mockApi(context) {
     page.on("pageerror", error => failures.push(`${phone.name}: page error: ${error.message}`));
     const check = async step => {
       await page.waitForTimeout(500);
+      await settle(page);
       const problems = [...await page.evaluate(checkPage), ...await micCovers(page)];
       problems.forEach(problem => failures.push(`${phone.name}, ${step}: ${problem}`));
       console.log(`${problems.length ? "✗" : "✓"} ${phone.name}: ${step}`);

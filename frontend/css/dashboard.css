@@ -51,7 +51,8 @@
 .heat-cell.level-3 { background: var(--heat-3); }
 .heat-cell.level-4 { background: var(--heat-4); }
 .heat-cell.is-closed { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
-.heatmap .heat-cell:hover { outline: 2px solid var(--ink); outline-offset: 1px; }
+.heatmap .heat-cell { transition: transform var(--duration-fast) var(--ease-out); }
+.heatmap .heat-cell:hover { outline: 2px solid var(--ink); outline-offset: 1px; transform: scale(1.25); }
 .heatmap-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 12px; color: var(--muted); font-size: var(--text-xs); }
 .heatmap-legend .heat-cell { width: 12px; }
 .heatmap-legend .legend-gap { margin-left: 12px; }
@@ -76,12 +77,14 @@
 /* Actions needed: one row per card from GET /api/actions. */
 .action-list { display: grid; margin: 20px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--divider); }
 .action-item {
+  transition: background-color var(--duration-fast);
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 16px 4px;
   border-bottom: 1px solid var(--divider);
 }
+.action-item:hover { background-color: rgb(235 246 245 / 55%); }
 .action-text { flex: 1; min-width: 0; }
 .action-text strong { display: block; font-weight: 400; }
 .action-text span { display: block; margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
@@ -118,7 +121,9 @@
   background: var(--surface);
   font-family: var(--font-ui);
 }
-.chat-box:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-tint); }
+.chat-box { transition: border-color var(--duration-fast), box-shadow var(--duration-base) var(--ease-out); }
+.chat-box:hover { box-shadow: 0 6px 20px rgb(66 86 100 / 8%); }
+.chat-box:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-tint), 0 10px 28px rgb(15 125 119 / 12%); }
 .chat-box textarea {
   display: block;
   width: 100%;
@@ -144,7 +149,11 @@
   background: transparent;
   cursor: pointer;
 }
+.icon-button { transition: background-color var(--duration-fast), transform var(--duration-fast) var(--ease-out); }
 .icon-button:hover:not(:disabled) { background: var(--neutral-soft); }
+.icon-button:active:not(:disabled) { transform: scale(0.92); }
+.send:not(:disabled) { animation: send-ready 300ms var(--ease-spring); }
+@keyframes send-ready { from { transform: scale(0.8); } }
 .icon-button:disabled { cursor: not-allowed; }
 .icon-button img { display: block; }
 .attachment { position: relative; overflow: hidden; }

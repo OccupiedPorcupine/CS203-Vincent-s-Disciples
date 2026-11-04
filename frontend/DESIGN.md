@@ -50,7 +50,9 @@ assistant bubble   added by js/assistant.js, bottom right
 | --- | --- |
 | ![Data ingestion](design/screenshots/data.png) | ![Sign in](design/screenshots/login.png) |
 
-The sign-in page is the exception: no header, one centred card on the soft brand gradient.
+The sign-in page is the exception: no header, one centred card on the soft brand gradient. Its
+left half is a decorative picture of what Chicky does: a sales line that draws itself, the dashed
+teal forecast continuing it, and two cards (tomorrow's forecast, a prep-list nudge) floating over it.
 
 ### Getting around
 
@@ -141,8 +143,8 @@ white text on it. Use `--teal-strong` instead.
 | Token | Value | Use for |
 | --- | --- | --- |
 | `--radius-sm` | 6px | Things nested inside a control (segmented buttons, menu items) |
-| `--radius-md` | 8px | Cards, buttons, inputs, menus |
-| `--radius-lg` | 12px | Chat bubbles, drop zones, the tour bubble, cards inside the assistant |
+| `--radius-md` | 8px | Buttons, inputs, menus |
+| `--radius-lg` | 12px | Cards, chat bubbles, drop zones, the tour bubble, cards inside the assistant |
 | `--radius-xl` | 16px | Floating panels and the dashboard chat box |
 | `--radius-pill` | 999px | Tags; circles use `50%` |
 
@@ -150,7 +152,8 @@ white text on it. Use `--teal-strong` instead.
 
 | Token | Use for |
 | --- | --- |
-| `--shadow-card` | Cards sitting on the page |
+| `--shadow-card` | Cards sitting on the page: a soft, layered shadow tinted with `--ink` |
+| `--shadow-card-hover` | A card under the pointer, and cards floating over a picture (sign-in page) |
 | `--shadow-menu` | Drop-down menus |
 | `--shadow-float` | Things floating above everything: assistant panel and bubble, tour bubble |
 
@@ -312,6 +315,53 @@ Motion explains where something came from or went; it is never decoration. Every
 | `--duration-slow` | 450ms | The tour's spotlight moving between elements |
 | `--ease-out` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Things appearing or arriving |
 | `--ease-in-out` | `cubic-bezier(0.65, 0, 0.35, 1)` | Things moving from one place to another |
+| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | Small things popping in with a slight overshoot (send button, assistant bubble) |
+| `--duration-enter` | 520ms | Cards and rows rising in when a page loads |
+| `--stagger` | 70ms | The gap between one card and the next as they rise in |
+
+**Arriving on a page.** Content rises 14px and fades in, in reading order: the page heading,
+then each card, `--stagger` apart (cards inside a grid wrapper such as the dashboard's `.overview`
+follow their wrapper's place). The order comes from CSS `nth-child` in `base.css`, so new pages
+get it for free as long as their content sits in `.page-heading`, `.card` and `.section`. Rows in
+lists and tables (`li`, `tr` inside `.page`) rise in a shorter sequence whenever they are added,
+so a list filled by a fetch arrives row by row. The revenue heatmap fills week by week.
+
+**Key figures count up.** When a page script writes a figure into `.headline .number` ("838",
+"$4,210"), [js/motion.js](js/motion.js) counts it up from zero, keeping the prefix, decimals and
+thousands separators. Nothing to wire up: set `textContent` as usual.
+
+**Loading text shimmers.** A `.note`, `.status-text`, `.empty-state` or `.lede` whose text starts with
+"Loading" or "Checking" gets `.is-loading`, a slow light sweep across the text; a card's `--`
+figure shimmers with it. Still no spinners.
+
+**Charts draw in** ([js/chart-theme.js](js/chart-theme.js)): points and bars arrive left to right,
+55ms apart. The recorded line has a faint ink wash beneath it, and hovered bars turn teal.
+
+**Feedback on interaction.**
+
+| Element | Hover | Press |
+| --- | --- | --- |
+| Primary and secondary buttons | Lift 1px with a soft shadow | Scale to 97% |
+| Cards (without a form) | Lift 2px, `--shadow-card-hover` | – |
+| Fields | Border darkens to `--subtle` | Focus: `--teal` border and a soft teal halo |
+| Menu items | Nudge 4px right | – |
+| Avatar, assistant bubble, icon buttons | Grow slightly | Shrink slightly |
+
+Cards that hold a form don't lift: a card that moves while you type in it is unsettling.
+
+**Things that open** grow out of where they came from: menus drop and unshrink from their corner,
+the assistant panel grows from the bubble, the Record sales dialog rises with a blurred backdrop,
+and a dismissed action slides right, fades and folds its row away (`chickyMotion.leave(element)`).
+Status lines settle in when they report a result.
+
+**Ambient motion** is kept to two places and is very slow: the header's gradient drifts between
+teal and sand over 28 seconds, and the sign-in page's picture (a chart drawing itself, then two
+cards floating over it) has gently drifting colour. It pauses during the guided tour.
+
+**The guided tour wins.** Entrance animations are off while a tour is running (`.guide-active`):
+the tour measures where things are and must not chase a card that is still rising.
+
+Load `js/motion.js` on every page, after `base.css` and before the page's own script.
 
 **Moving between pages.** Pages cross-fade using the browser's View Transitions: the header stays
 still while the old content lifts away and the new content rises in. Every page opts in with an
@@ -363,7 +413,9 @@ between steps, even across pages. Three pieces make that work, and each page nee
 
 **Reduced motion.** With `prefers-reduced-motion`, every transition and animation in `base.css`
 collapses to an instant change, page cross-fades are off, and the tour jumps straight to each step.
-Any new animation must do the same.
+Entrance, ambient and chart animations are written inside `@media (prefers-reduced-motion:
+no-preference)` (or checked in JS), so they don't exist at all, and figures appear without
+counting. Any new animation must do the same.
 
 ## Phones
 
@@ -456,7 +508,8 @@ The script mocks the API, so no backend or login is needed.
 
 ## Known gaps
 
-- The sign-in page's left panel is still a "PLACEHOLDER" block waiting for artwork.
+- The sign-in page's picture is drawn in HTML and SVG (a sample chart and two sample cards), not
+  real data. Swap it for artwork or a real screenshot once there is a logo and brand imagery.
 - Dashboard "Actions needed" items, the forecast "Ask about this forecast" card (disabled) and its
   "Local events" factor are placeholders that aren't connected yet. When they are, keep the
   components above.

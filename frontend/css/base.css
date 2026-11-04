@@ -44,7 +44,8 @@
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-pill: 999px;
-  --shadow-card: 2px 3px 3px rgb(0 0 0 / 22%);
+  --shadow-card: 0 1px 2px rgb(66 86 100 / 7%), 0 6px 20px rgb(66 86 100 / 8%);
+  --shadow-card-hover: 0 2px 4px rgb(66 86 100 / 8%), 0 14px 32px rgb(66 86 100 / 14%);
   --shadow-menu: 0 8px 24px rgb(66 86 100 / 13%);
   --shadow-float: 0 8px 24px rgb(0 0 0 / 18%);
   --control-height: 40px;
@@ -55,6 +56,9 @@
   --duration-slow: 450ms;    /* the tour's spotlight moving */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* small overshoot: buttons popping in */
+  --duration-enter: 520ms;   /* cards and rows rising in when a page loads */
+  --stagger: 70ms;           /* gap between one card and the next as they rise in */
 }
 
 /* Base */
@@ -170,9 +174,10 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 .card {
   padding: 20px 24px;
   border: 1px solid #f0ece4;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-card);
+  transition: box-shadow var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
 }
 .card-title { margin-bottom: 12px; font-size: var(--text-md); }
 
@@ -310,6 +315,114 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 ::view-transition-group(page) { animation-duration: var(--duration-base); }
 @keyframes page-out { to { opacity: 0; transform: translateY(-6px); } }
 @keyframes page-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* ---- Motion and polish (DESIGN.md, "Motion") ----
+   Interaction feedback (hover, press, focus) applies everywhere. Entrance and ambient motion is
+   inside `prefers-reduced-motion: no-preference`, so it simply doesn't exist for people who
+   asked for less motion, and is off during the guided tour (.guide-active), which measures where
+   things are and must not chase a card that is still rising. */
+
+/* Controls: colour, lift and press. */
+.primary-button,
+.secondary-button {
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+.primary-button:hover:not(:disabled) { box-shadow: 0 6px 16px rgb(15 125 119 / 24%); transform: translateY(-1px); }
+.secondary-button:hover:not(:disabled) { border-color: #b9dcd8; box-shadow: 0 4px 12px rgb(66 86 100 / 8%); transform: translateY(-1px); }
+:is(.primary-button, .secondary-button):active:not(:disabled) { box-shadow: none; transform: translateY(0) scale(0.97); transition-duration: 60ms; }
+.text-button { text-decoration-color: rgb(15 125 119 / 40%); transition: text-decoration-color var(--duration-fast), color var(--duration-fast); }
+.text-button:hover:not(:disabled) { color: var(--teal-hover); text-decoration-color: currentColor; }
+.segmented button { transition: background-color var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+.segmented button:hover:not([aria-pressed="true"]) { color: var(--ink); }
+.tag { transition: background-color var(--duration-fast), color var(--duration-fast); }
+
+.input { transition: border-color var(--duration-fast), box-shadow var(--duration-fast), background-color var(--duration-fast); }
+.input:hover:not(:disabled, :focus) { border-color: var(--subtle); }
+/* Replaces the outline on fields: a teal border (3.2:1) plus a soft halo. */
+.input:focus-visible { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgb(27 160 152 / 22%); }
+
+/* Cards lift a little under the pointer, so it's clear which one you're reading. Cards holding a
+   form stay put: a card that moves while you type in it is unsettling. */
+@media (hover: hover) {
+  .card:not(:has(form)):hover { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
+}
+
+/* Header: the avatar and menu button respond, menu items nudge towards the pointer. */
+.avatar { transition: box-shadow var(--duration-fast), transform var(--duration-fast) var(--ease-out); }
+.avatar:hover { transform: scale(1.05); }
+.navigation summary img { transition: opacity var(--duration-fast); }
+.navigation summary:hover img, .navigation[open] summary img { opacity: 0.9; }
+.navigation a { transition: background-color var(--duration-fast), padding-left var(--duration-fast) var(--ease-out); }
+.navigation a:hover:not([aria-current="page"]) { padding-left: 16px; }
+
+/* Status lines settle in when they report a result. */
+.status-text:is(.is-success, .is-error):not(:empty) { animation: status-in var(--duration-base) var(--ease-out); }
+@keyframes status-in { from { opacity: 0; transform: translateY(-3px); } }
+
+/* "Loading…" text shimmers (js/motion.js adds .is-loading), and so does a card's "--" figure while
+   its caption is loading. A slow sweep, not a spinner. */
+.is-loading,
+.headline:has(.is-loading) .number {
+  background: linear-gradient(100deg, var(--muted) 40%, #b9c2c8 50%, var(--muted) 60%) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.headline:has(.is-loading) .number { background-image: linear-gradient(100deg, var(--ink) 40%, #b9c2c8 50%, var(--ink) 60%); }
+
+/* Order of arrival: each direct child of the page, and each card inside a grid wrapper, gets an
+   index; cards rise in that order. Rows in lists and tables have their own short sequence. */
+.page > :nth-child(2) { --enter: 1; } .page > :nth-child(3) { --enter: 2; } .page > :nth-child(4) { --enter: 3; }
+.page > :nth-child(5) { --enter: 4; } .page > :nth-child(6) { --enter: 5; } .page > :nth-child(n + 7) { --enter: 6; }
+.page > * > :nth-child(2) { --enter-step: 1; } .page > * > :nth-child(3) { --enter-step: 2; }
+.page > * > :nth-child(n + 4) { --enter-step: 3; }
+:is(.page ul, .page ol, .page tbody) > :nth-child(2) { --row: 1; } :is(.page ul, .page ol, .page tbody) > :nth-child(3) { --row: 2; }
+:is(.page ul, .page ol, .page tbody) > :nth-child(4) { --row: 3; } :is(.page ul, .page ol, .page tbody) > :nth-child(5) { --row: 4; }
+:is(.page ul, .page ol, .page tbody) > :nth-child(6) { --row: 5; } :is(.page ul, .page ol, .page tbody) > :nth-child(n + 7) { --row: 6; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Page content rises in, card by card. `backwards` only, so once it has arrived hover can move it. */
+  :root:not(.guide-active) :is(.page-heading, .card, .section, .chat-box) {
+    animation: rise-in var(--duration-enter) var(--ease-out) backwards;
+    animation-delay: calc((var(--enter, 0) + var(--enter-step, 0)) * var(--stagger));
+  }
+  :root:not(.guide-active) .page-heading > div > * { animation: rise-in var(--duration-enter) var(--ease-out) backwards; }
+  :root:not(.guide-active) .page-heading .lede { animation-delay: 80ms; }
+
+  /* Rows arrive whenever a list is filled, including after it is refreshed. */
+  :root:not(.guide-active) :is(.page ul, .page ol, .page tbody) > :is(li, tr) {
+    animation: row-in 380ms var(--ease-out) backwards;
+    animation-delay: calc(var(--row, 0) * 45ms + 60ms);
+  }
+
+  /* The revenue heatmap fills week by week, left to right (js/motion.js sets --n). */
+  :root:not(.guide-active) .heatmap .heat-cell {
+    animation: cell-in 420ms var(--ease-out) backwards;
+    animation-delay: calc(var(--n, 0) * 14ms);
+  }
+
+  /* The header's gradient drifts very slowly between teal and sand. */
+  .topbar {
+    background: linear-gradient(90deg, #a9dcd6 0%, #dfe5dc 27.5%, #f5e3d2 50%, #dfe5dc 72.5%, #a9dcd6 100%) 0 0 / 200% 100%;
+    animation: header-drift 28s ease-in-out infinite alternate;
+  }
+  .guide-active .topbar { animation-play-state: paused; }
+
+  .is-loading, .headline:has(.is-loading) .number { animation: shimmer 1.6s linear infinite; }
+
+}
+
+@keyframes rise-in { from { opacity: 0; transform: translateY(14px); } }
+@keyframes row-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes cell-in { from { opacity: 0; transform: scale(0.4); } }
+@keyframes header-drift { to { background-position: 100% 0; } }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+/* Used by chickyMotion.leave() (js/motion.js) when a row is removed: fade, then fold away. */
+.is-leaving { overflow: hidden; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
