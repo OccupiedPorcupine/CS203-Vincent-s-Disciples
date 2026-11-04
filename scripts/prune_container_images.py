@@ -44,9 +44,23 @@ class Vercel:
         self.token = token
         self.scope = scope
         self.project = project
+        self.repository_ids = None
 
-    def request(self, method, path, **params):
-        query = urllib.parse.urlencode({"projectId": self.project, **params})
+    # The project and its registry repositories by ID: with the team token, looking a repository up
+    # by name failed ("VCR Repository not found", 4 Nov) although the same call by name works when
+    # signed in to the CLI.
+    def resolve(self):
+        self.project = self.request("GET", f"/v9/projects/{self.project}", project=False)["id"]
+        repositories = self.request("GET", "/v1/vcr/repository")["repositories"]
+        self.repository_ids = {repository["name"]: repository["id"] for repository in repositories}
+
+    def repository_id(self, name):
+        if name not in self.repository_ids:
+            raise VercelError(f"No registry repository {name!r}; the token can see {sorted(self.repository_ids) or 'none'}")
+        return self.repository_ids[name]
+
+    def request(self, method, path, project=True, **params):
+        query = urllib.parse.urlencode({**({"projectId": self.project} if project else {}), **params})
         if self.token:
             request = urllib.request.Request(f"{API}{path}?{query}&teamId={self.scope}", method=method,
                                              headers={"Authorization": f"Bearer {self.token}"})
@@ -71,7 +85,7 @@ class Vercel:
         images, cursor = [], None
         while True:
             # The cursor parameter is "cursor"; "next" is silently ignored and returns the first page again.
-            page = self.request("GET", f"/v1/vcr/repository/{repository}/images", limit=100,
+            page = self.request("GET", f"/v1/vcr/repository/{self.repository_id(repository)}/images", limit=100,
                                 **({"cursor": cursor} if cursor else {}))
             images += page["images"]
             cursor = page.get("nextCursor")
@@ -85,7 +99,7 @@ class Vercel:
         return self.request("GET", "/v7/deployments", since=int(since_ms), limit=100)["deployments"]
 
     def delete(self, repository, image_id):
-        self.request("DELETE", f"/v1/vcr/repository/{repository}/images/{image_id}")
+        self.request("DELETE", f"/v1/vcr/repository/{self.repository_id(repository)}/images/{image_id}")
 
 
 def commit_tag(deployment):
@@ -134,14 +148,22 @@ def main():
 
     vercel = Vercel(token, args.scope, args.project)
     try:
+        vercel.resolve()
+        print(f"Project {vercel.project}; registry repositories: "
+              + ", ".join(f"{name} ({id_})" for name, id_ in sorted(vercel.repository_ids.items())))
         protected = tags_in_use(vercel, args.production_keep, args.recent_hours, datetime.now(timezone.utc))
     except (VercelError, KeyError, ValueError) as error:
-        sys.exit(f"Couldn't list deployments, so nothing was deleted: {error}")
+        sys.exit(f"Couldn't look up the project, its registry or its deployments, so nothing was deleted: {error}")
     print(f"Images used by recent and production deployments: {', '.join(sorted(protected)) or 'none found'}")
 
     failures = 0
     for repository in args.repositories:
-        images = vercel.images(repository)
+        try:
+            images = vercel.images(repository)
+        except VercelError as error:
+            failures += 1
+            print(f"{repository}: couldn't list images, so none were deleted: {error}", file=sys.stderr)
+            continue
         kept, deleted = plan(images, args.keep, protected)
         in_use = len(kept) - min(args.keep, len(images))
         print(f"{repository}: {len(images)} images; keeping {len(kept)} ({min(args.keep, len(images))} newest"
@@ -156,7 +178,7 @@ def main():
                 failures += 1
                 print(f"  failed: {error}", file=sys.stderr)
     if failures:
-        sys.exit(f"{failures} image(s) couldn't be deleted.")
+        sys.exit(f"{failures} problem(s): see above.")
 
 
 if __name__ == "__main__":
