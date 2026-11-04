@@ -4,9 +4,9 @@ import java.util.Locale;
 import java.util.Optional;
 
 // Chat apps an owner can link to their account (issue #103). Each is added by a ChatConnector.
+// Telegram only: WhatsApp (#102) was dropped.
 public enum ChatChannel {
-    TELEGRAM("Telegram"),
-    WHATSAPP("WhatsApp");
+    TELEGRAM("Telegram");
 
     private final String label;
 

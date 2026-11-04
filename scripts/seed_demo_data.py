@@ -2,7 +2,9 @@
 
 The script talks to the running backend the same way the browser does: it fetches a CSRF
 token, signs up (or logs in if the account exists), creates any missing dishes and adds the
-sales for every date that has none yet. Running it again only fills in missing dates.
+sales for every date that has none yet, with leftovers and the odd sell-out. It also gives each
+dish a price and cost (if it has none) and a recipe, so revenue, profit and the prep list's
+ingredients have something to show. Running it again only fills in what is missing.
 
     python3 scripts/seed_demo_data.py                      # 120 days ending yesterday
     python3 scripts/seed_demo_data.py --days 60 --csv demo_sales.csv
@@ -34,6 +36,33 @@ DISHES = {
     "Lemon chicken rice": 14,
 }
 
+# Selling price and cost of one portion, in S$.
+PRICES = {
+    "Roasted chicken rice": ("4.50", "1.80"),
+    "Steamed chicken rice": ("4.50", "1.70"),
+    "Char siew rice": ("5.00", "2.10"),
+    "Chicken drumstick rice": ("6.00", "2.60"),
+    "Lemon chicken rice": ("5.50", "2.30"),
+}
+
+# What one portion uses (cooked amounts). Each ingredient keeps one unit across dishes.
+RECIPES = {
+    "Roasted chicken rice": [("Chicken", "g", 150), ("Rice", "g", 200), ("Cucumber", "g", 30), ("Chilli sauce", "ml", 20)],
+    "Steamed chicken rice": [("Chicken", "g", 150), ("Rice", "g", 200), ("Cucumber", "g", 30), ("Chilli sauce", "ml", 20)],
+    "Char siew rice": [("Pork shoulder", "g", 120), ("Rice", "g", 200), ("Char siew sauce", "ml", 30), ("Cucumber", "g", 30)],
+    "Chicken drumstick rice": [("Chicken drumstick", "pcs", 1), ("Rice", "g", 200), ("Chilli sauce", "ml", 20)],
+    "Lemon chicken rice": [("Chicken thigh", "g", 140), ("Rice", "g", 200), ("Lemon sauce", "ml", 40)],
+}
+
+# Ingredients whose cooked weight differs from what is bought, and the app's default doesn't know:
+# rice roughly doubles and a half when cooked. Only set while the owner hasn't customised them.
+YIELDS = {"Rice": 250}
+
+# The smaller dishes sometimes sell out at the weekend lunch rush; other days leave a few over.
+SELL_OUT_DISHES = {"Char siew rice", "Lemon chicken rice"}
+WEEKEND_SELL_OUT_CHANCE = 0.3
+LEFTOVER_MEAN = 2.5
+
 # Monday first, matching date.weekday().
 WEEKDAY_FACTOR = [0.90, 0.92, 0.95, 0.97, 1.05, 1.25, 1.20]
 RAINY_DAY_CHANCE = 0.15
@@ -43,7 +72,7 @@ NOISE = 0.08
 
 
 def generate_sales(end_date, days, seed):
-    """Returns {dish name: [(date, quantity), ...]}, oldest first."""
+    """Returns {dish name: [(date, quantity, sold out at or None, leftover), ...]}, oldest first."""
     rng = random.Random(seed)
     dates = [end_date - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
     sales = {name: [] for name in DISHES}
@@ -55,8 +84,13 @@ def generate_sales(end_date, days, seed):
             stall_factor *= RAINY_DAY_FACTOR
 
         for name, base in DISHES.items():
-            quantity = round(base * stall_factor * rng.gauss(1, NOISE))
-            sales[name].append((day, max(quantity, 0)))
+            quantity = max(round(base * stall_factor * rng.gauss(1, NOISE)), 0)
+            if name in SELL_OUT_DISHES and day.weekday() >= 5 and rng.random() < WEEKEND_SELL_OUT_CHANCE:
+                sold_out_at = f"{rng.randint(12, 13)}:{rng.choice(['05', '20', '35', '50'])}"
+                sales[name].append((day, quantity, sold_out_at, 0))
+            else:
+                leftover = max(round(rng.gauss(LEFTOVER_MEAN, 1.5)), 0)
+                sales[name].append((day, quantity, None, leftover))
 
     return sales
 
@@ -65,7 +99,7 @@ def write_csv(path, sales):
     rows = sorted(
         (day.isoformat(), name, quantity)
         for name, records in sales.items()
-        for day, quantity in records
+        for day, quantity, _, _ in records
     )
     with open(path, "w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
@@ -117,8 +151,8 @@ def seed(api, sales):
 
         recorded = {sale["date"] for sale in api.request("GET", f"/api/dishes/{dishes[name]}/sales")}
         missing = [
-            {"date": day.isoformat(), "quantitySold": quantity}
-            for day, quantity in records
+            {"date": day.isoformat(), "quantitySold": quantity, "soldOutAt": sold_out_at, "leftoverQuantity": leftover}
+            for day, quantity, sold_out_at, leftover in records
             if day.isoformat() not in recorded
         ]
 
@@ -127,6 +161,22 @@ def seed(api, sales):
             print(f"{name}: added {added} days")
         else:
             print(f"{name}: already complete")
+
+        if name in PRICES and not api.request("GET", f"/api/dishes/{dishes[name]}/prices"):
+            price, cost = PRICES[name]
+            api.request("PUT", f"/api/dishes/{dishes[name]}/price",
+                        {"price": price, "unitCost": cost, "effectiveFrom": records[0][0].isoformat()})
+            print(f"{name}: price S${price}, cost S${cost}")
+        if name in RECIPES:
+            items = [{"ingredient": ingredient, "unit": unit, "quantity": quantity}
+                     for ingredient, unit, quantity in RECIPES[name]]
+            api.request("PUT", f"/api/dishes/{dishes[name]}/recipe", {"items": items})
+
+    for ingredient in api.request("GET", "/api/ingredients"):
+        if ingredient["name"] in YIELDS and not ingredient["customised"]:
+            api.request("PUT", f"/api/ingredients/{ingredient['id']}",
+                        {"yieldPercent": YIELDS[ingredient["name"]], "perishable": ingredient["perishable"]})
+            print(f"{ingredient['name']}: {YIELDS[ingredient['name']]}% yield")
 
 
 def main():
