@@ -53,7 +53,7 @@ class AssistantUsageTest {
         }
 
         @Override
-        public byte[] speak(String text) {
+        public byte[] speak(String text, SpeechFormat format) {
             failIfAsked();
             return new byte[] {1, 2, 3};
         }

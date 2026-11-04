@@ -120,14 +120,14 @@ public class OpenAiAssistantModelClient implements AssistantModelClient {
     }
 
     @Override
-    public byte[] speak(String text) {
+    public byte[] speak(String text, SpeechFormat format) {
         requireConfigured();
         ObjectNode request = jsonMapper.createObjectNode();
         request.put("model", speechModel);
         request.put("voice", speechVoice);
         request.put("input", text);
         request.put("instructions", SPEECH_STYLE);
-        request.put("response_format", "mp3");
+        request.put("response_format", format.apiName());
 
         return call("speech (" + speechModel + ")", () -> restClient.post()
                 .uri("/audio/speech")

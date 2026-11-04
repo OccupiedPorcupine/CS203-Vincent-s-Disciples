@@ -2,6 +2,7 @@ package app.chat;
 
 import app.assistant.AssistantException;
 import app.assistant.AssistantService;
+import app.assistant.SpeechFormat;
 import app.dto.AssistantMessageRequest;
 import app.dto.AssistantMessageResponse;
 import org.slf4j.Logger;
@@ -30,7 +31,7 @@ public class ChatMessageService {
     static final Duration DELIVERY_MEMORY = Duration.ofDays(2);
     static final int MAX_TEXT = 1000;
 
-    static final String NOT_LINKED = "This chat isn't linked to a Chicky account yet. In Chicky, open Account, "
+    public static final String NOT_LINKED = "This chat isn't linked to a Chicky account yet. In Chicky, open Account, "
             + "then Chat apps, and tap Connect.";
 
     private final ChatLinkRepository links;
@@ -94,7 +95,7 @@ public class ChatMessageService {
                 return ChatReply.text("Tell me what you sold, like \"chicken rice 42, char siew 30\".");
             }
             if (text.length() > MAX_TEXT) {
-                return new ChatReply(heard, "That message is too long for me. Please send it in shorter parts.", null);
+                return new ChatReply(heard, "That message is too long for me. Please send it in shorter parts.", null, null);
             }
 
             String conversationId = link.conversationFor(clock.instant(), CONVERSATION_IDLE);
@@ -104,13 +105,27 @@ public class ChatMessageService {
                     conversationId, text, AssistantService.CHAT_PAGE,
                     channel.name().toLowerCase(Locale.ROOT) + "-" + mode, null, null));
             if (response.proposal() == null) {
-                return new ChatReply(heard, response.reply(), null);
+                return new ChatReply(heard, response.reply(), null, null);
             }
-            return new ChatReply(heard, response.reply() + "\n\n" + ChatProposalText.proposal(response.proposal()),
-                    response.proposal().id());
+            return new ChatReply(heard, response.reply(), ChatProposalText.proposal(response.proposal()), response.proposal().id());
         } catch (AssistantException exception) {
             log.info("{} message for user {} not handled: {}", channel, ownerId, exception.getCode());
-            return new ChatReply(heard, exception.getMessage(), null);
+            return new ChatReply(heard, exception.getMessage(), null, null);
+        }
+    }
+
+    // A reply as a voice note (Ogg Opus), for owners who sent one. Empty when the chat isn't linked,
+    // speech isn't available, or today's spoken replies are used up: the text reply is enough then.
+    public Optional<byte[]> speak(ChatChannel channel, String externalId, String text) {
+        Optional<ChatLink> link = links.findByChannelAndExternalId(channel, externalId);
+        if (link.isEmpty() || text == null || text.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(assistant.speak(link.get().getOwnerId(), text, SpeechFormat.OPUS));
+        } catch (AssistantException exception) {
+            log.info("No spoken {} reply for user {}: {}", channel, link.get().getOwnerId(), exception.getCode());
+            return Optional.empty();
         }
     }
 

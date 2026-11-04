@@ -100,7 +100,7 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     }
 
     @Override
-    public byte[] speak(String text) {
+    public byte[] speak(String text, SpeechFormat format) {
         throw new AssistantException(HttpStatus.SERVICE_UNAVAILABLE, "VOICE_UNAVAILABLE",
                 "Spoken replies need the OpenAI key on the server.");
     }

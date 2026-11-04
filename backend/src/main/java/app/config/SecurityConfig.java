@@ -30,6 +30,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import jakarta.servlet.http.HttpServletResponse;
 
+import app.chat.telegram.TelegramWebhookController;
+
 @Configuration
 public class SecurityConfig {
 
@@ -61,6 +63,10 @@ public class SecurityConfig {
                         // The H2 console does not send the application's CSRF token.
                         // This exception should only exist for local development.
                         // .ignoringRequestMatchers(h2Console)
+
+                        // Telegram calls the bot's webhook with no session; it proves itself with
+                        // a secret header instead (TelegramWebhookController).
+                        .ignoringRequestMatchers(TelegramWebhookController.PATH)
                 )
 
                 .securityContext(context -> context
@@ -84,7 +90,8 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/password-reset",
                                 "/api/auth/password-reset/confirm",
-                                "/api/auth/verify-email"
+                                "/api/auth/verify-email",
+                                TelegramWebhookController.PATH
                         ).permitAll()
 
                         // Error responses ({code, message}, see ApiErrorAttributes), so a 401 or 403
