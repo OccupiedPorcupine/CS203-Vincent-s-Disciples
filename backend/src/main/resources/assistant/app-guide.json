@@ -126,6 +126,7 @@
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "account-details", "description": "The name and email the user signed in with." },
+        { "guideId": "session-settings", "description": "Sign-in duration settings: idle timeout in minutes and maximum sign-in duration in hours. Defaults are 60 minutes and 8 hours. Save settings applies them on the next sign-in, across devices; Use defaults fills in the defaults before saving." },
         { "guideId": "chat-apps", "description": "Chat apps set up on this server, such as Telegram, each with Connect or Disconnect. Connect shows a link (and a QR code on a computer) that opens the chat app; after tapping Start there, the user can send sales by text or voice note and confirm them in the chat." }
       ]
     }

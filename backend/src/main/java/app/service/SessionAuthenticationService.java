@@ -1,6 +1,8 @@
 package app.service;
 
 import app.user.AppUser;
+import app.account.SessionExpiry;
+import java.time.Clock;
 import app.user.AuthenticatedUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,13 +21,16 @@ public class SessionAuthenticationService {
 
     private final SecurityContextRepository securityContextRepository;
     private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
+    private final Clock clock;
 
     public SessionAuthenticationService(
             SecurityContextRepository securityContextRepository,
-            SessionAuthenticationStrategy sessionAuthenticationStrategy
+            SessionAuthenticationStrategy sessionAuthenticationStrategy,
+            Clock clock
     ) {
         this.securityContextRepository = securityContextRepository;
         this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
+        this.clock = clock;
     }
 
     public void authenticate(
@@ -54,5 +59,6 @@ public class SessionAuthenticationService {
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, request, response);
+        SessionExpiry.start(request.getSession(), user, clock.millis());
     }
 }

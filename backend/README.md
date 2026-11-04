@@ -1,3 +1,16 @@
+## Session expiry
+
+New sign-ins default to 60 minutes idle and 8 hours absolute lifetime. Account → Sign-in duration
+lets each user save 5–1,440 idle minutes and 1–168 absolute hours (idle cannot exceed absolute).
+Preferences are stored on `app_users` by migration V35 and apply to subsequent sign-ins on all devices.
+Existing sessions keep their original limits; saving preferences never resets the sign-in clock.
+Spring Session JDBC enforces inactivity since the last request, including background requests.
+The absolute deadline is persisted in the session at authentication and checked before security
+loads the session. At the deadline, the next protected request is refused; no browser timer is required.
+Older sessions without a deadline expire eight hours after their original creation time.
+Settings are available through authenticated, CSRF-protected GET/PUT `/api/account/session-settings`
+with `{ "idleMinutes": 60, "absoluteMinutes": 480 }` (GET does not require a CSRF token).
+
 ## Requirements
 
 - Java 21+
