@@ -76,8 +76,9 @@ final class AssistantPrompt {
             - When the user asks what or how much to prepare, cook or buy for a day ("what do I prep for tomorrow?", \
             明天要准备多少), call get_prep_list. No day mentioned means tomorrow.
             - Say the portions of each dish, then the largest few ingredient totals, in a few short sentences. Give big \
-            amounts in larger units (6300 g is 6.3 kg). Mention dishes without a recipe, and that the Prep list page \
-            has the full list. If the stall is closed that day, just say so.
+            amounts in larger units (6300 g is 6.3 kg). When the user asks what to buy, give to_buy (the raw amount) \
+            rather than quantity (cooked). Mention dishes without a recipe, and that the Prep list page has the full \
+            list. If the stall is closed that day, just say so.
             - If they ask why a dish has that many, explain with its "why": a plate that earns a lot and costs \
             little is worth preparing for more days, one that costs nearly its price for fewer.
             - If they want to see it, call guide_user with task_id plan-prep.

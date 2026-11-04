@@ -12,7 +12,7 @@ public record PrepListResponse(
         @Schema(description = "Why the stall is closed that day; the lists are then empty. Null when open.") String closed,
         @Schema(description = "Extra portions on top of the forecast, in percent; null when each dish is prepared by its margin or to the top of its likely range") Integer bufferPercent,
         List<Dish> dishes,
-        @Schema(description = "Total of each ingredient for the dishes that have a recipe, by name") List<Ingredient> ingredients,
+        @Schema(description = "Total of each ingredient for the dishes that have a recipe, by name; perishables are bought for the day, the rest come from stock") List<Ingredient> ingredients,
         @Schema(description = "Dishes sold recently that couldn't be forecast, and why") List<Skipped> skipped
 ) {
     public record Dish(
@@ -29,7 +29,15 @@ public record PrepListResponse(
             @Schema(description = "Why this many, for showing to the user", example = "Running out costs you $2.90 a plate and a leftover $1.60, so this is enough on about 64% of days like it.") String why
     ) {}
 
-    public record Ingredient(String ingredient, String unit, BigDecimal quantity, List<String> dishes) {}
+    public record Ingredient(
+            String ingredient,
+            String unit,
+            @Schema(description = "Amount the portions use, as the recipes give it (cooked)", example = "7200") BigDecimal quantity,
+            List<String> dishes,
+            @Schema(description = "Cooked or usable weight ÷ purchased weight, in percent", example = "70") BigDecimal yieldPercent,
+            @Schema(description = "Amount to buy or take from stock: quantity ÷ yield, rounded up", example = "10285.715") BigDecimal toBuy,
+            @Schema(description = "Bought for this day (true), or kept in stock and bought weekly (false)") boolean perishable
+    ) {}
 
     public record Skipped(String dish, String reason) {}
 }
