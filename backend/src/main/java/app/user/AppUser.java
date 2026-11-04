@@ -71,6 +71,14 @@ public class AppUser {
         this.pictureUrl = pictureUrl;
     }
 
+    // Hands an account that never confirmed its email to the Google user who owns that address.
+    // The password goes, since whoever set it may not own the address.
+    public void claimWithGoogle(String googleId, String email, String name, String pictureUrl) {
+        this.googleId = googleId;
+        this.passwordHash = null;
+        updateProfile(email, name, pictureUrl);
+    }
+
     public void changePassword(String passwordHash) {
         this.passwordHash = passwordHash;
     }

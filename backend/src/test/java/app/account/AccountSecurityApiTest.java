@@ -1,6 +1,8 @@
 package app.account;
 
+import app.service.GoogleAuthService;
 import app.service.PublicHolidaySyncService;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -25,6 +27,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 // Password reset, email verification and the {code, message} error body over real HTTP and a
 // real (H2) database (issue #49). Emails are captured instead of sent.
@@ -39,6 +42,10 @@ class AccountSecurityApiTest {
 
     @MockitoBean
     EmailSender emailSender;
+
+    // Stubbed so a test can sign in as a Google user without a real ID token.
+    @MockitoBean
+    GoogleAuthService googleAuthService;
 
     @LocalServerPort
     int port;
@@ -121,6 +128,44 @@ class AccountSecurityApiTest {
         clearInvocations(emailSender);
         assertEquals(202, session.send("POST", "/api/auth/verify-email/resend", null).statusCode());
         verify(emailSender, never()).send(any(), any(), any());
+    }
+
+    @Test
+    void theAddressOwnerTakesBackAnUnconfirmedAccountBySigningInWithGoogle() throws Exception {
+        // Someone signs up with an address they don't own and never confirms it (#117).
+        Session impostor = signUp("owner@account.test");
+        GoogleIdToken.Payload payload = new GoogleIdToken.Payload();
+        payload.setSubject("google-owner");
+        payload.setEmail("owner@account.test");
+        payload.set("name", "Real owner");
+        when(googleAuthService.verifyToken("owner-credential")).thenReturn(payload);
+
+        Session owner = new Session();
+        HttpResponse<String> google = owner.send("POST", "/api/auth/google", "{\"credential\":\"owner-credential\"}");
+
+        assertEquals(200, google.statusCode(), google.body());
+        assertTrue(owner.get("/api/profile").body().contains("\"emailVerified\":true"));
+        assertEquals(401, impostor.get("/api/profile").statusCode());
+        assertEquals(401, login("owner@account.test", PASSWORD).statusCode());
+    }
+
+    @Test
+    void aConfirmedAccountStillNeedsLinkingBeforeGoogleSignIn() throws Exception {
+        clearInvocations(emailSender);
+        Session session = signUp("confirmed@account.test");
+        String token = emailedToken("confirmed@account.test", "Confirm your email for Chicky");
+        new Session().send("POST", "/api/auth/verify-email", "{\"token\":\"" + token + "\"}");
+        GoogleIdToken.Payload payload = new GoogleIdToken.Payload();
+        payload.setSubject("google-confirmed");
+        payload.setEmail("confirmed@account.test");
+        when(googleAuthService.verifyToken("confirmed-credential")).thenReturn(payload);
+
+        HttpResponse<String> google = new Session().send("POST", "/api/auth/google", "{\"credential\":\"confirmed-credential\"}");
+
+        assertEquals(409, google.statusCode());
+        assertTrue(google.body().contains("\"code\":\"ACCOUNT_LINKING_REQUIRED\""), google.body());
+        assertEquals(200, session.get("/api/profile").statusCode());
+        assertEquals(200, login("confirmed@account.test", PASSWORD).statusCode());
     }
 
     @Test
