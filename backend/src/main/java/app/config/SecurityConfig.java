@@ -31,12 +31,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import jakarta.servlet.http.HttpServletResponse;
 
 import app.chat.telegram.TelegramWebhookController;
+import app.account.SessionExpiryFilter;
+import java.time.Clock;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 @Configuration
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository,
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityContextRepository securityContextRepository, Clock clock,
                                                    @Value("${app.security.require-https:false}") boolean requireHttps,
                                                    @Value("${spring.h2.console.enabled:false}") boolean h2ConsoleEnabled) throws Exception {
 
@@ -53,6 +56,7 @@ public class SecurityConfig {
         // var h2Console = PathRequest.toH2Console();
 
         http
+                .addFilterBefore(new SessionExpiryFilter(clock), SecurityContextHolderFilter.class)
                 .cors(Customizer.withDefaults())
 
                 .csrf(csrf -> csrf
