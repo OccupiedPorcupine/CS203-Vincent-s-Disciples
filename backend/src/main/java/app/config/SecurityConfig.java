@@ -146,7 +146,8 @@ public class SecurityConfig {
                         .logoutUrl("/api/auth/logout")
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)
-                        .deleteCookies("JSESSIONID")
+                        // Spring Session names the login cookie SESSION, not the servlet default JSESSIONID.
+                        .deleteCookies("SESSION")
                         .logoutSuccessHandler((request, response, authentication) ->
                                 response.setStatus(HttpServletResponse.SC_NO_CONTENT))
                 );
