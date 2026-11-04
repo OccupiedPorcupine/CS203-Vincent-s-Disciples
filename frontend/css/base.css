@@ -56,6 +56,7 @@
   --duration-slow: 450ms;    /* the tour's spotlight moving */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* small overshoot: buttons popping in */
 }
 
 /* Base */
@@ -174,6 +175,7 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-card);
+  transition: box-shadow var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
 }
 .card-title { margin-bottom: 12px; font-size: var(--text-md); }
 
@@ -311,6 +313,54 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 ::view-transition-group(page) { animation-duration: var(--duration-base); }
 @keyframes page-out { to { opacity: 0; transform: translateY(-6px); } }
 @keyframes page-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* ---- Motion and polish (DESIGN.md, "Motion") ----
+   Interaction feedback (hover, press, focus) applies everywhere. Entrance and ambient motion is
+   inside `prefers-reduced-motion: no-preference`, so it simply doesn't exist for people who
+   asked for less motion, and is off during the guided tour (.guide-active), which measures where
+   things are and must not chase a card that is still rising. */
+
+/* Controls: colour, lift and press. */
+.primary-button,
+.secondary-button {
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+.primary-button:hover:not(:disabled) { box-shadow: 0 6px 16px rgb(15 125 119 / 24%); transform: translateY(-1px); }
+.secondary-button:hover:not(:disabled) { border-color: #b9dcd8; box-shadow: 0 4px 12px rgb(66 86 100 / 8%); transform: translateY(-1px); }
+:is(.primary-button, .secondary-button):active:not(:disabled) { box-shadow: none; transform: translateY(0) scale(0.97); transition-duration: 60ms; }
+.text-button { text-decoration-color: rgb(15 125 119 / 40%); transition: text-decoration-color var(--duration-fast), color var(--duration-fast); }
+.text-button:hover:not(:disabled) { color: var(--teal-hover); text-decoration-color: currentColor; }
+.segmented button { transition: background-color var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
+.segmented button:hover:not([aria-pressed="true"]) { color: var(--ink); }
+.tag { transition: background-color var(--duration-fast), color var(--duration-fast); }
+
+.input { transition: border-color var(--duration-fast), box-shadow var(--duration-fast), background-color var(--duration-fast); }
+.input:hover:not(:disabled, :focus) { border-color: var(--subtle); }
+/* Replaces the outline on fields: a teal border (3.2:1) plus a soft halo. */
+.input:focus-visible { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgb(27 160 152 / 22%); }
+
+/* Cards lift a little under the pointer, so it's clear which one you're reading. Cards holding a
+   form stay put: a card that moves while you type in it is unsettling. */
+@media (hover: hover) {
+  .card:not(:has(form)):hover { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
+}
+
+/* Header: the avatar and menu button respond, menu items nudge towards the pointer. */
+.avatar { transition: box-shadow var(--duration-fast), transform var(--duration-fast) var(--ease-out); }
+.avatar:hover { transform: scale(1.05); }
+.navigation summary img { transition: opacity var(--duration-fast); }
+.navigation summary:hover img, .navigation[open] summary img { opacity: 0.9; }
+.navigation a { transition: background-color var(--duration-fast), padding-left var(--duration-fast) var(--ease-out); }
+.navigation a:hover:not([aria-current="page"]) { padding-left: 16px; }
+
+/* Status lines settle in when they report a result. */
+.status-text:is(.is-success, .is-error):not(:empty) { animation: status-in var(--duration-base) var(--ease-out); }
+@keyframes status-in { from { opacity: 0; transform: translateY(-3px); } }
+
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }

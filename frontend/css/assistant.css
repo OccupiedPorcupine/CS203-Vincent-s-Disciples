@@ -37,7 +37,11 @@
   /* Kept out of the page cross-fade (base.css) so it never disappears behind the content. */
   view-transition-name: assistant-bubble;
 }
-.assistant-bubble:hover { background: var(--assistant-teal-dark); }
+.assistant-bubble {
+  transition: background-color var(--duration-fast, 160ms), transform var(--duration-fast, 160ms) var(--ease-out, ease-out), box-shadow var(--duration-fast, 160ms);
+}
+.assistant-bubble:hover { background: var(--assistant-teal-dark); transform: scale(1.06); box-shadow: 0 8px 22px rgb(15 125 119 / 32%); }
+.assistant-bubble:active { transform: scale(0.95); }
 .guide-active .assistant-bubble { view-transition-name: none; }
 
 .assistant-panel {

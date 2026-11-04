@@ -313,6 +313,19 @@ Motion explains where something came from or went; it is never decoration. Every
 | `--duration-slow` | 450ms | The tour's spotlight moving between elements |
 | `--ease-out` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Things appearing or arriving |
 | `--ease-in-out` | `cubic-bezier(0.65, 0, 0.35, 1)` | Things moving from one place to another |
+| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | Small things popping in with a slight overshoot (send button, assistant bubble) |
+
+**Feedback on interaction.**
+
+| Element | Hover | Press |
+| --- | --- | --- |
+| Primary and secondary buttons | Lift 1px with a soft shadow | Scale to 97% |
+| Cards (without a form) | Lift 2px, `--shadow-card-hover` | – |
+| Fields | Border darkens to `--subtle` | Focus: `--teal` border and a soft teal halo |
+| Menu items | Nudge 4px right | – |
+| Avatar, assistant bubble, icon buttons | Grow slightly | Shrink slightly |
+
+Cards that hold a form don't lift: a card that moves while you type in it is unsettling.
 
 **Moving between pages.** Pages cross-fade using the browser's View Transitions: the header stays
 still while the old content lifts away and the new content rises in. Every page opts in with an
