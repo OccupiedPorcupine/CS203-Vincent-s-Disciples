@@ -186,6 +186,9 @@ def score(case, result, today, shown=None):
         passed = not problems
     elif expect["type"] == "guide":
         passed = bool(guide) and any(step["guideId"] in expect["anyOf"] for step in guide)
+    elif expect["type"] == "link":
+        # In a chat app (page "chat") there are no tours: the reply links to the page instead (#99).
+        passed = proposal is None and not guide and any(page in result["reply"] for page in expect["anyOf"])
     else:
         passed = True
     return passed, fields

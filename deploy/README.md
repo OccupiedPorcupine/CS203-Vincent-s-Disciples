@@ -43,6 +43,7 @@ Set these in the Vercel project under **Settings → Environment Variables**, or
 | `APP_CORS_ALLOWED_ORIGINS` | The same address | The same address |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | An SMTP account (see below); the password as a sensitive variable | The same |
 | `SWAGGER_ENABLED` | Optional: `true` to serve the API docs at `/swagger-ui.html` | Unset (the docs stay private) |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET` | Unset: previews sit behind Vercel's login, so Telegram can't reach them | The bot's settings (see below); the token and secret as sensitive variables |
 | `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` | The **Staging** Supabase project (Seoul, `ap-northeast-2`) | The **Production** Supabase project (Singapore, `ap-southeast-1`) |
 
 Use each project's **Session pooler** address from Supabase's **Connect** panel, as `jdbc:postgresql://<host>:5432/postgres?sslmode=require`. The direct address is IPv6-only, and Vercel can't reach it. Put any new Supabase project in an Asian region, because of the startup limit above.
@@ -52,6 +53,8 @@ Only the live site uses the Production project. Don't point a local `backend/.en
 **The `prod` profile checks the settings.** With it, the backend refuses to start, and lists what's wrong, if the H2 console is on, the login cookie isn't HTTPS-only, `FORWARD_HEADERS_STRATEGY` is `none`, the database is H2, `MAIL_HOST` isn't set, or `APP_BASE_URL` or a CORS origin isn't `https://`. It also turns the Swagger UI off unless `SWAGGER_ENABLED=true`.
 
 **Email.** Password reset and email verification links are sent over SMTP. Without a domain of your own, Brevo's free plan (300 emails a day) sends from a single verified address; Resend needs a verified domain to send to anyone but you. Locally, without `MAIL_HOST`, the emails are written to the backend log instead.
+
+**Telegram.** The bot (see `backend/README.md`, "Telegram bot") runs on Production only. Previews need Vercel's login, which Telegram can't get past, and a bot has a single webhook, so a preview would take the bot away from the live site. After setting the three variables and redeploying, sign in as an admin and call `POST /api/admin/telegram/webhook` once. Telegram resends an update when the reply is slow, as it can be on a cold start; the backend handles each update once.
 
 **Previews share Staging, so migrations can reach it out of order.** Each branch's preview applies its own migrations: one PR's V25 can land before another PR's V23. So Preview, and only Preview, also sets:
 - `SPRING_FLYWAY_OUTOFORDER=true`, which applies a lower-numbered migration that arrives later;

@@ -191,6 +191,15 @@ class ChatLinkApiTest {
     }
 
     @Test
+    void withoutATelegramTokenTheWebhookDoesNotExist() throws Exception {
+        HttpResponse<String> response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/channels/telegram/webhook"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{\"update_id\": 1}")).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(404, response.statusCode(), response.body());
+    }
+
+    @Test
     void aResentMessageIsHandledOnce() {
         assertTrue(chatMessages.firstDelivery(CHANNEL, "update-1"));
         assertFalse(chatMessages.firstDelivery(CHANNEL, "update-1"));

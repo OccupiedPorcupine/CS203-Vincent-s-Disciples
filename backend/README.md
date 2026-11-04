@@ -64,6 +64,8 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `POST /api/assistant/transcribe` — multipart `audio` (under a minute) → `{text, languages}`; audio is not stored
 - `POST /api/assistant/messages` — `{conversationId?, text, page, inputMode, pageContext?, forecast?}` → `{conversationId, reply, proposal?, guide?}`; a proposal is only a suggestion. `forecast` (`{dishId, date}`) is the forecast on screen, so "why so high?" refers to it
 - `POST /api/assistant/proposals/{id}/confirm` — saves a proposal (optionally edited: `{entries: [...]}`); `.../cancel` discards it
+- `GET /api/chat-links` — chat apps set up on this server, each with the account's linked chat; `POST /api/chat-links/{channel}` → `{code, link, expiresAt}`, a one-time code (10 minutes) that links the chat it is sent from; `DELETE /api/chat-links/{id}` unlinks
+- `POST /api/channels/telegram/webhook` — Telegram's updates for the bot; only with the `X-Telegram-Bot-Api-Secret-Token` header (see "Telegram bot")
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)
@@ -93,6 +95,18 @@ It also explains forecasts. The forecast page's "Ask about this forecast" card s
 forecast and only what it was made from: the basis, the dish's last 4 same-weekday sales and the last
 7 days, and whether the weather forecast and a public holiday were used. The prompt tells the model
 to quote only those and to say that any other reason the user suggests isn't taken into account.
+
+### Telegram bot
+
+Owners can record sales from Telegram (issues #99 and #100): they link the chat on the **Account** page, then send sales as a message or a voice note and tap **Confirm** in the chat. `/today`, `/prep` and `/forecast` answer from the account's data without the language model. The bot is off unless `TELEGRAM_BOT_TOKEN` is set.
+
+To turn it on:
+
+1. In Telegram, message [@BotFather](https://t.me/BotFather), send `/newbot` and follow the steps. It gives you the bot's token and username.
+2. Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` (without the `@`) and `TELEGRAM_WEBHOOK_SECRET` (any long random string of letters, digits, `_` and `-`, e.g. from `openssl rand -hex 32`). Keep the token and the secret out of git.
+3. Telegram must be able to reach the backend over HTTPS at `APP_BASE_URL`. Register the webhook once per environment by calling `POST /api/admin/telegram/webhook` as an admin. It also sets the bot's command menu.
+
+Telegram calls `POST /api/channels/telegram/webhook` with each update, and the backend refuses any call without the secret. A bot has one webhook, so each environment needs its own bot. Only private chats are handled; group chats are ignored. Replies are plain text, and a voice note gets a spoken reply too, which counts against the daily spoken replies.
 
 ### Demo data
 
