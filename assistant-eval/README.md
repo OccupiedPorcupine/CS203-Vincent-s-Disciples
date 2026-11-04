@@ -3,6 +3,9 @@
 Measures how well the assistant turns what hawkers say into sales, for the "AI integration:
 evaluation and guardrails" section of the project document (issue #32).
 
+**The write-up is [REPORT.md](REPORT.md):** the models, the prompt and tool design, the
+guardrails and how each is tested, the results across runs, and the known weaknesses.
+
 ## Run it
 
 Start the backend, then:
@@ -56,26 +59,30 @@ committing anyone's voice.
 
 ## Real use
 
-Every message to the assistant is logged in `assistant_interactions` (see
-`backend/src/main/resources/db/migration/common/V8__assistant_interactions.sql`). How often
-people accept proposals unchanged, edit or cancel them:
+Every message to the assistant is logged in `assistant_interactions`, with its outcome, time and
+tokens. [`interactions_report.sql`](interactions_report.sql) reports:
+- how often people confirm proposals unchanged, edit them, cancel them or let them expire, by input mode and language (`en`, `zh` or `mixed`, from the scripts in the text);
+- the median and 90th-percentile time per message;
+- tokens and language-model cost per message.
 
-```sql
-SELECT outcome, count(*) AS proposals
-FROM assistant_interactions
-WHERE proposal_json IS NOT NULL
-GROUP BY outcome;
+It is read-only. Against Supabase, use the project's Postgres connection string (Supabase → Connect),
+not the `jdbc:` URL the backend uses:
+
+```bash
+psql "postgresql://USER:PASSWORD@HOST:5432/postgres" -f assistant-eval/interactions_report.sql
 ```
 
-And by input type and language. Each message is labelled `en`, `zh` or `mixed` from the scripts in the
-text that was sent (empty when it's only numbers):
+Against a local backend, give it a file database instead of the in-memory one, with
+`AUTO_SERVER=TRUE` so a second connection is allowed. From the repository root:
 
-```sql
-SELECT input_mode, detected_languages, outcome, count(*)
-FROM assistant_interactions
-WHERE proposal_json IS NOT NULL
-GROUP BY input_mode, detected_languages, outcome
-ORDER BY input_mode, detected_languages;
+```bash
+DB="jdbc:h2:file:$PWD/.local-data/evaldb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE"
+(cd backend && ASSISTANT_FREE_MESSAGES_PER_DAY=500 java -jar target/demo-0.0.1-SNAPSHOT.jar \
+  --spring.profiles.active=h2test "--spring.datasource.url=$DB") &
+python3 assistant-eval/run_eval.py
+java -cp ~/.m2/repository/com/h2database/h2/2.4.240/h2-2.4.240.jar org.h2.tools.RunScript \
+  -url "$DB" \
+  -user sa -script assistant-eval/interactions_report.sql -showResults
 ```
 
 ## Results so far
@@ -88,3 +95,4 @@ ORDER BY input_mode, detected_languages;
 | 2026-10-31 | `gpt-6-luna` | 55/55 | 0 | With the 9 price cases (#43) and the price instructions in the prompt. All pass, including Mandarin "五块", spoken "four fifty", a price with a cost, an unknown dish (asked about) and "chicken rice 5" staying a sale. `ask-01` also passed this time; nothing targeted it, so it may vary between runs. |
 | 2026-11-02 | `gpt-6-luna` | 68/72 | 0 | Sold-out times and leftovers (#50): 8/8. en-05 and zh-08 ("on Monday") fail because the run was on a Monday, so the expected date is ambiguous; ask-01 as before; prep-03 because the eval account has no prep list. |
 | 2026-11-03 | `gpt-6-luna` | 76/77, then explain 6/6 | 0 | With `explain_forecast` (#55) and its prompt section. Full run 76/77, explain 5/5: every reply quoted only the real inputs (e.g. "the average of your last 4 Wednesdays: 52, 48, 55 and 50") and said weather and holidays weren't used; "is it because of the rain?" and "got event nearby is it" were both answered no. The explain cases were rerun after adding "why is the range so wide?" and the range's explanation to the tool: 6/6. The one failure is `ask-01` as before. |
+| 2026-11-04 | `gpt-6-luna` | 77/78 | 0 | A repeat of the full set, to see how much a run varies. The only failure is `ask-01` again (5 of 6 runs). Run against a file database, so `interactions_report.sql` could measure it: a median of 3.1 s per message on the server (90th percentile 4.4 s), and about US$0.00017 of language model per typed message, with 96% of input tokens cached. |
