@@ -18,7 +18,7 @@ import java.util.Optional;
 
 // The part of every chat app that isn't specific to one (issue #99): finds the account a chat is
 // linked to and passes its messages to the same assistant as the web, with page "chat". Channel
-// connectors (Telegram #100, WhatsApp #102) only turn their app's messages into calls here and
+// connectors (Telegram #100) only turn their app's messages into calls here and
 // ChatReply back into messages. A chat that isn't linked can't read or change anything.
 @Service
 public class ChatMessageService {
