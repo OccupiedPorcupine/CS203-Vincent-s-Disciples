@@ -87,11 +87,16 @@ async function micCovers(page) {
 }
 
 // Lets entrance animations (cards and rows rising in, see DESIGN.md "Motion") finish, so sizes
-// are measured where things end up rather than mid-flight. Endless ones (shimmer, header) are skipped.
+// are measured where things end up rather than mid-flight. Endless ones (shimmer, header) are skipped,
+// and so are finished ones: WebKit can leave a table row's `finished` promise unresolved after its
+// row-in has ended. Gives up after 15s, longer than any entrance (the sign-in ring pulse is 12.4s).
 async function settle(page) {
-  await page.evaluate(() => Promise.all(document.getAnimations()
-    .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
-    .map(animation => animation.finished.catch(() => {}))));
+  await page.evaluate(() => Promise.race([
+    Promise.all(document.getAnimations()
+      .filter(animation => animation.playState !== "finished" && animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map(animation => animation.finished.catch(() => {}))),
+    new Promise(resolve => setTimeout(resolve, 15000))
+  ]));
 }
 
 async function mockApi(context) {
