@@ -332,6 +332,9 @@ thousands separators. Nothing to wire up: set `textContent` as usual.
 "Loading" or "Checking" gets `.is-loading`, a slow light sweep across the text; a card's `--`
 figure shimmers with it. Still no spinners.
 
+**Charts draw in** ([js/chart-theme.js](js/chart-theme.js)): points and bars arrive left to right,
+55ms apart. The recorded line has a faint ink wash beneath it, and hovered bars turn teal.
+
 **Feedback on interaction.**
 
 | Element | Hover | Press |
@@ -343,6 +346,11 @@ figure shimmers with it. Still no spinners.
 | Avatar, assistant bubble, icon buttons | Grow slightly | Shrink slightly |
 
 Cards that hold a form don't lift: a card that moves while you type in it is unsettling.
+
+**Things that open** grow out of where they came from: menus drop and unshrink from their corner,
+the assistant panel grows from the bubble, the Record sales dialog rises with a blurred backdrop,
+and a dismissed action slides right, fades and folds its row away (`chickyMotion.leave(element)`).
+Status lines settle in when they report a result.
 
 **The guided tour wins.** Entrance animations are off while a tour is running (`.guide-active`):
 the tour measures where things are and must not chase a card that is still rising.
