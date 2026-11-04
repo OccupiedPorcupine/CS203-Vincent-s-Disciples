@@ -12,6 +12,7 @@ from ml.src.simulation.backtest import (
     Forecast,
     History,
     POLICIES,
+    AppMarginBaseline,
     AppSoldOutBaseline,
     SoldOutAwareBaseline,
     Target,
@@ -95,6 +96,20 @@ def test_app_baseline_range_comes_from_its_last_twelve_errors():
         same = [sold[j] for j in range(index) if j % 7 == index % 7][-4:]
         errors.append(sold[index] - np.mean(same))
     assert forecast.quantile(0.9) == pytest.approx(forecast.point + np.quantile(sorted(errors), 0.9))
+
+
+def test_the_margin_baseline_aims_with_eight_weeks_of_errors():
+    rng = np.random.default_rng(2)
+    sold = list(rng.integers(30, 70, 112).astype(float))
+    history = history_from(sold)
+    forecast = AppMarginBaseline().forecast(history, target(date(2025, 6, 23)))
+
+    # BaselineForecaster.atProbability, written out directly.
+    errors = []
+    for index in range(len(sold) - 56, len(sold)):
+        same = [sold[j] for j in range(index) if j % 7 == index % 7][-4:]
+        errors.append(sold[index] - np.mean(same))
+    assert forecast.quantile(0.64) == pytest.approx(forecast.point + np.quantile(sorted(errors), 0.64))
 
 
 def test_sell_out_times_raise_the_estimate():

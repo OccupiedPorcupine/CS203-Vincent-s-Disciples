@@ -17,6 +17,9 @@ final class BaselineForecaster {
     static final int RECENT_DAYS = 7;
     // How many recent days are re-forecast to measure the baseline's typical error.
     static final int BACKTEST_DAYS = 12;
+    // The prep list aims at a point of the likely demand set by each dish's margin (#86), which
+    // needs a steadier spread than 12 errors give: about 8 weeks (see ml/README.md).
+    static final int MARGIN_BACKTEST_DAYS = 56;
     static final int MIN_BACKTEST_ERRORS = 5;
     // Used as +/- 25% when there are too few past errors to measure the range.
     static final double ROUGH_SPREAD = 0.25;
@@ -57,12 +60,7 @@ final class BaselineForecaster {
 
     // The likely range around a forecast, from how far the baseline was off on recent days.
     static Range range(List<Observation> history, double forecast) {
-        List<Double> errors = new ArrayList<>();
-        for (int index = Math.max(1, history.size() - BACKTEST_DAYS); index < history.size(); index++) {
-            Observation actual = history.get(index);
-            estimate(history.subList(0, index), actual.date())
-                    .ifPresent(estimate -> errors.add(actual.quantity() - estimate.quantity()));
-        }
+        List<Double> errors = errors(history, BACKTEST_DAYS);
 
         double low;
         double high;
@@ -76,6 +74,29 @@ final class BaselineForecaster {
             high = forecast + quantile(errors, 0.9);
         }
         return new Range(Math.max(0, Math.min(low, forecast)), Math.max(high, forecast), rough);
+    }
+
+    // The demand that, by the baseline's errors over the last MARGIN_BACKTEST_DAYS, is reached on
+    // the given share of days: 0.64 means enough for about 64 days in 100. With too few errors,
+    // the rough range's spread (+/- 25% for 10% to 90%) is stretched to the probability instead.
+    static double atProbability(List<Observation> history, double forecast, double probability) {
+        List<Double> errors = errors(history, MARGIN_BACKTEST_DAYS);
+        if (errors.size() < MIN_BACKTEST_ERRORS) {
+            return Math.max(0, forecast * (1 + ROUGH_SPREAD * (probability - 0.5) / 0.4));
+        }
+        errors.sort(null);
+        return Math.max(0, forecast + quantile(errors, probability));
+    }
+
+    // Actual minus baseline estimate on each of the last `days` recorded days.
+    private static List<Double> errors(List<Observation> history, int days) {
+        List<Double> errors = new ArrayList<>();
+        for (int index = Math.max(1, history.size() - days); index < history.size(); index++) {
+            Observation actual = history.get(index);
+            estimate(history.subList(0, index), actual.date())
+                    .ifPresent(estimate -> errors.add(actual.quantity() - estimate.quantity()));
+        }
+        return errors;
     }
 
     static long sameWeekdayCount(List<Observation> history, LocalDate date) {

@@ -8,6 +8,7 @@ import app.recipe.RecipeService;
 import app.service.PrepListService;
 import app.user.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -59,7 +60,8 @@ public class RecipeController {
     }
 
     @Operation(summary = "Prep list for a day", description = "Portions to prepare of each dish sold in the last 28 days, and the ingredients they need. "
-            + "Portions are the top of the forecast's likely range, or the forecast plus bufferPercent when it is given.")
+            + "Each dish is prepared by its margin: enough for (price − cost) / price of likely days. Dishes without a price "
+            + "and cost, or every dish with rule=top, get the top of the likely range; bufferPercent gives the forecast plus that many percent.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Prep list worked out; 'closed' is set instead when the stall is closed that day"),
             @ApiResponse(responseCode = "400", description = "Date not from today up to 7 days ahead, or buffer not 0 to 100", content = @Content),
@@ -68,7 +70,9 @@ public class RecipeController {
     @GetMapping("/prep-list")
     public PrepListResponse prepList(@AuthenticationPrincipal AuthenticatedUser user,
                                      @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-                                     @RequestParam(required = false) Integer bufferPercent) {
-        return prepListService.prepList(user.id(), date, bufferPercent);
+                                     @RequestParam(required = false) Integer bufferPercent,
+                                     @Parameter(description = "top for the top of each dish's likely range instead of its margin")
+                                     @RequestParam(required = false) String rule) {
+        return prepListService.prepList(user.id(), date, bufferPercent, "top".equals(rule));
     }
 }

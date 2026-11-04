@@ -65,7 +65,7 @@
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email and the Log out button." },
         { "guideId": "prep-date", "description": "Day to prepare for, from today up to 7 days ahead. Starts on tomorrow." },
-        { "guideId": "prep-buffer", "description": "How many portions to prepare: the top of each dish's likely range (the default), the forecast only, or the forecast plus 10, 20 or 30%." },
+        { "guideId": "prep-buffer", "description": "How many portions to prepare: Best for your margins (the default: each dish by its price and cost, enough for more days when a plate earns a lot and costs little; dishes without a price and cost get the top of the range), the top of the likely range, the forecast only, or the forecast plus 10, 20 or 30%." },
         { "guideId": "share-prep", "description": "Shares the prep list as plain text (e.g. to WhatsApp) on a phone, or copies it on a computer." },
         { "guideId": "prep-portions", "description": "Portions to prepare of each dish sold in the last 4 weeks, with its forecast, likely range and how it was worked out." },
         { "guideId": "prep-ingredients", "description": "Total of each ingredient for those portions, from the recipes, and which dishes use it. Dishes without a recipe are named underneath." },

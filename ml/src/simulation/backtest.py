@@ -80,9 +80,10 @@ class AppBaseline:
     ROUGH_SPREAD = 0.25
 
     def forecast(self, history: History, target: Target) -> Forecast | None:
-        # The estimate needs at most 4 same weekdays and the range 12 more days: 60 rows covers
-        # both, even across rest days and closures.
-        dates, sold = history.dates[-60:], history.sold[-60:]
+        # The estimate needs at most 4 same weekdays and the range BACKTEST_DAYS more days: 48 rows
+        # more than that covers both, even across rest days and closures.
+        keep = max(60, self.BACKTEST_DAYS + 48)
+        dates, sold = history.dates[-keep:], history.sold[-keep:]
         weekdays = _weekdays(dates)
         point = self._estimate(weekdays, sold, len(sold), _weekdays(np.array([target.date]))[0])
         if point is None:
@@ -131,6 +132,15 @@ class SoldOutAwareBaseline(AppBaseline):
 
     def forecast(self, history: History, target: Target) -> Forecast | None:
         return super().forecast(adjust_for_sell_outs(history), target)
+
+
+class AppMarginBaseline(AppBaseline):
+    """The app's prep list since #86: the margin rule aimed with the baseline's errors over the
+    last 8 weeks (BaselineForecaster.MARGIN_BACKTEST_DAYS), not 12 days. Use it with the margin
+    rule; the app's likely range, and so its top of the range, still uses 12 days."""
+
+    name = "App baseline, 8-week errors"
+    BACKTEST_DAYS = 56
 
 
 class AppSoldOutBaseline(AppBaseline):

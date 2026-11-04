@@ -229,7 +229,7 @@ public class AssistantTools {
                                 """)),
                 new ToolSpec(GET_PREP_LIST,
                         "Get the prep list for a day from today up to 7 days ahead: portions of each dish to prepare "
-                                + "(the top of its forecast range) and the total of each ingredient, from the user's recipes.",
+                                + "(enough for the share of days its margin makes worthwhile, or the top of its forecast range when it has no price and cost; why says which) and the total of each ingredient, from the user's recipes.",
                         schema("""
                                 {"type": "object",
                                  "properties": {"date": {"type": "string", "description": "YYYY-MM-DD"}},
@@ -380,7 +380,7 @@ public class AssistantTools {
         ArrayNode dishes = output.putArray("dishes");
         List<String> withoutRecipe = new ArrayList<>();
         for (PrepListResponse.Dish dish : prepList.dishes()) {
-            dishes.addObject().put("dish", dish.dish()).put("portions", dish.portions()).put("forecast", dish.expected());
+            dishes.addObject().put("dish", dish.dish()).put("portions", dish.portions()).put("forecast", dish.expected()).put("why", dish.why());
             if (!dish.hasRecipe()) withoutRecipe.add(dish.dish());
         }
         ArrayNode ingredients = output.putArray("ingredients");

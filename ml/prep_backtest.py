@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ml.src.simulation.backtest import (
     AppBaseline,
+    AppMarginBaseline,
     AppSoldOutBaseline,
     SoldOutAwareBaseline,
     ingredient_totals,
@@ -39,7 +40,7 @@ def main() -> None:
     args = parser.parse_args()
 
     sales = simulate(args.stalls, args.start, args.end, args.seed)
-    result = run_backtest(sales, [AppBaseline(), SoldOutAwareBaseline(), AppSoldOutBaseline()], eval_days=args.eval_days)
+    result = run_backtest(sales, [AppBaseline(), AppMarginBaseline(), SoldOutAwareBaseline(), AppSoldOutBaseline()], eval_days=args.eval_days)
     summary = summarise(result)
     ingredients = ingredient_totals(result)
 
