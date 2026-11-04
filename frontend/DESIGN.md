@@ -230,7 +230,7 @@ are the two references.
 <section class="card" aria-labelledby="controls-heading">
   <div class="headline">
     <h2 id="controls-heading" class="card-title">Plan a forecast</h2>
-    <span class="note">Any day from today to a week ahead. Today and tomorrow can also use the weather forecast.</span>
+    <span class="note">Any day from today to a week ahead.</span>
   </div>
   <form id="forecast-form">
     <div class="field">

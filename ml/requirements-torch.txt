@@ -1,0 +1,4 @@
+# PyTorch's CPU-only build, for Chronos-2 in the ML service (ml/Dockerfile). Install with
+#     pip install -r ml/requirements-torch.txt --index-url https://download.pytorch.org/whl/cpu
+# The default build from PyPI bundles CUDA and is several GB larger.
+torch==2.15.0

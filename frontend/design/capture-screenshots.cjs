@@ -41,8 +41,8 @@ const capture = async (page, out) => {
     if (m) return json(route, sales(Number(m[1])));
     if (p === "/api/forecast") return json(route, {
       dish: "Chicken rice", forecastDate: "2026-11-01", predictedDemand: 47.2, low: 41, high: 53, roughRange: false,
-      method: "BASELINE", fallbackReason: "DISH_NOT_IN_MODEL", basis: "Average of your last 4 Sundays",
-      note: "The forecast model hasn't been trained on this dish yet, so this uses your past sales only."
+      method: "MODEL", fallbackReason: null, basis: "Forecast model (Chronos-2), from your daily sales and public holidays",
+      note: null
     });
     if (p === "/api/data-sources") return json(route, [
       { filename: "pos-export-2026-q3.csv", sha256: "9f2c1ab4e7d0c3aa", uploadedAt: "2026-10-28T09:12:00Z", sizeBytes: 482113, usedByModel: true },

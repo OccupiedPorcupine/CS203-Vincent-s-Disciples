@@ -71,7 +71,7 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `GET /api/dishes`, `POST /api/dishes` — lists or creates the signed-in user's dishes
 - `GET /api/dishes/{dishId}/sales`, `POST /api/dishes/{dishId}/sales` — lists sales, or adds new days (rejects days that already have a record)
 - `PUT /api/dishes/{dishId}/sales/{date}` — sets one day's quantity, replacing any existing record; returns `previousQuantity`
-- `POST /api/forecast` — `{dishId, forecastDate}`, from today up to 7 days ahead → expected portions, the likely `low`–`high` range, `method` (`MODEL` or `BASELINE`), `basis` and `note`. The model uses NEA's 24-hour forecast for today and the 4-day outlook for the next 4 days; `weatherSource` and `weather` say which one (both null when no weather was used). Later dates use the baseline. The range is measured on estimates made as far after the last recorded sale as this date, so it widens when the latest sales are old
+- `POST /api/forecast` — `{dishId, forecastDate}`, from today up to 7 days ahead → expected portions, the likely `low`–`high` range, `method` (`MODEL` or `BASELINE`), `basis` and `note`. `MODEL` is Chronos-2 in the ML service (`POST /forecast`), from the dish's last year of daily sales (sold-out days counted as higher demand) and public holidays, for any dish with 7 days of sales including 4 of the forecast's weekday; its range is the model's 10% to 90% quantiles. Otherwise, or when the ML service fails, it's the baseline, whose range is measured on estimates made as far after the last recorded sale as this date, so it widens when the latest sales are old. Neither uses the weather
 - `GET /api/summary/weekly` — the 7 days ending on the latest recorded sale, as on the dashboard: portions against the 7 days before (`changePercent`), revenue, the best-selling dish, leftovers and the dish that sold out most, with `text.en` and `text.zh` to read aloud. The figures are those of `GET /api/revenue` and `GET /api/waste`; the sentences are templates, not written by the model
 - `GET /api/dishes/{dishId}/aliases`, `POST /api/dishes/{dishId}/aliases` — other names for a dish (e.g. `鸡饭`); matching ignores case and spacing, and each name points to one dish per user (409 `ALIAS_IN_USE` otherwise)
 - `GET /api/assistant/status` — whether the voice assistant and voice input are available
@@ -119,7 +119,7 @@ Code is in `src/main/java/app/assistant/`. The prompt is `AssistantPrompt`, the 
 It also explains forecasts. The forecast page's "Ask about this forecast" card sends questions like
 "why so high?" with the dish and date on screen. The read-only `explain_forecast` tool returns that
 forecast and only what it was made from: the basis, the dish's last 4 same-weekday sales and the last
-7 days, and whether the weather forecast and a public holiday were used. The prompt tells the model
+7 days, and whether a public holiday was used. The prompt tells the model
 to quote only those and to say that any other reason the user suggests isn't taken into account.
 
 ### Telegram bot

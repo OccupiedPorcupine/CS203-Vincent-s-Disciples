@@ -1,9 +1,11 @@
 package app.service;
 
+import app.holiday.PublicHoliday;
 import app.holiday.PublicHolidayRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 public class PublicHolidayService {
@@ -14,7 +16,11 @@ public class PublicHolidayService {
         this.publicHolidayRepository = publicHolidayRepository;
     }
 
-    public boolean isPublicHoliday(LocalDate date) {
-        return publicHolidayRepository.existsByDate(date);
+    // The public holidays from one date to another, both included, oldest first.
+    public List<LocalDate> holidaysBetween(LocalDate from, LocalDate to) {
+        return publicHolidayRepository.findByDateBetweenOrderByDateAsc(from, to).stream()
+                .map(PublicHoliday::getDate)
+                .distinct()
+                .toList();
     }
 }

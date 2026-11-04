@@ -533,11 +533,10 @@ class AssistantServiceTest {
             assertEquals(4, explanation.path("same_weekday_sales").size());
             assertEquals(List.of(friday.minusWeeks(1).toString(), TODAY.toString()),
                     explanation.path("last_7_days_sales").valueStream().map(sale -> sale.path("date").asString()).toList());
-            // The baseline uses sales only: the holiday is named but not used, and there's no weather.
+            // The baseline uses sales only: the holiday is named but not used.
             assertFalse(explanation.path("public_holiday").isNull());
             assertFalse(explanation.path("public_holiday_used").asBoolean());
-            assertFalse(explanation.path("weather_used").asBoolean());
-            assertTrue(explanation.path("weather_forecast").isNull());
+            assertTrue(explanation.path("weather_used").isMissingNode());
         } finally {
             if (holiday != null) holidayRepository.delete(holiday);
         }

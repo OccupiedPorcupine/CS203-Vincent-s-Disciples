@@ -1,74 +1,76 @@
 package app.service;
 
-import app.dto.MlPredictionRequest;
-import app.dto.MlPredictionResponse;
+import app.dto.MlForecastRequest;
+import app.dto.MlForecastResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
+import java.time.Clock;
 import java.time.Duration;
-import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.time.Instant;
 
 @Service
 public class MlForecastClient {
 
     private final RestClient restClient;
+    private final Clock clock;
+    // After a failed forecast, the next ones skip the ML service until then, so a prep list of many
+    // dishes doesn't wait out the timeout for each of them.
+    private volatile Instant skipUntil = Instant.MIN;
 
     // Sent to the ML service when ML_SHARED_SECRET is set, for hosts where it can't be kept
     // private (on Vercel it already is; see deploy/README.md).
     static final String SECRET_HEADER = "X-ML-Secret";
+    static final Duration SKIP_AFTER_FAILURE = Duration.ofMinutes(1);
 
     public MlForecastClient(String baseUrl) {
-        this(baseUrl, "");
+        this(baseUrl, "", Clock.systemUTC());
     }
 
     @Autowired
-    public MlForecastClient(@Value("${app.ml.base-url}") String baseUrl, @Value("${app.ml.shared-secret:}") String sharedSecret) {
-        // Short timeouts, so a stuck ML service falls back to the baseline forecast quickly.
+    public MlForecastClient(@Value("${app.ml.base-url}") String baseUrl, @Value("${app.ml.shared-secret:}") String sharedSecret,
+                            Clock clock) {
+        // After a cold start the ML service takes several seconds to load Chronos-2, and waits up to
+        // 15 s for it before answering, so the read timeout is a little longer than that.
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(2));
-        requestFactory.setReadTimeout(Duration.ofSeconds(10));
+        requestFactory.setReadTimeout(Duration.ofSeconds(20));
         RestClient.Builder builder = RestClient.builder()
-                // Strip a trailing slash so the base URL joins cleanly with "/predict".
+                // Strip a trailing slash so the base URL joins cleanly with "/forecast".
                 .baseUrl(baseUrl.replaceAll("/+$", ""))
                 .requestFactory(requestFactory);
         if (!sharedSecret.isBlank()) {
             builder.defaultHeader(SECRET_HEADER, sharedSecret);
         }
         this.restClient = builder.build();
+        this.clock = clock;
     }
 
-    public MlPredictionResponse predict(
-            MlPredictionRequest request
-    ) {
-        return restClient
-                .post()
-                .uri("/predict")
-                .body(request)
-                .retrieve()
-                .body(MlPredictionResponse.class);
-    }
-
-    // The dishes the model was trained on, normalised. Empty when the ML service doesn't say
-    // (an older service without /model-info, or artifacts without metadata).
-    public Optional<Set<String>> knownDishes() {
-        ModelInfo info;
+    // Chronos-2's forecast for one dish. Throws when the service is down, still loading the model
+    // after a cold start, or failed within the last SKIP_AFTER_FAILURE.
+    public MlForecastResponse forecast(MlForecastRequest request) {
+        if (clock.instant().isBefore(skipUntil)) {
+            throw new IllegalStateException("The ML service failed less than a minute ago");
+        }
         try {
-            info = restClient.get().uri("/model-info").retrieve().body(ModelInfo.class);
-        } catch (HttpClientErrorException.NotFound notFound) {
-            return Optional.empty();
+            MlForecastResponse response = restClient
+                    .post()
+                    .uri("/forecast")
+                    .body(request)
+                    .retrieve()
+                    .body(MlForecastResponse.class);
+            if (response == null || response.quantiles() == null || response.quantile_levels() == null
+                    || response.quantiles().size() != response.quantile_levels().size() || response.quantiles().isEmpty()) {
+                throw new IllegalStateException("The ML service sent an incomplete forecast");
+            }
+            return response;
+        } catch (RuntimeException exception) {
+            skipUntil = clock.instant().plus(SKIP_AFTER_FAILURE);
+            throw exception;
         }
-        if (info == null || info.dishes() == null) {
-            return Optional.empty();
-        }
-        return Optional.of(info.dishes().stream().map(MlForecastClient::normalise).collect(Collectors.toSet()));
     }
 
     // Whether the ML service answers its /health check. Never throws.
@@ -80,10 +82,4 @@ public class MlForecastClient {
             return false;
         }
     }
-
-    static String normalise(String dishName) {
-        return dishName.strip().toUpperCase(Locale.ROOT);
-    }
-
-    private record ModelInfo(List<String> dishes) {}
 }

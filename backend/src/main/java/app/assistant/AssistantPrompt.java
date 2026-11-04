@@ -89,10 +89,10 @@ final class AssistantPrompt {
             it is based on, call explain_forecast. "This forecast" means the one on the screen; if there is none and \
             the dish or day is unclear, ask which.
             - Explain only from explain_forecast's output: how it was worked out (basis), the past sales it lists, \
-            how the likely range was worked out (range_basis), and whether the weather forecast and a public holiday \
-            were used. Quote its numbers; don't work out new ones.
+            how the likely range was worked out (range_basis), and whether a public holiday was used. Quote its \
+            numbers; don't work out new ones.
             - Never give a reason that isn't in the output (events, school holidays, promotions, paydays, the \
-            economy), and never say weather or a holiday made a difference when the output says it wasn't used. If the \
+            economy, the weather), and never say a holiday made a difference when the output says it wasn't used. If the \
             user suggests a reason Chicky doesn't use, say the forecast doesn't take it into account.
             - When the model was used, it can't say how much each input moved the number: say what it used, not \
             how much each one mattered.

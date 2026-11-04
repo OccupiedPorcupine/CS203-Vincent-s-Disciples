@@ -65,14 +65,17 @@ public class PrepListService {
         this.clock = clock;
     }
 
-    public enum Rule { MARGIN, TOP_OF_RANGE, BUFFER }
+    public enum Rule { MARGIN, TOP_OF_RANGE, FORECAST, BUFFER }
 
     public PrepListResponse prepList(Long ownerId, LocalDate date, Integer bufferPercent) {
         return prepList(ownerId, date, bufferPercent, false);
     }
 
     // bufferPercent given: the forecast plus that many percent. Otherwise each dish's margin, or the
-    // top of its likely range when topOfRange is true or the dish has no price and cost.
+    // top of its likely range when topOfRange is true. A dish with no price and cost gets the top of
+    // the baseline's range, or the model's forecast itself: the model's range is wider, and in the
+    // prep simulator its top over-prepares (73.8% of the best profit, against 83.3% for the forecast
+    // and 81.6% for the baseline's top; ml/README.md).
     public PrepListResponse prepList(Long ownerId, LocalDate date, Integer bufferPercent, boolean topOfRange) {
         LocalDate today = LocalDate.now(clock);
         if (date.isBefore(today) || date.isAfter(today.plusDays(ForecastService.MAX_DAYS_AHEAD))) {
@@ -121,6 +124,10 @@ public class PrepListService {
                 portions = (int) Math.ceil(forecast.predictedDemand() * (100 + bufferPercent) / 100.0);
                 rule = Rule.BUFFER;
                 why = "The forecast plus " + bufferPercent + "%.";
+            } else if (price == null && !topOfRange && forecast.method() == ForecastResponse.Method.MODEL) {
+                portions = (int) Math.ceil(forecast.predictedDemand() - 1e-9);
+                rule = Rule.FORECAST;
+                why = "The forecast. Set this dish's price and cost on the Dishes page to prepare it by its margin.";
             } else if (topOfRange || price == null) {
                 portions = forecast.high();
                 rule = Rule.TOP_OF_RANGE;
