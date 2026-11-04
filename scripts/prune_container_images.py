@@ -46,9 +46,9 @@ class Vercel:
         self.project = project
         self.repository_ids = None
 
-    # The project and its registry repositories by ID: with the team token, looking a repository up
-    # by name failed ("VCR Repository not found", 4 Nov) although the same call by name works when
-    # signed in to the CLI.
+    # The project and its registry repositories by ID. Listing the repositories first also gives a
+    # clear error when the token can't use the registry: looking one up by name then just says "VCR
+    # Repository not found" (seen on 4 Nov with a token whose role had no registry access).
     def resolve(self):
         self.project = self.request("GET", f"/v9/projects/{self.project}", project=False)["id"]
         repositories = self.request("GET", "/v1/vcr/repository")["repositories"]
