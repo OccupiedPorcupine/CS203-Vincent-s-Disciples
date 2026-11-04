@@ -247,4 +247,17 @@ Python, PyTorch and pandas take about 340 MB before either model loads.
 4. **The cost to watch is memory.** Chronos-2 needs about 1.6 GB and a container image about 1 GB larger, with PyTorch and the weights. Measure its cold start and memory on Vercel before switching. If it doesn't fit, Chronos-Bolt tiny is the fallback: cheap and honest about its range, but no better than the baseline on the simulator.
 5. **Keep the baseline as the fallback** for when the ML service is down, as it is today.
 
+## Served (#106)
+
+The ML service now serves Chronos-2 at `POST /forecast` (`src/models/chronos_model.py`), and the backend uses it for every dish with enough sales. It's fed as in the benchmark, with one difference: **no rainfall**. The app keeps no past rainfall, and Chronos-2 needs the past values of any input it gets for the forecast day. Re-running the simulator (seed 7, 24 stalls, sell-out times on) with holidays only shows this costs nothing:
+
+| Chronos-2 + sell-out times | Forecast error (WAPE) | Margin rule | Forecast only | Forecast + 20% | Top of range |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Holidays and rainfall (benchmark) | 21.2% | 83.6% | 83.4% | 82.2% | 74.2% |
+| Holidays only (served) | 21.1% | **83.7%** | 83.3% | 82.5% | 73.8% |
+
+The percentages after the error are the share of the best possible profit. The baseline gets 81.6% with the top of its range (the app's previous default) and 81.8% with forecast + 20%. Chronos-2's range is honest, so preparing to its top over-prepares. A dish without a price and cost is therefore prepared to the model's forecast; with a price and cost it gets the margin rule.
+
+The simulator's sell-out adjustment is its generic customer curve. The app's is `SoldOutDemand` (uniform over trading hours, capped at 1.5), which did better in the #50 comparison. Cold start, memory and image size on Vercel are in `deploy/README.md`.
+
 The restaurant result is one restaurant and 7 dishes, and the simulator measures our own assumptions (#6). Pilot data (#88) is still what will show the gain for real stalls.

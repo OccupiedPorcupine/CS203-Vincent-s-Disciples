@@ -249,7 +249,7 @@ public class AssistantTools {
                                 """)),
                 new ToolSpec(GET_PREP_LIST,
                         "Get the prep list for a day from today up to 7 days ahead: portions of each dish to prepare "
-                                + "(enough for the share of days its margin makes worthwhile, or the top of its forecast range when it has no price and cost; why says which) and the total of each ingredient, from the user's recipes: quantity is cooked, to_buy is the raw amount by the ingredient's yield, "
+                                + "(enough for the share of days its margin makes worthwhile, or, when it has no price and cost, the forecast (from the model) or the top of its forecast range (from the baseline); why says which) and the total of each ingredient, from the user's recipes: quantity is cooked, to_buy is the raw amount by the ingredient's yield, "
                                 + "and perishable false means it comes from stock rather than being bought for the day.",
                         schema("""
                                 {"type": "object",

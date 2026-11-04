@@ -1,5 +1,7 @@
 package app.recipe;
 
+import app.dto.MlForecastResponse;
+import app.service.MlForecastClient;
 import app.service.PublicHolidaySyncService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -26,15 +28,20 @@ import java.util.regex.Pattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
-// Recipes and the prep list over real HTTP and a real (H2) database (issue #45). The ML service
-// isn't running in tests, so every dish is forecast from its own past sales. Each dish sells the
-// same amount every day, so its forecast and likely range are exactly that amount.
+// Recipes and the prep list over real HTTP and a real (H2) database (issue #45). The ML client is a
+// mock that answers nothing unless a test says otherwise, so dishes are forecast from their own past
+// sales. Each dish sells the same amount every day, so its forecast and likely range are exactly that.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PrepListApiTest {
 
     @MockitoBean
     PublicHolidaySyncService publicHolidaySyncService;
+
+    @MockitoBean
+    MlForecastClient mlForecastClient;
 
     @LocalServerPort
     int port;
@@ -168,6 +175,21 @@ class PrepListApiTest {
     }
 
     @Test
+    void aDishWithoutAPriceGetsTheModelsForecastRatherThanTheTopOfItsRange() throws Exception {
+        Session session = signUp("model@prep.test");
+        dishSelling(session, "Chicken rice", 40, 35);
+        when(mlForecastClient.forecast(any())).thenReturn(new MlForecastResponse(tomorrow.toString(), "chronos-2",
+                List.of(0.1, 0.5, 0.9), List.of(30.0, 41.2, 55.0), 41.2));
+
+        JsonNode dishes = json.readTree(session.get("/api/prep-list?date=" + tomorrow).body()).path("dishes");
+        JsonNode top = json.readTree(session.get("/api/prep-list?date=" + tomorrow + "&rule=top").body()).path("dishes");
+
+        assertEquals(List.of("Chicken rice 42 FORECAST MODEL"), rows(dishes, "dish", "portions", "rule", "method"));
+        assertTrue(dishes.get(0).path("why").asString().startsWith("The forecast. Set this dish's price and cost"));
+        assertEquals(List.of("Chicken rice 55 TOP_OF_RANGE"), rows(top, "dish", "portions", "rule"));
+    }
+
+    @Test
     void aClosedDayHasNothingToPrepare() throws Exception {
         Session session = signUp("closed@prep.test");
         dishSelling(session, "Chicken rice", 40);
@@ -246,9 +268,13 @@ class PrepListApiTest {
 
     // A dish that sold the same number every day for the last 14 days.
     private long dishSelling(Session session, String name, int perDay) throws Exception {
+        return dishSelling(session, name, perDay, 14);
+    }
+
+    private long dishSelling(Session session, String name, int perDay, int days) throws Exception {
         long dishId = json.readTree(session.send("POST", "/api/dishes", "{\"name\":\"" + name + "\"}").body()).path("id").asLong();
         List<String> sales = new ArrayList<>();
-        for (int daysAgo = 14; daysAgo >= 1; daysAgo--) {
+        for (int daysAgo = days; daysAgo >= 1; daysAgo--) {
             sales.add("{\"date\":\"" + today.minusDays(daysAgo) + "\",\"quantitySold\":" + perDay + "}");
         }
         HttpResponse<String> response = session.send("POST", "/api/dishes/" + dishId + "/sales", "{\"sales\":[" + String.join(",", sales) + "]}");
