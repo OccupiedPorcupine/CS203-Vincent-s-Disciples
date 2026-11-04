@@ -5,6 +5,7 @@ import app.chat.ChatChannel;
 import app.chat.ChatLinkService;
 import app.dto.ChatLinkCodeResponse;
 import app.dto.ChatLinksResponse;
+import app.dto.SetChatRemindersRequest;
 import app.user.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -43,6 +44,19 @@ public class ChatLinkController {
     public ChatLinkCodeResponse issueCode(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable String channel) {
         return chatLinkService.issueCode(user.id(), ChatChannel.fromPath(channel).orElseThrow(() ->
                 new AssistantException(HttpStatus.NOT_FOUND, "CHANNEL_NOT_CONFIGURED", "There's no chat app called " + channel + ".")));
+    }
+
+    @Operation(summary = "Set reminders", description = "Turns the linked chat's evening messages on or off: a reminder to "
+            + "send the day's sales (skipped once they're in, or when the stall is closed) and tomorrow's prep list.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Saved; the chat apps as GET returns them"),
+            @ApiResponse(responseCode = "400", description = "A time that isn't on the hour from 12:00 to 23:00 (INVALID_REMINDER_TIME)", content = @Content),
+            @ApiResponse(responseCode = "404", description = "No such linked chat on this account", content = @Content)
+    })
+    @PutMapping("/{id}/reminders")
+    public ChatLinksResponse setReminders(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id,
+                                          @RequestBody SetChatRemindersRequest request) {
+        return chatLinkService.setReminders(user.id(), id, request.salesReminderAt(), request.prepListAt());
     }
 
     @Operation(summary = "Unlink a chat", description = "The chat can no longer read or record anything for the account.")

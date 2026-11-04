@@ -31,6 +31,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import jakarta.servlet.http.HttpServletResponse;
 
 import app.chat.telegram.TelegramWebhookController;
+import app.controller.ChatJobController;
 import app.account.SessionExpiryFilter;
 import java.time.Clock;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
@@ -68,9 +69,10 @@ public class SecurityConfig {
                         // This exception should only exist for local development.
                         // .ignoringRequestMatchers(h2Console)
 
-                        // Telegram calls the bot's webhook with no session; it proves itself with
-                        // a secret header instead (TelegramWebhookController).
-                        .ignoringRequestMatchers(TelegramWebhookController.PATH)
+                        // Telegram calls the bot's webhook, and the scheduler the chat job, with no
+                        // session; each proves itself with a secret header instead
+                        // (TelegramWebhookController, ChatJobController).
+                        .ignoringRequestMatchers(TelegramWebhookController.PATH, ChatJobController.PATH)
                 )
 
                 .securityContext(context -> context
@@ -95,7 +97,8 @@ public class SecurityConfig {
                                 "/api/auth/password-reset",
                                 "/api/auth/password-reset/confirm",
                                 "/api/auth/verify-email",
-                                TelegramWebhookController.PATH
+                                TelegramWebhookController.PATH,
+                                ChatJobController.PATH
                         ).permitAll()
 
                         // Error responses ({code, message}, see ApiErrorAttributes), so a 401 or 403

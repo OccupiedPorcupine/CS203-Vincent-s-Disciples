@@ -9,4 +9,8 @@ public interface ChatConnector {
     // Opening this link on the owner's phone starts the chat and sends the code, e.g.
     // https://t.me/ChickyBot?start=<code>.
     String linkFor(String code);
+
+    // Sends a message the owner didn't ask for, such as the evening sales reminder (#101).
+    // Throws if the chat app refuses it, e.g. because the owner blocked the bot.
+    void send(String externalId, String text);
 }

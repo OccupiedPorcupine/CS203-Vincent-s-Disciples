@@ -1,0 +1,52 @@
+# Sends the evening sales reminders and prep lists to linked chats (issue #101). The backend can
+# scale to zero on Vercel, so it can't keep its own timer; this calls POST /api/channels/jobs/run
+# every hour instead, and the backend sends whatever has come due. Owners pick an hour from 12 pm
+# to 11 pm on the Account page or with /remind, so this runs at five past each of those hours.
+#
+# Needs the repository secret CRON_SECRET, the same value as CRON_SECRET on Vercel Production.
+name: Chat reminders
+
+on:
+  schedule:
+    # 12:05 to 23:05 Singapore time (04:05 to 15:05 UTC). GitHub can start a scheduled run late;
+    # the backend still sends anything due today that hasn't gone out.
+    - cron: "5 4-15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A run that overlaps the last one waits; the backend sends each message once anyway.
+concurrency:
+  group: chat-reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    name: Send due chat reminders
+    runs-on: ubuntu-latest
+    # Forks have no secret, and shouldn't message this project's users.
+    if: github.repository == 'OccupiedPorcupine/CS203-Vincent-s-Disciples'
+    steps:
+      - name: Check the secret is set
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::The CRON_SECRET secret isn't set. See deploy/README.md, 'Telegram'."
+            exit 1
+          fi
+      # Three tries, because the first request after an idle spell starts the backend.
+      - name: Run the job
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          for attempt in 1 2 3; do
+            status=$(curl -s -o response.json -w '%{http_code}' --max-time 120 -X POST \
+              -H "Authorization: Bearer $CRON_SECRET" https://chicky-zeta.vercel.app/api/channels/jobs/run)
+            echo "POST /api/channels/jobs/run: $status $(cat response.json 2>/dev/null)"
+            [ "$status" = 200 ] && exit 0
+            [ "$status" = 401 ] && { echo "::error::The backend refused CRON_SECRET. Set the same value on Vercel Production and here."; exit 1; }
+            sleep 20
+          done
+          exit 1

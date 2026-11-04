@@ -44,6 +44,7 @@ class ChatLinkApiTest {
             return new ChatConnector() {
                 @Override public ChatChannel channel() { return CHANNEL; }
                 @Override public String linkFor(String code) { return "https://t.me/TestBot?start=" + code; }
+                @Override public void send(String externalId, String text) { }
             };
         }
     }
