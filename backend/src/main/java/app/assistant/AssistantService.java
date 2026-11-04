@@ -4,6 +4,7 @@ import app.assistant.AssistantInteraction.Outcome;
 import app.assistant.AssistantModelClient.ModelResponse;
 import app.assistant.AssistantModelClient.ToolCall;
 import app.assistant.AssistantModelClient.Usage;
+import app.assistant.guide.AppGuide;
 import app.assistant.guide.GuideRetriever;
 import app.assistant.guide.GuideStep;
 import app.dish.Dish;
@@ -19,6 +20,7 @@ import app.service.DishService;
 import app.user.AppUserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,13 +45,16 @@ public class AssistantService {
 
     private static final Logger log = LoggerFactory.getLogger(AssistantService.class);
 
+    // The page of messages from a chat app (ChatMessageService) rather than the website.
+    public static final String CHAT_PAGE = "chat";
     static final Duration PROPOSAL_LIFETIME = Duration.ofMinutes(15);
     static final int MAX_MODEL_CALLS = 5;
     static final long MAX_AUDIO_BYTES = 5L * 1024 * 1024;
 
     private static final Map<String, String> AUDIO_EXTENSIONS = Map.of(
             "audio/webm", "webm", "video/webm", "webm", "audio/mp4", "m4a", "video/mp4", "mp4",
-            "audio/x-m4a", "m4a", "audio/mpeg", "mp3", "audio/wav", "wav", "audio/x-wav", "wav");
+            "audio/x-m4a", "m4a", "audio/mpeg", "mp3", "audio/wav", "wav", "audio/x-wav", "wav",
+            "audio/ogg", "ogg");
 
     private final AssistantModelClient modelClient;
     private final AssistantTools tools;
@@ -65,10 +70,12 @@ public class AssistantService {
     private final DishAliasService dishAliasService;
     private final StallClosureService stallClosureService;
     private final GuideRetriever guideRetriever;
+    private final AppGuide appGuide;
     private final SpeechCache speechCache;
     private final DishPriceService priceService;
     private final JsonMapper jsonMapper;
     private final Clock clock;
+    private final String baseUrl;
 
     public AssistantService(AssistantModelClient modelClient, AssistantTools tools, ConversationStore conversations,
                             AssistantRateLimiter rateLimiter, AssistantUsageService usage,
@@ -76,8 +83,9 @@ public class AssistantService {
                             AppUserRepository users, ProposalValidator proposalValidator, DishRepository dishRepository,
                             DishService dishService, DailySaleService dailySaleService,
                             DishAliasService dishAliasService, StallClosureService stallClosureService,
-                            GuideRetriever guideRetriever,
-                            SpeechCache speechCache, DishPriceService priceService, JsonMapper jsonMapper, Clock clock) {
+                            GuideRetriever guideRetriever, AppGuide appGuide,
+                            SpeechCache speechCache, DishPriceService priceService, JsonMapper jsonMapper, Clock clock,
+                            @Value("${app.base-url}") String baseUrl) {
         this.modelClient = modelClient;
         this.tools = tools;
         this.conversations = conversations;
@@ -92,10 +100,12 @@ public class AssistantService {
         this.dishAliasService = dishAliasService;
         this.stallClosureService = stallClosureService;
         this.guideRetriever = guideRetriever;
+        this.appGuide = appGuide;
         this.speechCache = speechCache;
         this.priceService = priceService;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
+        this.baseUrl = baseUrl.replaceAll("/+$", "");
     }
 
     public AssistantStatusResponse status(Long ownerId) {
@@ -104,28 +114,34 @@ public class AssistantService {
     }
 
     public TranscriptionResponse transcribe(Long ownerId, MultipartFile audio) {
-        rateLimiter.check(ownerId);
-        long started = System.nanoTime();
-
         if (audio == null || audio.isEmpty()) {
             log.warn("Transcribe for user {}: no audio received", ownerId);
             throw new AssistantException(HttpStatus.BAD_REQUEST, "NO_AUDIO", "No audio was recorded.");
         }
-        if (audio.getSize() > MAX_AUDIO_BYTES) {
-            throw new AssistantException(HttpStatus.BAD_REQUEST, "AUDIO_TOO_LONG", "The recording is too long. Please keep it under a minute.");
-        }
-        String contentType = audio.getContentType() == null ? "" : audio.getContentType().split(";")[0].strip();
-        String extension = AUDIO_EXTENSIONS.get(contentType);
-        if (extension == null) {
-            log.warn("Transcribe for user {}: unsupported content type '{}' ({} bytes)", ownerId, audio.getContentType(), audio.getSize());
-            throw new AssistantException(HttpStatus.BAD_REQUEST, "UNSUPPORTED_AUDIO", "This audio format isn't supported.");
-        }
-
-        byte[] bytes;
         try {
-            bytes = audio.getBytes();
+            return transcribe(ownerId, audio.getBytes(), audio.getContentType());
         } catch (IOException exception) {
             throw new AssistantException(HttpStatus.BAD_REQUEST, "NO_AUDIO", "The recording could not be read.");
+        }
+    }
+
+    // Also used for voice notes from chat apps (ChatMessageService).
+    public TranscriptionResponse transcribe(Long ownerId, byte[] bytes, String mediaType) {
+        rateLimiter.check(ownerId);
+        long started = System.nanoTime();
+
+        if (bytes == null || bytes.length == 0) {
+            log.warn("Transcribe for user {}: no audio received", ownerId);
+            throw new AssistantException(HttpStatus.BAD_REQUEST, "NO_AUDIO", "No audio was recorded.");
+        }
+        if (bytes.length > MAX_AUDIO_BYTES) {
+            throw new AssistantException(HttpStatus.BAD_REQUEST, "AUDIO_TOO_LONG", "The recording is too long. Please keep it under a minute.");
+        }
+        String contentType = mediaType == null ? "" : mediaType.split(";")[0].strip();
+        String extension = AUDIO_EXTENSIONS.get(contentType);
+        if (extension == null) {
+            log.warn("Transcribe for user {}: unsupported content type '{}' ({} bytes)", ownerId, mediaType, bytes.length);
+            throw new AssistantException(HttpStatus.BAD_REQUEST, "UNSUPPORTED_AUDIO", "This audio format isn't supported.");
         }
 
         usage.useTranscription(ownerId);
@@ -134,7 +150,7 @@ public class AssistantService {
                     bytes, "speech." + extension, tools.dishVocabulary(ownerId));
             usage.recordTranscribedSeconds(ownerId, transcription.seconds());
             log.info("Transcribed for user {}: {} bytes of {} in {} ms -> {} characters, languages {}", ownerId,
-                    audio.getSize(), contentType, millisSince(started), transcription.text().length(), transcription.languages());
+                    bytes.length, contentType, millisSince(started), transcription.text().length(), transcription.languages());
             log.debug("Transcript for user {}: {}", ownerId, transcription.text());
             return new TranscriptionResponse(transcription.text(), transcription.languages());
         } catch (RuntimeException exception) {
@@ -203,8 +219,10 @@ public class AssistantService {
                 .put("dish_id", request.forecast().dishId())
                 .put("date", request.forecast().date().toString());
 
+        boolean chat = CHAT_PAGE.equals(request.page());
         String instructions = AssistantPrompt.build(today, request.page(), tools.listDishes(ownerId, today).toString(),
-                guideRetriever.context(request.text(), request.page()), jsonMapper.writeValueAsString(pageElements),
+                guideRetriever.context(request.text(), request.page()),
+                chat ? appGuide.links(baseUrl) : jsonMapper.writeValueAsString(pageElements),
                 tools.closures(ownerId, today).toString(), String.valueOf(shownForecast));
         AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
         String reply = null;
@@ -214,7 +232,7 @@ public class AssistantService {
 
         for (int call = 0; call < MAX_MODEL_CALLS && reply == null; call++) {
             modelCalls++;
-            ModelResponse response = modelClient.respond(instructions, items, tools.specs());
+            ModelResponse response = modelClient.respond(instructions, items, tools.specs(request.page()));
             tokens = tokens.plus(response.usage());
             items.addAll(response.outputItems());
 

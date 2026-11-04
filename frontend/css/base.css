@@ -147,6 +147,7 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 .account-unconfirmed { margin: -4px 0 12px; color: var(--warning); font-size: var(--text-xs); }
 .account-unconfirmed .text-button { font-size: var(--text-xs); }
 .account-menu .secondary-button { width: 100%; }
+.account-menu .account-link { margin-bottom: 8px; }
 .account-menu .status-text:empty { display: none; }
 
 /* Page layout */

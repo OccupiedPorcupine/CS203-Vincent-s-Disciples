@@ -1,0 +1,25 @@
+/* Account layout. Shared tokens and components are in base.css. */
+.account-details,
+.chat-apps { max-width: 720px; margin-top: 24px; }
+.muted-text { color: var(--muted); font-size: var(--text-sm); }
+.chat-apps > .muted-text + .muted-text { margin-top: 8px; }
+
+/* One row per chat app: its name and state, then Connect or Disconnect. */
+.chat-list { margin-top: 16px; padding: 0; list-style: none; border-top: 1px solid var(--divider); }
+.chat-app {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 16px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.chat-app-name { font-weight: 500; }
+.chat-connect { display: grid; grid-column: 1 / -1; gap: 12px; justify-items: start; }
+.chat-qr { width: 180px; }
+.chat-qr svg { display: block; width: 100%; height: auto; }
+
+/* On a phone the link opens the app directly; the QR code is for scanning from a computer. */
+@media (max-width: 760px) {
+  .chat-qr { display: none; }
+}

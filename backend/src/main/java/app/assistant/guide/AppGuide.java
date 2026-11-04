@@ -108,6 +108,21 @@ public class AppGuide {
         return steps;
     }
 
+    // Full links to each page, and to the page where each task starts, for replies in a chat app
+    // (#99). Tasks that work on any page, like recording sales, are left out: a chat does them itself.
+    public String links(String baseUrl) {
+        StringBuilder lines = new StringBuilder();
+        pages.values().forEach(page -> lines.append("- page ").append(page.path("id").asString()).append(": ")
+                .append(baseUrl).append('/').append(page.path("url").asString()).append('\n'));
+        tasks.values().forEach(task -> {
+            String page = task.path("steps").path(0).path("page").asString();
+            if (url(page) != null) {
+                lines.append("- task ").append(task.path("id").asString()).append(": ").append(baseUrl).append('/').append(url(page)).append('\n');
+            }
+        });
+        return lines.toString().strip();
+    }
+
     public GuideStep step(String page, String guideId, String message) {
         return new GuideStep(page, url(page), guideId, message);
     }

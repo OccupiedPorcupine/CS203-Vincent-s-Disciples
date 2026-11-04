@@ -274,8 +274,11 @@ public class AssistantTools {
                                 """)));
     }
 
-    public List<ToolSpec> specs() {
-        return specs;
+    // A chat app (page "chat") has nothing to highlight, so it doesn't get guide_user.
+    public List<ToolSpec> specs(String page) {
+        return AssistantService.CHAT_PAGE.equals(page)
+                ? specs.stream().filter(spec -> !GUIDE_USER.equals(spec.name())).toList()
+                : specs;
     }
 
     // Returns the function_call_output text for the model. Problems are reported back to the

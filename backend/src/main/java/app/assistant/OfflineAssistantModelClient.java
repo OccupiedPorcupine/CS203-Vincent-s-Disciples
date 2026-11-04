@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
 // development and tests without an OpenAI key. It is not AI: it only understands typed sales
 // like "yesterday chicken rice 42, char siew 30" (with "sold out at 12:40" or "3 left over"), closures like "closed tomorrow" (today,
 // tomorrow or yesterday only), "what do I prep for tomorrow?", "why ...?" about the forecast on screen,
-// and "how do I ..." questions that share words with a task in the app guide. It drives the same tools
+// and "how do I ..." questions that share words with a task in the app guide (in a chat app, answered
+// with the task's link). It drives the same tools
 // a real model would (list_dishes then propose_sales_entry and/or propose_closure, get_prep_list,
 // explain_forecast, or guide_user), so the rest of the pipeline is real.
 public class OfflineAssistantModelClient implements AssistantModelClient {
@@ -63,7 +64,8 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     private static final Set<String> STOP_WORDS = Set.of(
             "the", "how", "can", "where", "what", "and", "for", "you", "your", "with", "from", "this", "that",
             "show", "help", "guide", "into", "use", "get", "want", "page", "one", "day");
-    private static final String GUIDE_MARKER = "App guide index, with the current page in full under current_page (JSON):";
+    // The guide's heading line in the web and chat prompts; the index JSON is on the next line.
+    private static final String GUIDE_MARKER = "App guide index";
 
     private static final String HELP = "Offline demo mode: I only understand typed sales such as \"chicken rice 42, char siew rice 30\", "
             + "closures such as \"closed tomorrow\", \"what do I prep for tomorrow?\", \"why?\" about a forecast on screen, "
@@ -123,6 +125,11 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             }
             String taskId = EVERY_WEEKDAY.matcher(text).find() && CLOSED.matcher(text).find() ? "set-opening-days"
                     : QUESTION.matcher(text).find() ? matchTask(text, instructions) : null;
+            if (taskId != null && tools.stream().noneMatch(tool -> AssistantTools.GUIDE_USER.equals(tool.name()))) {
+                // In a chat app: no tour, so give the link to the task's page (AppGuide.links).
+                Matcher link = Pattern.compile("- task " + Pattern.quote(taskId) + ": (\\S+)").matcher(instructions);
+                return message(link.find() ? "You can do that on this page: " + link.group(1) : HELP);
+            }
             if (taskId != null) {
                 ObjectNode arguments = jsonMapper.createObjectNode();
                 arguments.put("task_id", taskId);
@@ -297,7 +304,7 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         if (markerAt < 0) {
             return null;
         }
-        String guideLine = instructions.substring(markerAt + GUIDE_MARKER.length()).strip().lines().findFirst().orElse("{}");
+        String guideLine = instructions.substring(markerAt).lines().skip(1).findFirst().orElse("{}").strip();
         Set<String> asked = words(text);
 
         String best = null;
