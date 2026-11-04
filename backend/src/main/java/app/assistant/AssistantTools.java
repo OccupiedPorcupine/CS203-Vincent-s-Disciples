@@ -245,7 +245,8 @@ public class AssistantTools {
                                 """)),
                 new ToolSpec(GET_PREP_LIST,
                         "Get the prep list for a day from today up to 7 days ahead: portions of each dish to prepare "
-                                + "(enough for the share of days its margin makes worthwhile, or the top of its forecast range when it has no price and cost; why says which) and the total of each ingredient, from the user's recipes.",
+                                + "(enough for the share of days its margin makes worthwhile, or the top of its forecast range when it has no price and cost; why says which) and the total of each ingredient, from the user's recipes: quantity is cooked, to_buy is the raw amount by the ingredient's yield, "
+                                + "and perishable false means it comes from stock rather than being bought for the day.",
                         schema("""
                                 {"type": "object",
                                  "properties": {"date": {"type": "string", "description": "YYYY-MM-DD"}},
@@ -419,7 +420,9 @@ public class AssistantTools {
         prepList.ingredients().forEach(ingredient -> ingredients.addObject()
                 .put("ingredient", ingredient.ingredient())
                 .put("quantity", ingredient.quantity())
-                .put("unit", ingredient.unit()));
+                .put("unit", ingredient.unit())
+                .put("to_buy", ingredient.toBuy())
+                .put("perishable", ingredient.perishable()));
         output.set("dishes_without_recipe", jsonMapper.valueToTree(withoutRecipe));
         output.set("not_forecast", jsonMapper.valueToTree(prepList.skipped()));
         return output;

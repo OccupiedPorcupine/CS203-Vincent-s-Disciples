@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
     List<Ingredient> findByOwnerIdOrderByNameAsc(Long ownerId);
+    Optional<Ingredient> findByIdAndOwnerId(Long id, Long ownerId);
     Optional<Ingredient> findByOwnerIdAndNameKey(Long ownerId, String nameKey);
 }

@@ -69,6 +69,7 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `PUT /api/closures/nea-days` — `{from, to, open}` marks NEA's closed days in a range as open anyway, or closed again
 - `GET /api/chat-links` — chat apps set up on this server, each with the account's linked chat; `POST /api/chat-links/{channel}` → `{code, link, expiresAt}`, a one-time code (10 minutes) that links the chat it is sent from; `DELETE /api/chat-links/{id}` unlinks
 - `POST /api/channels/telegram/webhook` — Telegram's updates for the bot; only with the `X-Telegram-Bot-Api-Secret-Token` header (see "Telegram bot")
+- `GET /api/ingredients`, `PUT /api/ingredients/{id}` — the recipes' ingredients, each with its yield (cooked ÷ purchased weight) and whether it's bought daily; `{yieldPercent, perishable}` sets them, null for the default (USDA's cooking yield for the name, see `IngredientDefaults`, or 100% and perishable). `GET /api/prep-list` gives each ingredient's cooked `quantity` and the raw `toBuy`
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)

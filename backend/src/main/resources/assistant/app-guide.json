@@ -57,7 +57,7 @@
       "id": "prep",
       "title": "Prep list",
       "url": "prep.html",
-      "summary": "What to prepare for a day: portions of each dish from its forecast plus a safety margin, the total of each ingredient from the recipes, a Share button, and each dish's recipe.",
+      "summary": "What to prepare for a day: portions of each dish from its forecast plus a safety margin, how much of each ingredient to buy or take from stock, a Share button, each dish's recipe, and each ingredient's yield and whether it is bought daily.",
       "elements": [
         { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Data ingestion and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
@@ -69,8 +69,9 @@
         { "guideId": "prep-buffer", "description": "How many portions to prepare: Best for your margins (the default: each dish by its price and cost, enough for more days when a plate earns a lot and costs little; dishes without a price and cost get the top of the range), the top of the likely range, the forecast only, or the forecast plus 10, 20 or 30%." },
         { "guideId": "share-prep", "description": "Shares the prep list as plain text (e.g. to WhatsApp) on a phone, or copies it on a computer." },
         { "guideId": "prep-portions", "description": "Portions to prepare of each dish sold in the last 4 weeks, with its forecast, likely range and how it was worked out." },
-        { "guideId": "prep-ingredients", "description": "Total of each ingredient for those portions, from the recipes, and which dishes use it. Dishes without a recipe are named underneath." },
-        { "guideId": "recipe-list", "description": "Recipes section: one row per dish. Opening a row shows its ingredients, each with an amount per portion and a unit (g, ml, pcs), with Add ingredient, Remove and Save recipe." }
+        { "guideId": "prep-ingredients", "description": "Each ingredient for those portions, as the raw amount to buy (the recipes' cooked amount ÷ the ingredient's yield), under To buy for food bought each day and From stock for food kept in stock. Dishes without a recipe are named underneath." },
+        { "guideId": "recipe-list", "description": "Recipes section: one row per dish. Opening a row shows its ingredients, each with a cooked amount per portion and a unit (g, ml, pcs), with Add ingredient, Remove and Save recipe." },
+        { "guideId": "ingredient-buying", "description": "Buying section: one row per ingredient with its yield in percent (how much of what is bought is left once cooked; it starts from USDA's cooking yield for meats and 100% for the rest), whether it is bought each day or kept in stock, Save and Use defaults." }
       ]
     },
     {
@@ -171,6 +172,13 @@
       "summary": "Enter what one portion of a dish uses (ingredients and amounts), so the prep list can add up ingredients.",
       "steps": [
         { "page": "prep", "guideId": "recipe-list", "message": "Open a dish, type each ingredient with its amount per portion and unit, like chicken 150 g, then press Save recipe." }
+      ]
+    },
+    {
+      "id": "set-ingredient-yields",
+      "summary": "Say how much of an ingredient is left after cooking (its yield), or that it is kept in stock, so the prep list says how much raw to buy.",
+      "steps": [
+        { "page": "prep", "guideId": "ingredient-buying", "message": "Type how much of each ingredient is left once cooked, like 70% for chicken, and whether you buy it each day or keep it in stock, then press Save." }
       ]
     },
     {
