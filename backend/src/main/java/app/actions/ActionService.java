@@ -108,7 +108,7 @@ public class ActionService {
     // ---- Rules ----
 
     private static Set<LocalDate> closedDates(StallClosureService.StallClosures closures) {
-        return closures.closedDates().stream().map(closedDate -> closedDate.getClosedDate()).collect(Collectors.toSet());
+        return closures.closedDates().stream().map(StallClosureService.Closure::date).collect(Collectors.toSet());
     }
 
     private static ActionCard firstSales() {

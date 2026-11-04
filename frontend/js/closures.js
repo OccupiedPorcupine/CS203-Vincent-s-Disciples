@@ -1,4 +1,8 @@
-// "Opening days" on the Data page: weekly rest days, trading hours and one-off closed days.
+// "Opening days" on the Data page: the stall's hawker centre and NEA's closures of it, weekly rest
+// days, trading hours and one-off closed days.
+const hawkerCentreSelect = document.getElementById("hawker-centre");
+const hawkerCentreStatus = document.getElementById("hawker-centre-status");
+const neaClosureList = document.getElementById("nea-closure-list");
 const restDayBoxes = document.querySelectorAll('input[name="rest-day"]');
 const closedDateForm = document.getElementById("closed-date-form");
 const closedDateInput = document.getElementById("closed-date");
@@ -30,7 +34,58 @@ function formatClosedDay(isoDate) {
   });
 }
 
-function renderClosures({ restDays, closedDates, hours }) {
+function formatRange(startDate, endDate) {
+  if (startDate === endDate) return formatClosedDay(startDate);
+  const start = new Date(`${startDate}T00:00:00Z`).toLocaleDateString("en-SG", {
+    weekday: "short", day: "numeric", month: "short", timeZone: "UTC"
+  });
+  return `${start} – ${formatClosedDay(endDate)}`;
+}
+
+function dayCount(startDate, endDate) {
+  return Math.round((new Date(`${endDate}T00:00:00Z`) - new Date(`${startDate}T00:00:00Z`)) / 86400000) + 1;
+}
+
+// One row per NEA closure: open anyway when the stall trades regardless, or close it again.
+function renderNeaClosures(hawkerCentre, neaClosures) {
+  hawkerCentreSelect.value = hawkerCentre ? String(hawkerCentre.id) : "";
+  neaClosureList.replaceChildren(...neaClosures.map(closure => {
+    const item = document.createElement("li");
+    const allOpen = closure.openDays.length === dayCount(closure.startDate, closure.endDate);
+    item.classList.toggle("is-open", allOpen);
+
+    const label = document.createElement("span");
+    label.textContent = `${formatRange(closure.startDate, closure.endDate)} · ${closure.reason}`;
+    const notes = [];
+    if (closure.remarks) notes.push(closure.remarks);
+    if (allOpen) notes.push("You’re opening anyway.");
+    else if (closure.openDays.length) notes.push(`Opening anyway on ${closure.openDays.map(formatClosedDay).join(", ")}.`);
+    if (notes.length) {
+      const note = document.createElement("span");
+      note.className = "nea-closure-note";
+      note.textContent = notes.join(" ");
+      label.append(note);
+    }
+
+    const open = closure.openDays.length === 0;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "text-button";
+    toggle.textContent = open ? "Open anyway" : "Close again";
+    toggle.setAttribute("aria-label", `${toggle.textContent}: ${formatRange(closure.startDate, closure.endDate)}`);
+    toggle.addEventListener("click", () => saveClosures("/api/closures/nea-days", {
+      method: "PUT",
+      body: JSON.stringify({ from: closure.startDate, to: closure.endDate, open })
+    }, open ? `You’re open ${formatRange(closure.startDate, closure.endDate)}.` : `Closed again ${formatRange(closure.startDate, closure.endDate)}.`,
+    hawkerCentreStatus));
+
+    item.append(label, toggle);
+    return item;
+  }));
+}
+
+function renderClosures({ restDays, closedDates, hours, hawkerCentre = null, neaClosures = [] }) {
+  renderNeaClosures(hawkerCentre, neaClosures);
   restDayBoxes.forEach(box => { box.checked = restDays.includes(box.value); });
   opensAtInput.value = hours ? hours.opensAt : "";
   closesAtInput.value = hours ? hours.closesAt : "";
@@ -39,7 +94,8 @@ function renderClosures({ restDays, closedDates, hours }) {
   const today = todayInSingapore();
   const cutoff = new Date(`${today}T00:00:00Z`);
   cutoff.setUTCDate(cutoff.getUTCDate() - PAST_DAYS_SHOWN);
-  const shown = closedDates.filter(closed => closed.date >= cutoff.toISOString().slice(0, 10));
+  // NEA's days are listed with the hawker centre above.
+  const shown = closedDates.filter(closed => closed.source !== "NEA" && closed.date >= cutoff.toISOString().slice(0, 10));
 
   closedDateList.replaceChildren(...shown.map(closed => {
     const item = document.createElement("li");
@@ -134,6 +190,30 @@ closedDateForm.addEventListener("submit", async event => {
   updateClosedDateButton();
 });
 
+// NEA's list of hawker centres, to pick the stall's. Empty until the backend has fetched it once.
+async function loadHawkerCentres() {
+  try {
+    const centres = await apiRequest("/api/closures/hawker-centres");
+    const none = new Option(centres.length ? "Not in a hawker centre" : "NEA’s list isn’t available yet", "");
+    hawkerCentreSelect.replaceChildren(none, ...centres.map(centre => new Option(centre.name, centre.id)));
+    hawkerCentreSelect.disabled = centres.length === 0;
+  } catch (error) {
+    if (error.status !== 401) {
+      console.error(error);
+      showClosuresStatus("Couldn’t load NEA’s list of hawker centres. Refresh the page to try again.", "error", hawkerCentreStatus);
+    }
+  }
+}
+
+hawkerCentreSelect.addEventListener("change", () => {
+  const id = hawkerCentreSelect.value ? Number(hawkerCentreSelect.value) : null;
+  const name = hawkerCentreSelect.selectedOptions[0]?.textContent;
+  saveClosures("/api/closures/hawker-centre", {
+    method: "PUT",
+    body: JSON.stringify({ hawkerCentreId: id })
+  }, id ? `Saved. NEA’s closures of ${name} now count as closed days.` : "Saved. NEA’s closures no longer count.", hawkerCentreStatus);
+});
+
 async function loadClosures() {
   try {
     renderClosures(await apiRequest("/api/closures"));
@@ -145,7 +225,8 @@ async function loadClosures() {
   }
 }
 
-loadClosures();
+// The centres first, so the stall's centre can be selected when the closures arrive.
+loadHawkerCentres().then(loadClosures);
 
 // Sent by js/assistant.js when the user confirms closed days with the voice assistant.
 window.addEventListener("chicky:closures-saved", loadClosures);

@@ -57,7 +57,7 @@ public class RevenueService {
 
         StallClosureService.StallClosures closures = closureService.getClosures(ownerId);
         Set<LocalDate> closedDates = new HashSet<>();
-        closures.closedDates().forEach(closedDate -> closedDates.add(closedDate.getClosedDate()));
+        closures.closedDates().forEach(closedDate -> closedDates.add(closedDate.date()));
 
         List<DailyRevenueResponse.Day> days = new ArrayList<>();
         for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {

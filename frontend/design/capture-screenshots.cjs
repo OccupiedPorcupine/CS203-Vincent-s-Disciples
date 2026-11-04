@@ -51,8 +51,12 @@ const capture = async (page, out) => {
     // Closed days older than 30 days aren't listed, so the example sits a fortnight from today.
     if (p === "/api/closures") return json(route, {
       restDays: ["MONDAY"],
-      closedDates: [{ date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), reason: "Centre cleaning" }]
+      closedDates: [{ date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10), reason: "Family wedding", source: "OWNER" }],
+      hours: null,
+      hawkerCentre: { id: 1, name: "Adam Road Food Centre" },
+      neaClosures: [{ startDate: "2026-12-07", endDate: "2026-12-08", reason: "Centre cleaning (NEA)", remarks: null, openDays: [] }]
     });
+    if (p === "/api/closures/hawker-centres") return json(route, [{ id: 1, name: "Adam Road Food Centre", address: "2, Adam Road, Singapore 289876" }]);
     if (p === "/api/assistant/status") return json(route, { available: true, voice: true });
     if (p === "/api/assistant/messages") return json(route, {
       conversationId: "c1",

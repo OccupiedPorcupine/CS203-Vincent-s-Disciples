@@ -2,6 +2,9 @@ package app.controller;
 
 import app.dto.CloseDateRequest;
 import app.dto.ClosuresResponse;
+import app.dto.HawkerCentreResponse;
+import app.dto.SetHawkerCentreRequest;
+import app.dto.SetNeaDaysRequest;
 import app.closure.Hours;
 import app.dto.SetRestDaysRequest;
 import app.dto.SetTradingHoursRequest;
@@ -18,8 +21,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
-@Tag(name = "Closures", description = "Days the stall is closed: weekly rest days and one-off closed dates")
+@Tag(name = "Closures", description = "Days the stall is closed: weekly rest days, one-off closed dates and its hawker centre's NEA closures")
 @RestController
 @RequestMapping("/api/closures")
 public class StallClosureController {
@@ -97,5 +101,42 @@ public class StallClosureController {
     @DeleteMapping("/hours")
     public ClosuresResponse clearHours(@AuthenticationPrincipal AuthenticatedUser user) {
         return ClosuresResponse.from(stallClosureService.clearHours(user.id()));
+    }
+
+    @Operation(summary = "List hawker centres", description = "NEA's hawker centres, by name, for the owner to pick the stall's.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Hawker centres listed"),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @GetMapping("/hawker-centres")
+    public List<HawkerCentreResponse> hawkerCentres() {
+        return stallClosureService.hawkerCentres().stream().map(HawkerCentreResponse::from).toList();
+    }
+
+    @Operation(summary = "Set the stall's hawker centre",
+            description = "Links the stall to a hawker centre, so NEA's cleaning and works closures count as closed days. "
+                    + "A null id unlinks it; days the owner marked closed themselves are kept either way.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Hawker centre saved; returns all closures"),
+            @ApiResponse(responseCode = "400", description = "Unknown hawker centre", content = @Content),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @PutMapping("/hawker-centre")
+    public ClosuresResponse setHawkerCentre(@AuthenticationPrincipal AuthenticatedUser user,
+                                            @RequestBody SetHawkerCentreRequest request) {
+        return ClosuresResponse.from(stallClosureService.setHawkerCentre(user.id(), request.hawkerCentreId()));
+    }
+
+    @Operation(summary = "Open or close NEA's closed days",
+            description = "Marks the days in a range that NEA closes the stall's hawker centre as open anyway, or closed again.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Saved; returns all closures"),
+            @ApiResponse(responseCode = "400", description = "Invalid range", content = @Content),
+            @ApiResponse(responseCode = "401", description = "User is not authenticated", content = @Content)
+    })
+    @PutMapping("/nea-days")
+    public ClosuresResponse setNeaDays(@AuthenticationPrincipal AuthenticatedUser user,
+                                       @Valid @RequestBody SetNeaDaysRequest request) {
+        return ClosuresResponse.from(stallClosureService.setNeaDaysOpen(user.id(), request.from(), request.to(), request.open()));
     }
 }
