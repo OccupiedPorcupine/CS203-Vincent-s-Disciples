@@ -154,7 +154,17 @@ async function mockApi(context) {
       { dishId: 2, dish: "Char siew rice", items: [] }
     ]);
     if (path === "/api/ingredients") return json(route, [{ name: "Rice", unit: "g" }, { name: "Roast chicken", unit: "g" }]);
-    if (path === "/api/closures") return json(route, { restDays: ["TUESDAY"], closedDates: [{ date: day(14), reason: "Centre cleaning" }], hours: { opensAt: "10:00", closesAt: "15:00" } });
+    if (path === "/api/closures") return json(route, {
+      restDays: ["TUESDAY"],
+      closedDates: [{ date: day(14), reason: "Family wedding", source: "OWNER" }, { date: day(21), reason: "Centre cleaning (NEA)", source: "NEA" }],
+      hours: { opensAt: "10:00", closesAt: "15:00" },
+      hawkerCentre: { id: 1, name: "Adam Road Food Centre" },
+      neaClosures: [{ startDate: day(21), endDate: day(22), reason: "Centre cleaning (NEA)", remarks: "Only Cooked Food Section is closed.", openDays: [] }]
+    });
+    if (path === "/api/closures/hawker-centres") return json(route, [
+      { id: 1, name: "Adam Road Food Centre", address: "2, Adam Road, Singapore 289876" },
+      { id: 2, name: "Old Airport Road Blk 51 (51 Old Airport Road Food Centre and Shopping Mall)", address: "51 Old Airport Road" }
+    ]);
     if (path === "/api/waste") return json(route, { leftoverPortions: 12, leftoverCost: "20.40", leftoversWithoutCost: 0, soldOutDays: 2, daysRecorded: 3,
       dishes: [{ dishId: 1, name: "Chicken rice", leftoverPortions: 12, leftoverCost: "20.40", soldOutDays: 2, earliestSoldOutAt: "12:40" }] });
     return route.fulfill({ status: 404, body: "" });

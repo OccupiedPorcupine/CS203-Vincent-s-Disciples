@@ -559,7 +559,7 @@ public class AssistantTools {
     private JsonNode proposeClosure(JsonNode arguments, TurnContext context) {
         StallClosures current = stallClosureService.getClosures(context.ownerId);
         Set<LocalDate> closedDates = new HashSet<>();
-        current.closedDates().forEach(closedDate -> closedDates.add(closedDate.getClosedDate()));
+        current.closedDates().forEach(closedDate -> closedDates.add(closedDate.date()));
 
         List<ProposedClosure> closures = new ArrayList<>();
         List<String> problems = new ArrayList<>();
@@ -608,7 +608,8 @@ public class AssistantTools {
         return output;
     }
 
-    // The stall's weekly rest days and closed days from today on, for the instructions.
+    // The stall's weekly rest days and closed days from today on, for the instructions. NEA's
+    // closures go in as ranges: a months-long renovation would be a long list of days.
     @Transactional(readOnly = true)
     public ObjectNode closures(Long ownerId, LocalDate today) {
         StallClosures current = stallClosureService.getClosures(ownerId);
@@ -617,10 +618,24 @@ public class AssistantTools {
         current.restDays().stream().sorted().forEach(day -> restDays.add(day.name()));
         ArrayNode closedDates = node.putArray("closed_dates");
         current.closedDates().stream()
-                .filter(closedDate -> !closedDate.getClosedDate().isBefore(today))
+                .filter(closedDate -> !closedDate.fromNea() && !closedDate.date().isBefore(today))
                 .forEach(closedDate -> closedDates.addObject()
-                        .put("date", closedDate.getClosedDate().toString())
-                        .put("reason", closedDate.getReason()));
+                        .put("date", closedDate.date().toString())
+                        .put("reason", closedDate.reason()));
+        if (current.hawkerCentre() != null) {
+            node.put("hawker_centre", current.hawkerCentre().name());
+            ArrayNode nea = node.putArray("nea_closures");
+            current.neaClosures().forEach(closure -> {
+                ObjectNode item = nea.addObject()
+                        .put("from", closure.startDate().toString())
+                        .put("to", closure.endDate().toString())
+                        .put("reason", closure.reason());
+                if (!closure.openDays().isEmpty()) {
+                    ArrayNode open = item.putArray("open_anyway");
+                    closure.openDays().forEach(day -> open.add(day.toString()));
+                }
+            });
+        }
         return node;
     }
 

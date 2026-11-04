@@ -135,6 +135,20 @@
         <span class="note">Days your stall is closed aren’t counted as days with no sales, and aren’t forecast. A day you record sales on counts as open.</span>
       </div>
 
+      <div class="hawker-centre" data-guide-id="hawker-centre">
+        <div class="field">
+          <label for="hawker-centre">Hawker centre</label>
+          <div class="select-wrap">
+            <select id="hawker-centre" class="input" disabled>
+              <option value="">Loading NEA’s list…</option>
+            </select>
+          </div>
+        </div>
+        <p class="field-hint">NEA’s cleaning and works days for your centre count as closed days. If your stall opens on one anyway, press Open anyway.</p>
+        <p id="hawker-centre-status" class="status-text" role="status" aria-live="polite"></p>
+        <ul id="nea-closure-list" class="closed-date-list nea-closure-list" aria-label="NEA closures of your hawker centre"></ul>
+      </div>
+
       <fieldset class="rest-days" data-guide-id="rest-days">
         <legend>Weekly rest days</legend>
         <div class="rest-day-list">

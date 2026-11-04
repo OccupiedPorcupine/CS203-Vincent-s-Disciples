@@ -65,7 +65,14 @@
 .import-existing legend { margin-bottom: 8px; }
 .import-existing label { display: flex; align-items: center; gap: 8px; margin: 4px 0; cursor: pointer; }
 
-.rest-days { margin-top: 16px; font-size: var(--text-sm); }
+.hawker-centre { margin-top: 16px; }
+.hawker-centre .field { max-width: 480px; }
+.hawker-centre .field-hint { margin: 6px 0 0; color: var(--muted); font-size: var(--text-sm); }
+.hawker-centre .status-text:empty { display: none; }
+.nea-closure-list li { align-items: flex-start; }
+.nea-closure-list .nea-closure-note { display: block; margin-top: 2px; color: var(--muted); font-size: var(--text-xs); }
+.nea-closure-list li.is-open > span:first-child { color: var(--muted); }
+.rest-days { margin-top: 24px; font-size: var(--text-sm); }
 .rest-days legend { margin-bottom: 8px; }
 .rest-day-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .rest-day { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; }

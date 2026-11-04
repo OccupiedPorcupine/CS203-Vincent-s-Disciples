@@ -90,7 +90,8 @@
         { "guideId": "source-list", "description": "Table of uploaded files, when they were uploaded, their size, whether the model uses them, and an Import sales button that turns a file's rows into daily sales." },
         { "guideId": "import-panel", "description": "Shown after an upload or after pressing Import sales: what is in the file (rows, dates, problems by row) and, for each dish name in the file, which dish to record it as, a new dish, or leave it out. Days that already have sales can be kept or replaced." },
         { "guideId": "import-button", "description": "Imports the file's rows into daily sales, inside the import panel. Nothing is saved before this is pressed." },
-        { "guideId": "closures-panel", "description": "Opening days section at the bottom of the page: the stall's weekly rest days and one-off closed days. Closed days aren't counted as days with no sales and aren't forecast." },
+        { "guideId": "closures-panel", "description": "Opening days section at the bottom of the page: the stall's hawker centre, weekly rest days and one-off closed days. Closed days aren't counted as days with no sales and aren't forecast." },
+        { "guideId": "hawker-centre", "description": "Hawker centre drop-down at the top of Opening days. Picking the stall's centre makes NEA's cleaning and works days closed days; they're listed below it, each with an Open anyway button." },
         { "guideId": "rest-days", "description": "Monday to Sunday buttons. Ticking a day makes it a weekly rest day; changes save straight away." },
         { "guideId": "trading-hours", "description": "Trading hours: when the stall opens and closes, with Save hours. They tell how early in the day a dish sold out. A closing time after midnight (e.g. 02:00) is fine." },
         { "guideId": "closed-date-form", "description": "Pick a date and an optional reason (e.g. centre cleaning), then press Add closed day. Added days are listed below with a Remove button." }
@@ -198,8 +199,9 @@
     },
     {
       "id": "set-opening-days",
-      "summary": "Set the stall's weekly rest days and one-off closed days (e.g. hawker centre cleaning), so they aren't counted as days with no sales and aren't forecast.",
+      "summary": "Set the stall's hawker centre (so NEA's cleaning days are closed days), weekly rest days and one-off closed days, so they aren't counted as days with no sales and aren't forecast.",
       "steps": [
+        { "page": "data", "guideId": "hawker-centre", "message": "Pick your hawker centre, and NEA's cleaning days are added as closed days for you." },
         { "page": "data", "guideId": "rest-days", "message": "Tick the days of the week your stall is always closed. They save straight away." },
         { "page": "data", "guideId": "closed-date-form", "message": "For a one-off closure, pick the date, add a reason if you like, and press Add closed day." }
       ]

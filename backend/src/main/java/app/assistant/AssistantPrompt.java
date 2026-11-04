@@ -56,6 +56,8 @@ final class AssistantPrompt {
             - A message can have both sales and a closure ("sold 40 chicken rice today, closed tomorrow"): call \
             both propose_sales_entry and propose_closure; they share one confirm card.
             - Like sales, this only shows a confirm card. Never say a day is marked closed until the user confirms.
+            - nea_closures are days NEA closes the stall's hawker_centre for cleaning or works; they count as closed \
+            days. If the user will open on one of them anyway, call propose_closure with closed false for those days.
 
             Prices
             - When the user gives a dish a new price or cost ("char siew rice is now $5", "叉烧饭现在五块", \

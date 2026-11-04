@@ -63,6 +63,9 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `POST /api/assistant/transcribe` — multipart `audio` (under a minute) → `{text, languages}`; audio is not stored
 - `POST /api/assistant/messages` — `{conversationId?, text, page, inputMode, pageContext?, forecast?}` → `{conversationId, reply, proposal?, guide?}`; a proposal is only a suggestion. `forecast` (`{dishId, date}`) is the forecast on screen, so "why so high?" refers to it
 - `POST /api/assistant/proposals/{id}/confirm` — saves a proposal (optionally edited: `{entries: [...]}`); `.../cancel` discards it
+- `GET /api/closures` — the stall's rest days, closed days (`source` `OWNER` or `NEA`), trading hours, hawker centre and its upcoming NEA closures
+- `GET /api/closures/hawker-centres`, `PUT /api/closures/hawker-centre` — NEA's hawker centres, and `{hawkerCentreId}` (null to unlink) to pick the stall's
+- `PUT /api/closures/nea-days` — `{from, to, open}` marks NEA's closed days in a range as open anyway, or closed again
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)
@@ -73,6 +76,12 @@ registered twice for the same user. Uploads from before V25 were saved under
 `../.local-data/training-data`; they're still read from there while the file exists.
 Uploads are currently marked `AVAILABLE_FOR_TRAINING`; connecting them to a training job and an
 active model version is a separate pipeline step.
+
+NEA's hawker centre cleaning and works dates come from data.gov.sg's "Dates of Hawker Centres
+Closure" (`HawkerCentreSyncService`): daily at 04:30, and on startup when the stored copy is more
+than 20 hours old. A stall linked to a centre treats those dates as closed days. They aren't
+copied into `closed_dates`, so the owner's own days always win and unlinking drops only NEA's.
+Set `HAWKER_CENTRE_SYNC_ENABLED=false` to stop the fetch; tests have it off.
 
 ### Voice assistant
 

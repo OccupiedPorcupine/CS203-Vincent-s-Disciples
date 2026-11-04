@@ -366,7 +366,7 @@ public class AssistantService {
         }
 
         Set<LocalDate> alreadyClosed = new HashSet<>();
-        stallClosureService.getClosures(ownerId).closedDates().forEach(closed -> alreadyClosed.add(closed.getClosedDate()));
+        stallClosureService.getClosures(ownerId).closedDates().forEach(closed -> alreadyClosed.add(closed.date()));
         for (ProposedClosure closure : closures) {
             if (closure.closed()) {
                 // "Closed tomorrow" again shouldn't wipe a reason given before, e.g. "Centre cleaning".

@@ -55,14 +55,14 @@ class StallClosureApiTest {
     void restDaysCanBeChangedBackAndForth() throws Exception {
         Session session = signUp("rest-days@closures.test");
 
-        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null}", session.get("/api/closures").body());
-        assertEquals("{\"restDays\":[\"TUESDAY\"],\"closedDates\":[],\"hours\":null}",
+        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}", session.get("/api/closures").body());
+        assertEquals("{\"restDays\":[\"TUESDAY\"],\"closedDates\":[],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("PUT", "/api/closures/rest-days", "{\"restDays\":[\"TUESDAY\"]}").body());
-        assertEquals("{\"restDays\":[\"MONDAY\",\"TUESDAY\"],\"closedDates\":[],\"hours\":null}",
+        assertEquals("{\"restDays\":[\"MONDAY\",\"TUESDAY\"],\"closedDates\":[],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("PUT", "/api/closures/rest-days", "{\"restDays\":[\"TUESDAY\",\"MONDAY\"]}").body());
-        assertEquals("{\"restDays\":[\"MONDAY\"],\"closedDates\":[],\"hours\":null}",
+        assertEquals("{\"restDays\":[\"MONDAY\"],\"closedDates\":[],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("PUT", "/api/closures/rest-days", "{\"restDays\":[\"MONDAY\"]}").body());
-        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null}",
+        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("PUT", "/api/closures/rest-days", "{\"restDays\":[]}").body());
     }
 
@@ -82,11 +82,11 @@ class StallClosureApiTest {
         Session session = signUp("closed-dates@closures.test");
 
         session.send("PUT", "/api/closures/dates/2026-11-05", "{\"reason\":\"  Centre cleaning \"}");
-        assertEquals("{\"restDays\":[],\"closedDates\":[{\"date\":\"2026-11-05\",\"reason\":\"Centre cleaning\"}],\"hours\":null}",
+        assertEquals("{\"restDays\":[],\"closedDates\":[{\"date\":\"2026-11-05\",\"reason\":\"Centre cleaning\",\"source\":\"OWNER\"}],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("PUT", "/api/closures/dates/2026-11-05", "{\"reason\":\"Centre cleaning\"}").body());
-        assertEquals("{\"restDays\":[],\"closedDates\":[{\"date\":\"2026-11-05\",\"reason\":null}],\"hours\":null}",
+        assertEquals("{\"restDays\":[],\"closedDates\":[{\"date\":\"2026-11-05\",\"reason\":null,\"source\":\"OWNER\"}],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("PUT", "/api/closures/dates/2026-11-05", null).body());
-        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null}",
+        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("DELETE", "/api/closures/dates/2026-11-05", null).body());
     }
 
@@ -94,7 +94,7 @@ class StallClosureApiTest {
     void closuresBelongToTheirOwner() throws Exception {
         signUp("owner-a@closures.test").send("PUT", "/api/closures/dates/2026-11-05", "{\"reason\":\"Holiday\"}");
 
-        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null}", signUp("owner-b@closures.test").get("/api/closures").body());
+        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}", signUp("owner-b@closures.test").get("/api/closures").body());
     }
 
     @Test
@@ -116,16 +116,16 @@ class StallClosureApiTest {
     void tradingHoursCanBeSetIncludingPastMidnightAndCleared() throws Exception {
         Session session = signUp("hours@closures.test");
 
-        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":{\"opensAt\":\"10:00\",\"closesAt\":\"15:00\"}}",
+        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":{\"opensAt\":\"10:00\",\"closesAt\":\"15:00\"},\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("PUT", "/api/closures/hours", "{\"opensAt\":\"10:00\",\"closesAt\":\"15:00\"}").body());
-        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":{\"opensAt\":\"18:00\",\"closesAt\":\"02:00\"}}",
+        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":{\"opensAt\":\"18:00\",\"closesAt\":\"02:00\"},\"hawkerCentre\":null,\"neaClosures\":[]}",
                 session.send("PUT", "/api/closures/hours", "{\"opensAt\":\"18:00\",\"closesAt\":\"02:00\"}").body());
 
         HttpResponse<String> same = session.send("PUT", "/api/closures/hours", "{\"opensAt\":\"10:00\",\"closesAt\":\"10:00\"}");
         assertEquals(400, same.statusCode());
         assertTrue(same.body().contains("The closing time must be different from the opening time."), same.body());
 
-        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null}", session.send("DELETE", "/api/closures/hours", null).body());
+        assertEquals("{\"restDays\":[],\"closedDates\":[],\"hours\":null,\"hawkerCentre\":null,\"neaClosures\":[]}", session.send("DELETE", "/api/closures/hours", null).body());
     }
 
     @Test
