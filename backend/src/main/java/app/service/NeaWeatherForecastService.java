@@ -21,6 +21,24 @@ public class NeaWeatherForecastService {
     }
 
     public MlPredictionRequest.WeatherInput getWeather(LocalDate forecastDate) {
+        General general = fetch(forecastDate);
+
+        return weatherFeatureAdapter.adapt(
+                general.temperature().low(),
+                general.temperature().high(),
+                general.wind().speed().low(),
+                general.wind().speed().high(),
+                general.forecast().code()
+        );
+    }
+
+    // The same forecast in words, e.g. "Thundery Showers, 25 to 33°C", for explaining a forecast to the user.
+    public String describe(LocalDate forecastDate) {
+        General general = fetch(forecastDate);
+        return "%s, %.0f to %.0f°C".formatted(general.forecast().text(), general.temperature().low(), general.temperature().high());
+    }
+
+    private General fetch(LocalDate forecastDate) {
         ApiResponse response = restClient.get()
                 .uri("/v2/real-time/api/twenty-four-hr-forecast")
                 .retrieve()
@@ -34,14 +52,7 @@ public class NeaWeatherForecastService {
         General general = record.general();
 
         validateForecastDate(forecastDate, general.validPeriod());
-
-        return weatherFeatureAdapter.adapt(
-                general.temperature().low(),
-                general.temperature().high(),
-                general.wind().speed().low(),
-                general.wind().speed().high(),
-                general.forecast().code()
-        );
+        return general;
     }
 
     private void validateForecastDate(LocalDate forecastDate, ValidPeriod validPeriod) {

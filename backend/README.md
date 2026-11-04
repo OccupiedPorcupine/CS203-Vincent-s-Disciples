@@ -61,7 +61,7 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `GET /api/dishes/{dishId}/aliases`, `POST /api/dishes/{dishId}/aliases` — other names for a dish (e.g. `鸡饭`); matching ignores case and spacing, and each name points to one dish per user (409 `ALIAS_IN_USE` otherwise)
 - `GET /api/assistant/status` — whether the voice assistant and voice input are available
 - `POST /api/assistant/transcribe` — multipart `audio` (under a minute) → `{text, languages}`; audio is not stored
-- `POST /api/assistant/messages` — `{conversationId?, text, page, inputMode, languages}` → `{conversationId, reply, proposal?}`; a proposal is only a suggestion
+- `POST /api/assistant/messages` — `{conversationId?, text, page, inputMode, pageContext?, forecast?}` → `{conversationId, reply, proposal?, guide?}`; a proposal is only a suggestion. `forecast` (`{dishId, date}`) is the forecast on screen, so "why so high?" refers to it
 - `POST /api/assistant/proposals/{id}/confirm` — saves a proposal (optionally edited: `{entries: [...]}`); `.../cancel` discards it
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
@@ -86,6 +86,12 @@ sales, which are only saved when the user confirms them. Set it up in `backend/.
 
 Code is in `src/main/java/app/assistant/`. The prompt is `AssistantPrompt`, the model's tools are
 `AssistantTools`, and every message and its outcome is logged in `assistant_interactions`.
+
+It also explains forecasts. The forecast page's "Ask about this forecast" card sends questions like
+"why so high?" with the dish and date on screen. The read-only `explain_forecast` tool returns that
+forecast and only what it was made from: the basis, the dish's last 4 same-weekday sales and the last
+7 days, and whether the weather forecast and a public holiday were used. The prompt tells the model
+to quote only those and to say that any other reason the user suggests isn't taken into account.
 
 ### Demo data
 

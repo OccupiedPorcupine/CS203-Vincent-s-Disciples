@@ -1,0 +1,122 @@
+[
+ {
+  "reply": "It’s based on your last four Wednesdays: 52, 48, 55 and 50 portions, averaging 51. The likely range is 38–65; weather and public holidays weren’t used.",
+  "proposal": null,
+  "guide": null,
+  "transcript": null,
+  "seconds": 3.47,
+  "explainProblems": [],
+  "id": "explain-01",
+  "category": "explain",
+  "input": "why is this forecast so high?",
+  "expected": {
+   "type": "explain",
+   "require": "average|last (4|four)|past|recorded|based on",
+   "forbid": [
+    "(?<!not )(?<!n't )(because|due to|thanks to)[^.]{0,30}(rain|weather|event|school|payday|promotion)"
+   ]
+  },
+  "passed": true,
+  "fields": null
+ },
+ {
+  "reply": "No—rain isn’t taken into account for this forecast. It’s based on your last 4 Wednesdays’ fishball noodle sales: 52, 48, 55 and 50 portions.",
+  "proposal": null,
+  "guide": null,
+  "transcript": null,
+  "seconds": 3.96,
+  "explainProblems": [],
+  "id": "explain-02",
+  "category": "explain",
+  "input": "is it because of the rain tomorrow?",
+  "expected": {
+   "type": "explain",
+   "require": "\\bnot\\b|n't|\\bno\\b|only",
+   "forbid": [
+    "(?<!not )(?<!n't )(because|due to|thanks to)[^.]{0,30}(rain|weather|event|school|payday|promotion)"
+   ]
+  },
+  "passed": true,
+  "fields": null
+ },
+ {
+  "reply": "这个预测是你过去4个星期三的鱼丸面销量平均：52、48、55和50份，所以预测为51份。可能范围是38到65份；目前记录还不够多，范围暂按预测上下25%估算，未使用天气或公共假期因素。",
+  "proposal": null,
+  "guide": null,
+  "transcript": null,
+  "seconds": 3.98,
+  "explainProblems": [],
+  "id": "explain-03",
+  "category": "explain",
+  "input": "为什么这个预测这么多？",
+  "expected": {
+   "type": "explain",
+   "require": "平均|星期|周|礼拜",
+   "forbid": [
+    "(?<!不是)因为[^。]{0,15}(下雨|天气|活动)"
+   ]
+  },
+  "passed": true,
+  "fields": null
+ },
+ {
+  "reply": "It’s 51, based on your last 4 Wednesdays: 52, 48, 55 and 50 portions. Chicky doesn’t take nearby events into account; weather and public holidays weren’t used either.",
+  "proposal": null,
+  "guide": null,
+  "transcript": null,
+  "seconds": 3.69,
+  "explainProblems": [],
+  "id": "explain-04",
+  "category": "explain",
+  "input": "why so many ah? got event nearby is it",
+  "expected": {
+   "type": "explain",
+   "require": "\\bnot\\b|n't|\\bno\\b|only|average|based on",
+   "forbid": [
+    "(?<!not )(?<!n't )(because|due to|thanks to)[^.]{0,30}(rain|weather|event|school|payday|promotion)"
+   ]
+  },
+  "passed": true,
+  "fields": null
+ },
+ {
+  "reply": "Tomorrow’s forecast is 51 portions, based on the average of your last four Wednesdays: 52, 48, 55 and 50. The likely range is 38–65 because there isn’t enough history to measure forecast accuracy yet; weather and public holidays weren’t used.",
+  "proposal": null,
+  "guide": null,
+  "transcript": null,
+  "seconds": 4.12,
+  "explainProblems": [],
+  "id": "explain-05",
+  "category": "explain",
+  "input": "why is tomorrow's fishball noodles forecast that number?",
+  "expected": {
+   "type": "explain",
+   "require": "average|last (4|four)|past|recorded|based on",
+   "forbid": [
+    "(?<!not )(?<!n't )(because|due to|thanks to)[^.]{0,30}(rain|weather|event|school|payday|promotion)"
+   ]
+  },
+  "passed": true,
+  "fields": null
+ },
+ {
+  "reply": "There are too few past days to measure how far forecasts are usually off, so the range is a rough 25% either side of the 51-portion forecast: 38–65 portions. It should narrow as more sales are recorded.",
+  "proposal": null,
+  "guide": null,
+  "transcript": null,
+  "seconds": 4.07,
+  "explainProblems": [],
+  "id": "explain-06",
+  "category": "explain",
+  "input": "Why is the likely range so wide?",
+  "expected": {
+   "type": "explain",
+   "require": "25|rough|few|more sales",
+   "forbid": [
+    "(?<!not )(?<!n't )(because|due to|thanks to)[^.]{0,30}(rain|weather|event|school|payday|promotion)"
+   ]
+  },
+  "passed": true,
+  "fields": null
+ }
+]

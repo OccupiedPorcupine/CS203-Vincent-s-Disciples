@@ -238,22 +238,28 @@
 
         </section>
 
-        <!-- Chat -->
-        <section class="card side-card chat-card">
+        <!-- Ask about this forecast: js/assistant.js sends these through the assistant (data-assistant-ask),
+             with the forecast on screen, and the reply shows in the assistant panel. -->
+        <section class="card side-card chat-card" data-guide-id="forecast-ask" data-assistant-ask>
 
           <h2 class="card-title">Ask about this forecast</h2>
 
-          <div id="chat-messages" class="messages">
+          <p class="chat-placeholder">
+            Ask why a forecast is that number. Chicky answers only from the sales, weather and holidays that went into it.
+          </p>
 
-            <p class="chat-placeholder">
-              Ask why demand is higher or add business context.
-            </p>
-
+          <div class="chat-suggestions">
+            <button type="button" class="secondary-button" data-question="Why is this forecast this number?" disabled>
+              Why this number?
+            </button>
+            <button type="button" class="secondary-button" data-question="Why is the likely range so wide?" disabled>
+              Why this range?
+            </button>
           </div>
 
-          <div class="chat-form">
+          <form class="chat-form">
 
-            <!-- Not connected yet, so disabled like the dashboard's unconnected buttons. -->
+            <!-- Disabled until the assistant is available. -->
             <input
               id="chat-input"
               class="input"
@@ -267,15 +273,14 @@
 
             <button
               id="chat-send"
-              type="button"
+              type="submit"
               class="secondary-button"
-              title="Not connected yet"
               disabled
             >
               Ask
             </button>
 
-          </div>
+          </form>
 
         </section>
 

@@ -49,7 +49,8 @@
         { "guideId": "forecast-button", "description": "Generate forecast button below the date. Runs the forecast for the chosen dish and date. Disabled until a date is chosen." },
         { "guideId": "forecast-result", "description": "Predicted portions, the likely range, how the forecast was worked out (the model, or an average of past sales such as the last 4 Saturdays, and why), and the chart of past sales for the chosen dish." },
         { "guideId": "history-view", "description": "Switch the chart between the last 7 days and the same weekday in past weeks." },
-        { "guideId": "demand-factors", "description": "Weather, holiday, event and disruption factors behind the forecast." }
+        { "guideId": "demand-factors", "description": "Weather, holiday, event and disruption factors behind the forecast." },
+        { "guideId": "forecast-ask", "description": "Ask about this forecast card: Why this number? and Why this range? buttons, and a box to ask the assistant about the forecast on screen. The answer shows in the assistant panel." }
       ]
     },
     {

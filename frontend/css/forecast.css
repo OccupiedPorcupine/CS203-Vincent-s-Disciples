@@ -43,11 +43,13 @@
 .side-card h3 + p { margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
 .extra-context { display: grid; gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--divider); }
 
-/* Chat card (not connected yet) */
-.chat-card { display: flex; flex: 1; flex-direction: column; min-height: 240px; }
-.messages { flex: 1; min-height: 120px; }
+/* Ask about this forecast: replies show in the assistant panel */
+.chat-card { display: flex; flex: 1; flex-direction: column; gap: 12px; }
+.chat-card .card-title { margin-bottom: 0; }
 .chat-placeholder { color: var(--muted); font-size: var(--text-sm); }
+.chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
 .chat-form { display: flex; gap: 8px; margin-top: auto; }
+.chat-form .input { flex: 1; min-width: 0; }
 
 @media (max-width: 760px) {
   .controls { grid-template-columns: 1fr; }

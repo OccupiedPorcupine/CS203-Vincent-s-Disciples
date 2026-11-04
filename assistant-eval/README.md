@@ -12,14 +12,17 @@ python3 assistant-eval/run_eval.py                      # backend on :8080
 python3 assistant-eval/run_eval.py --only zh            # only cases whose id starts with "zh"
 ```
 
-It signs in as `eval@chicky.test` (created on first run) with five dishes: Chicken rice, Char
-siew rice, Roast pork rice, Wanton mee and Lemon chicken rice. Every case starts a new
+It signs in as `eval@chicky.test` (created on first run) with six dishes: Chicken rice, Char
+siew rice, Roast pork rice, Wanton mee, Lemon chicken rice and Fishball noodles. Before the cases,
+it records Fishball noodles' sales on tomorrow's weekday in the last 4 weeks, so the explain cases
+have a real forecast to ask about. Every case starts a new
 conversation from the dashboard. Proposals are cancelled, never confirmed. The report goes to
 `results/<date>-<model>.md`, with the raw replies in a matching `.json` file.
 
-A full run is about 50 messages, or roughly 100–150 OpenAI requests (each message takes 2–3).
+A full run is about 80 messages, or roughly 160–240 OpenAI requests (each message takes 2–3).
 That costs a few cents, but it is more than OpenAI's free tier allows in a day (50 requests), so
-the account needs a payment method. If OpenAI's limit is hit, the script stops and writes a
+the account needs a payment method. It is also more than the Free plan's 50 assistant messages a
+day (#65), so start the backend with `ASSISTANT_FREE_MESSAGES_PER_DAY=500`. If OpenAI's limit is hit, the script stops and writes a
 partial report. The backend allows 20 assistant requests a minute per user, so the script waits
 a minute when it is limited.
 
@@ -34,6 +37,7 @@ a minute when it is limited.
 | guide | 3 | A how-to question starts a tour that highlights the right element |
 | price | 9 | "char siew rice is now $5" (English, Singlish, Mandarin, mixed, spoken amounts, with a cost) proposes that price for that dish; an unknown dish is asked about; "chicken rice 5" stays a sale |
 | off-topic, injection | 5 | Nothing is proposed and no tour starts |
+| explain | 6 | "Why is this forecast so high?", "why is the range so wide?", "is it because of the rain?", "got event nearby is it", in English, Singlish and Mandarin, and once from the dashboard with no forecast on screen. Nothing is proposed, every number in the reply is one of the forecast's real inputs, and it doesn't give a reason the forecast didn't use ("because of the rain") |
 
 The report also gives dish, date and quantity accuracy per expected entry, and the average time
 per case.
@@ -83,3 +87,4 @@ ORDER BY input_mode, detected_languages;
 | 2026-10-30 | `gpt-6-luna` | 45/46 | 0 | Full run, 3.6–4.3 s per sales message. Every dish, date and quantity right (44/44), including all Mandarin and mixed cases. The one failure, `ask-01`: "today chicken 40" was proposed as Chicken rice instead of asking whether Lemon chicken rice was meant; the confirm card shows the dish, so it would be caught before saving. Also checked by hand in the browser: a spoken mixed English–Mandarin clip went through the mic, transcription, confirm card and save. |
 | 2026-10-31 | `gpt-6-luna` | 55/55 | 0 | With the 9 price cases (#43) and the price instructions in the prompt. All pass, including Mandarin "五块", spoken "four fifty", a price with a cost, an unknown dish (asked about) and "chicken rice 5" staying a sale. `ask-01` also passed this time; nothing targeted it, so it may vary between runs. |
 | 2026-11-02 | `gpt-6-luna` | 68/72 | 0 | Sold-out times and leftovers (#50): 8/8. en-05 and zh-08 ("on Monday") fail because the run was on a Monday, so the expected date is ambiguous; ask-01 as before; prep-03 because the eval account has no prep list. |
+| 2026-11-03 | `gpt-6-luna` | 76/77, then explain 6/6 | 0 | With `explain_forecast` (#55) and its prompt section. Full run 76/77, explain 5/5: every reply quoted only the real inputs (e.g. "the average of your last 4 Wednesdays: 52, 48, 55 and 50") and said weather and holidays weren't used; "is it because of the rain?" and "got event nearby is it" were both answered no. The explain cases were rerun after adding "why is the range so wide?" and the range's explanation to the tool: 6/6. The one failure is `ask-01` as before. |

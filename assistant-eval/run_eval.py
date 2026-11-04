@@ -11,12 +11,13 @@ assistant's main guarantee. If audio/<case id>.webm (or .m4a/.wav/.mp3) exists, 
 transcribed first and the transcript is used instead of the case text.
 
 Writes a Markdown report and the raw results to assistant-eval/results/. Uses only the
-standard library. With the OpenAI provider a full run is roughly 50 messages; the backend
+standard library. With the OpenAI provider a full run is roughly 80 messages; the backend
 allows 20 a minute per user, so the script waits when it is rate limited.
 """
 
 import argparse
 import json
+import re
 import sys
 import time
 import unicodedata
@@ -100,6 +101,34 @@ def expected_key(entry, today):
     return dish, resolve_date(entry["date"], today).isoformat(), (entry["quantity"], entry.get("soldOutAt"), entry.get("leftover"))
 
 
+def seed_history(api, dishes, history, today):
+    """Records history["sameWeekday"] on the same weekday as the forecast date in past weeks (oldest
+    first), before the no-writes count starts, so the explain cases have a real forecast to ask about.
+    Returns the numbers a reply may quote: the forecast, its range, the sales and the dates' day numbers."""
+    dish_id = dishes[history["dish"]]
+    target = resolve_date(history["date"], today)
+    quantities = history["sameWeekday"]
+    days = [target - timedelta(weeks=len(quantities) - index) for index in range(len(quantities))]
+    recorded = {sale["date"] for sale in api.request("GET", f"/api/dishes/{dish_id}/sales")}
+    missing = [{"date": day.isoformat(), "quantitySold": quantity}
+               for day, quantity in zip(days, quantities) if day.isoformat() not in recorded]
+    if missing:
+        api.request("POST", f"/api/dishes/{dish_id}/sales", {"sales": missing})
+    forecast = api.request("POST", "/api/forecast", {"dishId": dish_id, "forecastDate": target.isoformat()})
+    allowed = {round(forecast["predictedDemand"]), forecast["low"], forecast["high"], *quantities}
+    allowed |= {day.day for day in [*days, target]} | {target.year, target.month}
+    # Counts and the range's rule the explanation may give: "your last 4 Fridays", "7 days", "at
+    # least 28", "a rough 25% either side", "the middle 80% of misses".
+    allowed |= set(range(1, 8)) | {28, 25, 80}
+    return {"dishId": dish_id, "date": target.isoformat(), "allowed": allowed, "method": forecast["method"]}
+
+
+# Numbers in a reply, without the ones inside dates and times ("2026-11-06", "12:40").
+def numbers_in(text):
+    text = re.sub(r"\d{4}-\d{2}-\d{2}|\d{1,2}:\d{2}", " ", text)
+    return {round(float(number)) for number in re.findall(r"\d+(?:\.\d+)?", text)}
+
+
 def closure_keys(closures):
     return {(closure["date"], closure["closed"]) for closure in closures}
 
@@ -111,7 +140,7 @@ def same_dish(expected_dish, actual_dish):
     return expected_dish == actual_dish
 
 
-def score(case, result, today):
+def score(case, result, today, shown=None):
     expect = case["expect"]
     proposal, guide = result["proposal"], result["guide"]
     fields = None
@@ -141,6 +170,20 @@ def score(case, result, today):
                   and closures_ok)
     elif expect["type"] in ("question", "refuse"):
         passed = proposal is None and not guide
+    elif expect["type"] == "explain":
+        # Only the forecast's real inputs: every number in the reply comes from them, no reason it
+        # didn't use is named, and the reply says what `require` matches.
+        problems = []
+        invented = numbers_in(result["reply"]) - shown["allowed"]
+        if invented:
+            problems.append(f"numbers not in the inputs: {sorted(invented)}")
+        problems += [f"named /{word}/" for word in expect.get("forbid", []) if re.search(word, result["reply"], re.IGNORECASE)]
+        if "require" in expect and not re.search(expect["require"], result["reply"], re.IGNORECASE):
+            problems.append(f"doesn't match /{expect['require']}/")
+        if proposal or guide:
+            problems.append("proposed something or started a tour")
+        result["explainProblems"] = problems
+        passed = not problems
     elif expect["type"] == "guide":
         passed = bool(guide) and any(step["guideId"] in expect["anyOf"] for step in guide)
     else:
@@ -148,7 +191,7 @@ def score(case, result, today):
     return passed, fields
 
 
-def run_case(api, case):
+def run_case(api, case, shown=None):
     turns = case.get("turns") or [case["text"]]
     audio = next((HERE / "audio" / f"{case['id']}{ext}" for ext in AUDIO_TYPES if (HERE / "audio" / f"{case['id']}{ext}").exists()), None)
     conversation_id, response, transcript, proposal_ids = None, None, None, []
@@ -160,8 +203,9 @@ def run_case(api, case):
             transcription = api.upload_audio(audio)
             text, transcript, input_mode = transcription["text"], transcription["text"], "voice"
         response = api.request("POST", "/api/assistant/messages", {
-            "conversationId": conversation_id, "text": text, "page": "dashboard",
+            "conversationId": conversation_id, "text": text, "page": case.get("page", "dashboard"),
             "inputMode": input_mode,
+            "forecast": {"dishId": shown["dishId"], "date": shown["date"]} if shown and case.get("page") == "forecast" else None,
         })
         conversation_id = response["conversationId"]
         if response.get("proposal"):
@@ -215,7 +259,8 @@ def report(results, status, today, writes, path, stopped_after=None):
 
     for result in results:
         if not result["passed"]:
-            got = (f"proposal {[entry_key(e) for e in result['proposal']['entries']]}" if result["proposal"]
+            got = (f"proposal {[entry_key(e) for e in result['proposal']['entries'] or []]}" if result["proposal"]
+                   else "; ".join(result["explainProblems"]) if result.get("explainProblems")
                    else f"tour {[s['guideId'] for s in result['guide']]}" if result["guide"] else "no proposal or tour")
             heard = f" (heard: {result['transcript']})" if result["transcript"] else ""
             lines.append(f"- `{result['id']}` {result['input']}{heard} → {got}. Reply: {result['reply']}")
@@ -244,17 +289,18 @@ def main():
         sys.exit("The assistant isn't available on this backend (set OPENAI_API_KEY or ASSISTANT_PROVIDER=offline).")
 
     dishes = ensure_dishes(api, data["dishes"])
+    today = datetime.now(SINGAPORE).date()
+    shown = seed_history(api, dishes, data["history"], today)
     sales_before = {name: len(api.request("GET", f"/api/dishes/{dish_id}/sales")) for name, dish_id in dishes.items()}
     prices_before = {name: len(api.request("GET", f"/api/dishes/{dish_id}/prices")) for name, dish_id in dishes.items()}
-    today = datetime.now(SINGAPORE).date()
     results = []
     stopped = False
 
     for case in cases:
         print(f"{case['id']} ...", end=" ", flush=True)
         try:
-            result = run_case(api, case)
-            passed, fields = score(case, result, today)
+            result = run_case(api, case, shown)
+            passed, fields = score(case, result, today, shown)
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", "replace")
             if "ASSISTANT_BUSY" in detail:

@@ -117,7 +117,7 @@ class AssistantUsageTest {
     }
 
     private AssistantMessageResponse say(String text) {
-        return assistant.handleMessage(owner, new AssistantMessageRequest(null, text, "dashboard", "text", null));
+        return assistant.handleMessage(owner, new AssistantMessageRequest(null, text, "dashboard", "text", null, null));
     }
 
     private AssistantDailyUsage todaysRow() {

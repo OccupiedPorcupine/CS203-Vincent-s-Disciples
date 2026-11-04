@@ -198,9 +198,14 @@ public class AssistantService {
         Set<String> liveElementIds = new HashSet<>();
         pageElements.forEach(element -> liveElementIds.add(element.id()));
 
+        // Only an ID and a date: explain_forecast checks the dish is the user's.
+        ObjectNode shownForecast = request.forecast() == null ? null : jsonMapper.createObjectNode()
+                .put("dish_id", request.forecast().dishId())
+                .put("date", request.forecast().date().toString());
+
         String instructions = AssistantPrompt.build(today, request.page(), tools.listDishes(ownerId, today).toString(),
                 guideRetriever.context(request.text(), request.page()), jsonMapper.writeValueAsString(pageElements),
-                tools.closures(ownerId, today).toString());
+                tools.closures(ownerId, today).toString(), String.valueOf(shownForecast));
         AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
         String reply = null;
         List<String> toolsCalled = new ArrayList<>();
