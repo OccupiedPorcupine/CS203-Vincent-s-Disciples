@@ -302,7 +302,9 @@ function renderHeatmap(daily, today) {
   for (let week = 0; week < WEEKS; week++) {
     const monday = addDays(daily.from, week * 7);
     const month = monday.slice(0, 7);
-    if (month !== lastMonth && Number(monday.slice(8)) <= 7) {
+    // A month starting in the last two weeks has no room for its label, which would stick out past
+    // the grid and make it scroll, cutting off the weekday labels.
+    if (month !== lastMonth && Number(monday.slice(8)) <= 7 && week < WEEKS - 2) {
       const label = document.createElement("span");
       label.className = "heatmap-month";
       label.style.gridColumn = String(week + 2);
