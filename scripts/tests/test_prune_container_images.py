@@ -51,8 +51,11 @@ class FakeVercel:
         self.production = production
         self.all_deployments = all_deployments
 
-    def deployments(self, *filters, limit):
-        return (self.production if "production" in filters else self.all_deployments)[:limit]
+    def production_deployments(self, limit):
+        return self.production[:limit]
+
+    def deployments_since(self, since_ms):
+        return self.all_deployments
 
 
 def deployment(sha, hours_ago):

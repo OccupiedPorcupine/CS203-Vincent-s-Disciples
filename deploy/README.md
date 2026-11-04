@@ -93,7 +93,7 @@ It deletes the rest. An image's tag is the first 12 characters of the commit it 
 **Running it by hand:** GitHub → Actions → Prune container images → Run workflow. Tick "Only list what would be deleted" to see the plan first. From a terminal signed in to Vercel:
 
 ```bash
-VERCEL_CMD=vercel python3 scripts/prune_container_images.py --dry-run   # then without --dry-run
+python3 scripts/prune_container_images.py --dry-run   # then without --dry-run
 ```
 
 **The token.** The workflow needs the repository secret `VERCEL_TOKEN`:
