@@ -184,6 +184,21 @@ def score(case, result, today, shown=None):
             problems.append("proposed something or started a tour")
         result["explainProblems"] = problems
         passed = not problems
+    elif expect["type"] == "summary":
+        # The summary's own figures only: every number in the reply is in it, including the portions.
+        text = shown["summary"]["text"]
+        problems = []
+        invented = numbers_in(result["reply"]) - numbers_in(text["en"]) - numbers_in(text["zh"])
+        if invented:
+            problems.append(f"numbers not in the summary: {sorted(invented)}")
+        if str(shown["summary"]["portions"]) not in result["reply"].replace(",", ""):
+            problems.append("doesn't give the week's portions")
+        if "require" in expect and not re.search(expect["require"], result["reply"], re.IGNORECASE):
+            problems.append(f"doesn't match /{expect['require']}/")
+        if proposal or guide:
+            problems.append("proposed something or started a tour")
+        result["explainProblems"] = problems
+        passed = not problems
     elif expect["type"] == "guide":
         passed = bool(guide) and any(step["guideId"] in expect["anyOf"] for step in guide)
     elif expect["type"] == "link":
@@ -294,6 +309,8 @@ def main():
     dishes = ensure_dishes(api, data["dishes"])
     today = datetime.now(SINGAPORE).date()
     shown = seed_history(api, dishes, data["history"], today)
+    # The weekly summary the "summary" cases should read out (issue #56).
+    shown["summary"] = api.request("GET", "/api/summary/weekly")
     sales_before = {name: len(api.request("GET", f"/api/dishes/{dish_id}/sales")) for name, dish_id in dishes.items()}
     prices_before = {name: len(api.request("GET", f"/api/dishes/{dish_id}/prices")) for name, dish_id in dishes.items()}
     results = []

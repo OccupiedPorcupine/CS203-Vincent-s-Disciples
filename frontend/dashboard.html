@@ -80,6 +80,19 @@
       </section>
     </div>
 
+    <!-- The same 7 days in a few sentences, to read or play aloud (GET /api/summary/weekly, issue #56). -->
+    <section class="card week-summary" aria-labelledby="week-heading" data-guide-id="week-summary">
+      <div class="week-summary-heading">
+        <h2 id="week-heading" class="card-title">Your week</h2>
+        <div class="week-summary-buttons" id="week-summary-buttons" hidden>
+          <button class="secondary-button" type="button" data-language="en">Play</button>
+          <button class="secondary-button" type="button" data-language="zh" lang="zh">播放中文</button>
+        </div>
+      </div>
+      <p class="week-summary-text" id="week-summary-text">Loading&hellip;</p>
+      <p class="note" id="week-summary-status" role="status" aria-live="polite"></p>
+    </section>
+
     <!-- Revenue and margin from dish prices (GET /api/revenue), same 7 days as the charts. -->
     <div class="money">
       <section class="card" aria-labelledby="revenue-heading" data-guide-id="revenue-card">

@@ -51,6 +51,11 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             "(\\d+)\\s*(?:left ?over|left)\\b|\\bleft ?overs?\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern PREP = Pattern.compile("\\b(prep|prepare)\\b|准备|备料", Pattern.CASE_INSENSITIVE);
+    // "how was my week?", "how's business?", 这个星期生意怎么样.
+    private static final Pattern WEEK = Pattern.compile(
+            "\\bhow('s| is| was)? (my |the )?(week|business)\\b|(这个?(星期|礼拜|周)|本周|生意).*(怎样|怎么样|如何)",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern CHINESE = Pattern.compile("\\p{IsHan}");
     private static final Pattern WHY = Pattern.compile("\\bwhy\\b|为什么|为何", Pattern.CASE_INSENSITIVE);
     private static final Pattern SHOWN_FORECAST = Pattern.compile(
             "The forecast on the user's screen \\(JSON, null if none\\): \\{\"dish_id\":(\\d+),\"date\":\"([\\d-]+)\"}");
@@ -68,7 +73,7 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
     private static final String GUIDE_MARKER = "App guide index";
 
     private static final String HELP = "Offline demo mode: I only understand typed sales such as \"chicken rice 42, char siew rice 30\", "
-            + "closures such as \"closed tomorrow\", \"what do I prep for tomorrow?\", \"why?\" about a forecast on screen, "
+            + "closures such as \"closed tomorrow\", \"what do I prep for tomorrow?\", \"why?\" about a forecast on screen, \"how was my week?\", "
             + "or questions like \"how do I upload data?\".";
 
     private final JsonMapper jsonMapper;
@@ -115,6 +120,9 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
                 ObjectNode arguments = jsonMapper.createObjectNode();
                 arguments.put("date", find(TODAY_WORD.matcher(text).find() ? TODAY : TOMORROW, instructions));
                 return call(AssistantTools.GET_PREP_LIST, arguments);
+            }
+            if (WEEK.matcher(text).find()) {
+                return call(AssistantTools.GET_WEEKLY_SUMMARY, jsonMapper.createObjectNode());
             }
             Matcher shown = SHOWN_FORECAST.matcher(instructions);
             if (WHY.matcher(text).find() && shown.find()) {
@@ -179,6 +187,9 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         }
         if (AssistantTools.EXPLAIN_FORECAST.equals(toolName)) {
             return message(explanationReply(output));
+        }
+        if (AssistantTools.GET_WEEKLY_SUMMARY.equals(toolName)) {
+            return message(output.path("text").path(CHINESE.matcher(lastUserText(input)).find() ? "zh" : "en").asString());
         }
 
         if (output.path("ok").asBoolean()) {

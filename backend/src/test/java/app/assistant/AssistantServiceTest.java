@@ -498,6 +498,20 @@ class AssistantServiceTest {
     }
 
     @Test
+    void askingHowTheWeekWentRepliesWithTheWeeklySummaryInTheUsersLanguage() {
+        dailySaleService.setSale(chickenRice.getId(), owner, TODAY.minusDays(1), 40);
+        dailySaleService.setSale(chickenRice.getId(), owner, TODAY, 42);
+
+        var english = assistant.handleMessage(owner, new AssistantMessageRequest(null, "How was my week?", "dashboard", "text", null, null));
+        var chinese = assistant.handleMessage(owner, new AssistantMessageRequest(null, "这个星期生意怎么样？", "dashboard", "text", null, null));
+
+        assertNull(english.proposal());
+        assertEquals("In the 7 days to Thursday 29 October, you sold 82 portions. Chicken rice sold the most, 82 portions.",
+                english.reply());
+        assertEquals("截至10月29日星期四的7天，你卖了82份。卖得最多的是Chicken rice，82份。", chinese.reply());
+    }
+
+    @Test
     void explainForecastGivesOnlyTheInputsTheForecastUsed() {
         LocalDate friday = TODAY.plusDays(1);
         for (int week = 1; week <= 4; week++) {
