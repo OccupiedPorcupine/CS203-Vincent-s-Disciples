@@ -20,8 +20,8 @@ public interface AssistantModelClient {
 
     Transcription transcribe(byte[] audio, String filename, List<String> keywords);
 
-    // Spoken audio (MP3) of the text.
-    byte[] speak(String text);
+    // Spoken audio of the text, in the given format.
+    byte[] speak(String text, SpeechFormat format);
 
     ModelResponse respond(String instructions, List<JsonNode> input, List<ToolSpec> tools);
 

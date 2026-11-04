@@ -58,6 +58,7 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `GET /api/dishes`, `POST /api/dishes` — lists or creates the signed-in user's dishes
 - `GET /api/dishes/{dishId}/sales`, `POST /api/dishes/{dishId}/sales` — lists sales, or adds new days (rejects days that already have a record)
 - `PUT /api/dishes/{dishId}/sales/{date}` — sets one day's quantity, replacing any existing record; returns `previousQuantity`
+- `POST /api/forecast` — `{dishId, forecastDate}`, from today up to 7 days ahead → expected portions, the likely `low`–`high` range, `method` (`MODEL` or `BASELINE`), `basis` and `note`. The model uses NEA's 24-hour forecast for today and the 4-day outlook for the next 4 days; `weatherSource` and `weather` say which one (both null when no weather was used). Later dates use the baseline. The range is measured on estimates made as far after the last recorded sale as this date, so it widens when the latest sales are old
 - `GET /api/dishes/{dishId}/aliases`, `POST /api/dishes/{dishId}/aliases` — other names for a dish (e.g. `鸡饭`); matching ignores case and spacing, and each name points to one dish per user (409 `ALIAS_IN_USE` otherwise)
 - `GET /api/assistant/status` — whether the voice assistant and voice input are available
 - `POST /api/assistant/transcribe` — multipart `audio` (under a minute) → `{text, languages}`; audio is not stored
@@ -66,6 +67,8 @@ The frontend reads the backend address from `frontend/index.html` and fetches th
 - `GET /api/closures` — the stall's rest days, closed days (`source` `OWNER` or `NEA`), trading hours, hawker centre and its upcoming NEA closures
 - `GET /api/closures/hawker-centres`, `PUT /api/closures/hawker-centre` — NEA's hawker centres, and `{hawkerCentreId}` (null to unlink) to pick the stall's
 - `PUT /api/closures/nea-days` — `{from, to, open}` marks NEA's closed days in a range as open anyway, or closed again
+- `GET /api/chat-links` — chat apps set up on this server, each with the account's linked chat; `POST /api/chat-links/{channel}` → `{code, link, expiresAt}`, a one-time code (10 minutes) that links the chat it is sent from; `DELETE /api/chat-links/{id}` unlinks
+- `POST /api/channels/telegram/webhook` — Telegram's updates for the bot; only with the `X-Telegram-Bot-Api-Secret-Token` header (see "Telegram bot")
 - `GET /api/data-sources` — lists the signed-in user's registered training sources
 - `POST /api/data-sources` — accepts a multipart CSV/XLSX upload (maximum 25 MB)
 - `/h2-console` — local development database console (H2 only; disabled when using Supabase)
@@ -101,6 +104,18 @@ It also explains forecasts. The forecast page's "Ask about this forecast" card s
 forecast and only what it was made from: the basis, the dish's last 4 same-weekday sales and the last
 7 days, and whether the weather forecast and a public holiday were used. The prompt tells the model
 to quote only those and to say that any other reason the user suggests isn't taken into account.
+
+### Telegram bot
+
+Owners can record sales from Telegram (issues #99 and #100): they link the chat on the **Account** page, then send sales as a message or a voice note and tap **Confirm** in the chat. `/today`, `/prep` and `/forecast` answer from the account's data without the language model. The bot is off unless `TELEGRAM_BOT_TOKEN` is set.
+
+To turn it on:
+
+1. In Telegram, message [@BotFather](https://t.me/BotFather), send `/newbot` and follow the steps. It gives you the bot's token and username.
+2. Set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` (without the `@`) and `TELEGRAM_WEBHOOK_SECRET` (any long random string of letters, digits, `_` and `-`, e.g. from `openssl rand -hex 32`). Keep the token and the secret out of git.
+3. Telegram must be able to reach the backend over HTTPS at `APP_BASE_URL`. Register the webhook once per environment by calling `POST /api/admin/telegram/webhook` as an admin. It also sets the bot's command menu.
+
+Telegram calls `POST /api/channels/telegram/webhook` with each update, and the backend refuses any call without the secret. A bot has one webhook, so each environment needs its own bot. Only private chats are handled; group chats are ignored. Replies are plain text, and a voice note gets a spoken reply too, which counts against the daily spoken replies.
 
 ### Demo data
 

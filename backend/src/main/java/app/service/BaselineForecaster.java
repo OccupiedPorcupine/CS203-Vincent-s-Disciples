@@ -60,7 +60,14 @@ final class BaselineForecaster {
 
     // The likely range around a forecast, from how far the baseline was off on recent days.
     static Range range(List<Observation> history, double forecast) {
-        List<Double> errors = errors(history, BACKTEST_DAYS);
+        return range(history, forecast, 1);
+    }
+
+    // The same, for a forecast made `horizon` days after the last recorded sale: the errors are
+    // from estimates that only knew the sales from that many days before each day (issue #51), so
+    // the range widens as the date gets further away.
+    static Range range(List<Observation> history, double forecast, int horizon) {
+        List<Double> errors = errors(history, BACKTEST_DAYS, horizon);
 
         double low;
         double high;
@@ -80,7 +87,11 @@ final class BaselineForecaster {
     // the given share of days: 0.64 means enough for about 64 days in 100. With too few errors,
     // the rough range's spread (+/- 25% for 10% to 90%) is stretched to the probability instead.
     static double atProbability(List<Observation> history, double forecast, double probability) {
-        List<Double> errors = errors(history, MARGIN_BACKTEST_DAYS);
+        return atProbability(history, forecast, probability, 1);
+    }
+
+    static double atProbability(List<Observation> history, double forecast, double probability, int horizon) {
+        List<Double> errors = errors(history, MARGIN_BACKTEST_DAYS, horizon);
         if (errors.size() < MIN_BACKTEST_ERRORS) {
             return Math.max(0, forecast * (1 + ROUGH_SPREAD * (probability - 0.5) / 0.4));
         }
@@ -88,12 +99,17 @@ final class BaselineForecaster {
         return Math.max(0, forecast + quantile(errors, probability));
     }
 
-    // Actual minus baseline estimate on each of the last `days` recorded days.
-    private static List<Double> errors(List<Observation> history, int days) {
+    // Actual minus baseline estimate on each of the last `days` recorded days, each estimated from
+    // the sales recorded at least `horizon` days before it (1: everything before it).
+    private static List<Double> errors(List<Observation> history, int days, int horizon) {
         List<Double> errors = new ArrayList<>();
         for (int index = Math.max(1, history.size() - days); index < history.size(); index++) {
             Observation actual = history.get(index);
-            estimate(history.subList(0, index), actual.date())
+            LocalDate known = actual.date().minusDays(horizon);
+            List<Observation> before = history.subList(0, index).stream()
+                    .filter(observation -> !observation.date().isAfter(known))
+                    .toList();
+            estimate(before, actual.date())
                     .ifPresent(estimate -> errors.add(actual.quantity() - estimate.quantity()));
         }
         return errors;

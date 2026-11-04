@@ -99,10 +99,20 @@ class OpenAiAssistantModelClientTest {
                 .andExpect(jsonPath("$.instructions").exists())
                 .andRespond(withSuccess(new byte[]{73, 68, 51}, MediaType.valueOf("audio/mpeg")));
 
-        byte[] audio = client.speak("请确认后保存。");
+        byte[] audio = client.speak("请确认后保存。", SpeechFormat.MP3);
 
         server.verify();
         assertArrayEquals(new byte[]{73, 68, 51}, audio);
+    }
+
+    @Test
+    void speakAsksForOpusForATelegramVoiceNote() {
+        server.expect(requestTo("https://api.test/v1/audio/speech"))
+                .andExpect(jsonPath("$.response_format").value("opus"))
+                .andRespond(withSuccess(new byte[]{79, 103, 103}, MediaType.valueOf("audio/ogg")));
+
+        assertArrayEquals(new byte[]{79, 103, 103}, client.speak("Saved.", SpeechFormat.OPUS));
+        server.verify();
     }
 
     @Test

@@ -162,8 +162,14 @@ public class AssistantService {
     // MP3 of a reply or guide step. Guide steps repeat, so audio is cached, and cached audio
     // doesn't count towards the user's rate limit or daily spoken replies.
     public byte[] speak(Long ownerId, String text) {
+        return speak(ownerId, text, SpeechFormat.MP3);
+    }
+
+    // Also used for voice-note replies in chat apps, as Ogg Opus.
+    public byte[] speak(Long ownerId, String text, SpeechFormat format) {
         String cleaned = text.strip();
-        byte[] cached = speechCache.get(cleaned);
+        String cacheKey = format.apiName() + ":" + cleaned;
+        byte[] cached = speechCache.get(cacheKey);
         if (cached != null) {
             log.info("Speech for user {}: {} characters from cache ({} bytes)", ownerId, cleaned.length(), cached.length);
             return cached;
@@ -173,14 +179,15 @@ public class AssistantService {
         long started = System.nanoTime();
         byte[] audio;
         try {
-            audio = modelClient.speak(cleaned);
+            audio = modelClient.speak(cleaned, format);
         } catch (RuntimeException exception) {
             usage.refundSpokenReply(ownerId);
             throw exception;
         }
         usage.recordSpokenCharacters(ownerId, cleaned.length());
-        speechCache.put(cleaned, audio);
-        log.info("Speech for user {}: {} characters -> {} bytes in {} ms", ownerId, cleaned.length(), audio.length, millisSince(started));
+        speechCache.put(cacheKey, audio);
+        log.info("Speech for user {}: {} characters -> {} bytes of {} in {} ms", ownerId, cleaned.length(), audio.length,
+                format.apiName(), millisSince(started));
         return audio;
     }
 

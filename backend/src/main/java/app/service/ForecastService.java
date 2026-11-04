@@ -3,6 +3,7 @@ package app.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -40,8 +41,9 @@ public class ForecastService {
     static final int MODEL_MIN_SAME_WEEKDAYS = 4;
     // The basis mentions sold-out days in this many days before the forecast date (the model's window).
     static final int SOLD_OUT_NOTE_DAYS = 28;
+    // The range is measured on estimates made up to this many days ahead (the model's 4-week window).
+    static final int MAX_HORIZON_DAYS = 28;
 
-    private static final String MODEL_BASIS = "Forecast model, using your recent sales, the weather forecast and public holidays";
 
     private final ForecastDataService forecastDataService;
     private final NeaWeatherForecastService neaWeatherForecastService;
@@ -65,10 +67,11 @@ public class ForecastService {
     }
 
     // A forecast and the recorded sales it came from, so the prep list can work out other points
-    // of the likely demand (BaselineForecaster.atProbability).
-    record Prediction(ForecastResponse response, List<Observation> recorded) {
+    // of the likely demand (BaselineForecaster.atProbability). horizon is how many days the date is
+    // after the last recorded sale.
+    record Prediction(ForecastResponse response, List<Observation> recorded, int horizon) {
         double atProbability(double probability) {
-            return BaselineForecaster.atProbability(recorded, response.predictedDemand(), probability);
+            return BaselineForecaster.atProbability(recorded, response.predictedDemand(), probability, horizon);
         }
     }
 
@@ -90,11 +93,15 @@ public class ForecastService {
         List<Observation> recorded = sales.stream()
                 .map(sale -> new Observation(sale.getSaleDate(), sale.getQuantitySold()))
                 .toList();
+        // Days from the last recorded sale to the date. The range is measured on estimates made that
+        // far ahead, so it widens when the latest sales are old.
+        int horizon = recorded.isEmpty() ? 1
+                : (int) Math.clamp(ChronoUnit.DAYS.between(recorded.getLast().date(), date), 1, MAX_HORIZON_DAYS);
         long soldOutDays = sales.stream()
                 .filter(sale -> sale.getSoldOutAt() != null && !sale.getSaleDate().isBefore(date.minusDays(SOLD_OUT_NOTE_DAYS)))
                 .count();
         if (!countSoldOutDemand || soldOutDays == 0) {
-            return new Prediction(forecast(dish, date, recorded), recorded);
+            return new Prediction(forecast(dish, date, recorded, horizon), recorded, horizon);
         }
 
         // Sold-out days count as the demand they likely had (SoldOutDemand), for both the model and
@@ -105,22 +112,22 @@ public class ForecastService {
                 .map(sale -> new Observation(sale.getSaleDate(),
                         SoldOutDemand.estimate(sale.getQuantitySold(), sale.getSoldOutAt(), hours)))
                 .toList();
-        ForecastResponse response = forecast(dish, date, demand);
-        Range range = BaselineForecaster.range(recorded, response.predictedDemand());
+        ForecastResponse response = forecast(dish, date, demand, horizon);
+        Range range = BaselineForecaster.range(recorded, response.predictedDemand(), horizon);
         return new Prediction(new ForecastResponse(response.dish(), response.forecastDate(), response.predictedDemand(),
                 (int) Math.floor(range.low()), (int) Math.ceil(range.high()), range.rough(), response.method(),
                 response.fallbackReason(), response.basis() + ", counting " + (soldOutDays == 1 ? "1 sold-out day" : soldOutDays + " sold-out days")
-                        + " as higher demand", response.note()), recorded);
+                        + " as higher demand", response.note(), response.weatherSource(), response.weather()), recorded, horizon);
     }
 
-    private ForecastResponse forecast(Dish dish, LocalDate date, List<Observation> history) {
+    private ForecastResponse forecast(Dish dish, LocalDate date, List<Observation> history, int horizon) {
         Estimate baseline = BaselineForecaster.estimate(history, date).orElseThrow(() -> new IllegalArgumentException(
                 "No sales are recorded for " + dish.getName() + " yet. Record a few days of sales to get a forecast."));
 
         long sameWeekdays = BaselineForecaster.sameWeekdayCount(history, date);
         if (history.size() < MODEL_MIN_DAYS || sameWeekdays < MODEL_MIN_SAME_WEEKDAYS) {
             String weekday = date.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
-            return fromBaseline(dish, date, history, baseline, FallbackReason.SHORT_HISTORY,
+            return fromBaseline(dish, date, history, horizon, baseline, FallbackReason.SHORT_HISTORY,
                     "The forecast model needs at least " + MODEL_MIN_DAYS + " days of sales, including "
                             + MODEL_MIN_SAME_WEEKDAYS + " " + weekday + "s. This dish has " + days(history.size())
                             + " so far, with " + sameWeekdays + " " + weekday + (sameWeekdays == 1 ? "" : "s") + ".");
@@ -129,22 +136,22 @@ public class ForecastService {
         try {
             Optional<Set<String>> modelDishes = mlForecastClient.knownDishes();
             if (modelDishes.isPresent() && !modelDishes.get().contains(MlForecastClient.normalise(dish.getName()))) {
-                return fromBaseline(dish, date, history, baseline, FallbackReason.DISH_NOT_IN_MODEL,
+                return fromBaseline(dish, date, history, horizon, baseline, FallbackReason.DISH_NOT_IN_MODEL,
                         "The forecast model hasn't been trained on this dish yet, so this uses your past sales only.");
             }
         } catch (RuntimeException exception) {
-            return modelUnavailable(dish, date, history, baseline, exception);
+            return modelUnavailable(dish, date, history, horizon, baseline, exception);
         }
 
-        MlPredictionRequest.WeatherInput weather;
+        NeaWeatherForecastService.Forecast weather;
         try {
-            weather = neaWeatherForecastService.getWeather(date);
+            weather = neaWeatherForecastService.forecast(date);
         } catch (InvalidForecastDateException exception) {
-            return fromBaseline(dish, date, history, baseline, FallbackReason.WEATHER_UNAVAILABLE,
-                    "The weather forecast doesn't cover this date yet, so this uses your past sales only.");
+            return fromBaseline(dish, date, history, horizon, baseline, FallbackReason.WEATHER_UNAVAILABLE,
+                    "NEA's weather outlook only covers the next 4 days, so this uses your past sales only.");
         } catch (RuntimeException exception) {
             log.warn("NEA weather unavailable, using the baseline forecast: {}", exception.toString());
-            return fromBaseline(dish, date, history, baseline, FallbackReason.WEATHER_UNAVAILABLE,
+            return fromBaseline(dish, date, history, horizon, baseline, FallbackReason.WEATHER_UNAVAILABLE,
                     "The weather service isn't responding, so this uses your past sales only.");
         }
 
@@ -155,35 +162,39 @@ public class ForecastService {
                     date.toString(),
                     history.stream().map(observation -> new MlPredictionRequest.SalesRecord(
                             observation.date().toString(), observation.quantity())).toList(),
-                    weather,
+                    weather.input(),
                     publicHolidayService.isPublicHoliday(date)
             )).predicted_demand();
         } catch (RuntimeException exception) {
-            return modelUnavailable(dish, date, history, baseline, exception);
+            return modelUnavailable(dish, date, history, horizon, baseline, exception);
         }
 
         double expected = Math.max(0, prediction);
-        return response(dish, date, history, expected, Method.MODEL, null, MODEL_BASIS, null);
+        String basis = "Forecast model, using your recent sales, " + weather.source().label() + " and public holidays";
+        return response(dish, date, history, horizon, expected, Method.MODEL, null, basis, null,
+                weather.source().name(), weather.source().label() + ": " + weather.description());
     }
 
-    private ForecastResponse modelUnavailable(Dish dish, LocalDate date, List<Observation> history, Estimate baseline,
-                                              RuntimeException exception) {
+    private ForecastResponse modelUnavailable(Dish dish, LocalDate date, List<Observation> history, int horizon,
+                                              Estimate baseline, RuntimeException exception) {
         log.warn("ML service unavailable, using the baseline forecast: {}", exception.toString());
-        return fromBaseline(dish, date, history, baseline, FallbackReason.MODEL_UNAVAILABLE,
+        return fromBaseline(dish, date, history, horizon, baseline, FallbackReason.MODEL_UNAVAILABLE,
                 "The forecast model isn't responding, so this uses your past sales only.");
     }
 
-    private ForecastResponse fromBaseline(Dish dish, LocalDate date, List<Observation> history, Estimate baseline,
-                                          FallbackReason reason, String note) {
-        return response(dish, date, history, baseline.quantity(), Method.BASELINE, reason, baseline.basis(), note);
+    private ForecastResponse fromBaseline(Dish dish, LocalDate date, List<Observation> history, int horizon,
+                                          Estimate baseline, FallbackReason reason, String note) {
+        return response(dish, date, history, horizon, baseline.quantity(), Method.BASELINE, reason, baseline.basis(), note,
+                null, null);
     }
 
-    private ForecastResponse response(Dish dish, LocalDate date, List<Observation> history, double expected,
-                                      Method method, FallbackReason reason, String basis, String note) {
-        Range range = BaselineForecaster.range(history, expected);
+    private ForecastResponse response(Dish dish, LocalDate date, List<Observation> history, int horizon, double expected,
+                                      Method method, FallbackReason reason, String basis, String note,
+                                      String weatherSource, String weather) {
+        Range range = BaselineForecaster.range(history, expected, horizon);
         return new ForecastResponse(dish.getName(), date, expected,
                 (int) Math.floor(range.low()), (int) Math.ceil(range.high()), range.rough(),
-                method, reason, basis, note);
+                method, reason, basis, note, weatherSource, weather);
     }
 
     private static String days(int count) {

@@ -40,6 +40,8 @@ class ForecastServiceTest {
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 31);
     private static final LocalDate TOMORROW = TODAY.plusDays(1);
     private static final MlPredictionRequest.WeatherInput WEATHER = new MlPredictionRequest.WeatherInput(2, 50, 0, 6, 29);
+    private static final NeaWeatherForecastService.Forecast OUTLOOK = new NeaWeatherForecastService.Forecast(
+            WEATHER, NeaWeatherForecastService.Source.NEA_4_DAY_OUTLOOK, "Thundery Showers, 24 to 33°C");
 
     private final ForecastDataService data = mock(ForecastDataService.class);
     private final NeaWeatherForecastService weather = mock(NeaWeatherForecastService.class);
@@ -115,12 +117,14 @@ class ForecastServiceTest {
         LocalDate nextWeek = TODAY.plusDays(5);
         when(data.getSalesHistory(any(), eq(nextWeek))).thenReturn(daysOfSales(28, 40));
         when(ml.knownDishes()).thenReturn(Optional.of(Set.of("CHICKEN RICE")));
-        when(weather.getWeather(nextWeek)).thenThrow(new InvalidForecastDateException("outside"));
+        when(weather.forecast(nextWeek)).thenThrow(new InvalidForecastDateException("outside"));
 
         ForecastResponse forecast = service.forecast(1L, nextWeek, 7L);
 
         assertEquals(FallbackReason.WEATHER_UNAVAILABLE, forecast.fallbackReason());
-        assertEquals("The weather forecast doesn't cover this date yet, so this uses your past sales only.", forecast.note());
+        assertEquals("NEA's weather outlook only covers the next 4 days, so this uses your past sales only.", forecast.note());
+        assertNull(forecast.weatherSource());
+        assertNull(forecast.weather());
     }
 
     @Test
@@ -138,7 +142,7 @@ class ForecastServiceTest {
     void failedPredictionUsesTheBaseline() {
         when(data.getSalesHistory(any(), eq(TOMORROW))).thenReturn(daysOfSales(28, 40));
         when(ml.knownDishes()).thenReturn(Optional.empty());
-        when(weather.getWeather(TOMORROW)).thenReturn(WEATHER);
+        when(weather.forecast(TOMORROW)).thenReturn(OUTLOOK);
         when(ml.predict(any())).thenThrow(new ResourceAccessException("Read timed out"));
 
         ForecastResponse forecast = service.forecast(1L, TOMORROW, 7L);
@@ -150,7 +154,7 @@ class ForecastServiceTest {
     void usesTheModelWhenItCanAndNeverReturnsANegativeForecast() {
         when(data.getSalesHistory(any(), eq(TOMORROW))).thenReturn(daysOfSales(28, 40));
         when(ml.knownDishes()).thenReturn(Optional.of(Set.of("CHICKEN RICE")));
-        when(weather.getWeather(TOMORROW)).thenReturn(WEATHER);
+        when(weather.forecast(TOMORROW)).thenReturn(OUTLOOK);
         when(ml.predict(any())).thenReturn(new MlPredictionResponse("Chicken rice", TOMORROW.toString(), -3.2));
 
         ForecastResponse forecast = service.forecast(1L, TOMORROW, 7L);
@@ -160,6 +164,44 @@ class ForecastServiceTest {
         assertNull(forecast.note());
         assertEquals(0, forecast.predictedDemand(), 1e-9);
         assertEquals(0, forecast.low());
+    }
+
+    @Test
+    void aModelForecastSaysWhichWeatherForecastItUsed() {
+        LocalDate inFourDays = TODAY.plusDays(4);
+        when(data.getSalesHistory(any(), eq(inFourDays))).thenReturn(daysOfSales(28, 40));
+        when(ml.knownDishes()).thenReturn(Optional.of(Set.of("CHICKEN RICE")));
+        when(weather.forecast(inFourDays)).thenReturn(OUTLOOK);
+        when(ml.predict(any())).thenReturn(new MlPredictionResponse("Chicken rice", inFourDays.toString(), 44));
+
+        ForecastResponse forecast = service.forecast(1L, inFourDays, 7L);
+
+        assertEquals(Method.MODEL, forecast.method());
+        assertEquals("NEA_4_DAY_OUTLOOK", forecast.weatherSource());
+        assertEquals("NEA's 4-day outlook: Thundery Showers, 24 to 33°C", forecast.weather());
+        assertEquals("Forecast model, using your recent sales, NEA's 4-day outlook and public holidays", forecast.basis());
+    }
+
+    @Test
+    void theRangeWidensWhenTheLatestSalesAreOld() {
+        // Sales rising by one a day for six weeks, so older sales are further off.
+        List<DailySale> rising = new ArrayList<>();
+        for (int day = 42; day >= 1; day--) {
+            rising.add(new DailySale(dish, TOMORROW.minusDays(day), 100 - day));
+        }
+        LocalDate nextWeek = TODAY.plusDays(7);
+        List<DailySale> stale = rising.subList(0, rising.size() - 6);
+        when(data.getSalesHistory(any(), eq(TOMORROW))).thenReturn(rising);
+        when(data.getSalesHistory(any(), eq(nextWeek))).thenReturn(stale);
+        when(ml.knownDishes()).thenReturn(Optional.of(Set.of()));
+
+        ForecastResponse fresh = service.forecast(1L, TOMORROW, 7L);
+        ForecastResponse old = service.forecast(1L, nextWeek, 7L);
+
+        // The last sale is 1 day before tomorrow, but 13 days before next week.
+        assertTrue(old.high() - old.predictedDemand() > fresh.high() - fresh.predictedDemand(),
+                "fresh " + fresh.low() + "-" + fresh.high() + " around " + fresh.predictedDemand()
+                        + ", old " + old.low() + "-" + old.high() + " around " + old.predictedDemand());
     }
 
     // One sale a day for the given number of days before tomorrow, all the same quantity.
