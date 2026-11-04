@@ -1,6 +1,14 @@
 /* Account layout. Shared tokens and components are in base.css. */
 .account-details,
+.session-settings,
 .chat-apps { max-width: 720px; margin-top: 24px; }
+.session-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 24px 0 16px; }
+.session-fields label { display: grid; gap: 8px; }
+.session-fields input { width: 100%; min-width: 0; }
+@media (max-width: 760px) {
+  .session-fields { grid-template-columns: minmax(0, 1fr); }
+  .session-settings .form-actions { flex-wrap: wrap; }
+}
 .muted-text { color: var(--muted); font-size: var(--text-sm); }
 .chat-apps > .muted-text + .muted-text { margin-top: 8px; }
 
