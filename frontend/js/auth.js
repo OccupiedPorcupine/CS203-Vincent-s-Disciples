@@ -4,7 +4,8 @@ const config = {
   apiBaseUrl: ["localhost", "127.0.0.1"].includes(location.hostname)
     ? document.querySelector('meta[name="api-base-url"]').content.replace(/\/$/, "")
     : "",
-  googleClientId: ""
+  // From the page, so the Google button doesn't wait for the backend; /api/config can change it.
+  googleClientId: document.querySelector('meta[name="google-client-id"]')?.content || ""
 };
 
 const panels = {
@@ -245,16 +246,25 @@ document.querySelector("#logout-button").addEventListener("click", async () => {
   }
 });
 
-function initializeGoogleSignIn() {
-  if (!config.googleClientId) {
-    document.querySelector("#google-help").hidden = false;
-    return;
-  }
+let googleScript = null;
 
-  const script = document.createElement("script");
-  script.src = "https://accounts.google.com/gsi/client";
-  script.async = true;
-  script.onload = () => {
+// Shows the Google button for config.googleClientId, loading Google's script the first time. Called
+// straight away with the page's client ID, and again if the backend's (/api/config) differs.
+function initializeGoogleSignIn() {
+  document.querySelector("#google-button").replaceChildren();
+  document.querySelector("#google-help").hidden = Boolean(config.googleClientId);
+  if (!config.googleClientId) return;
+
+  googleScript ??= new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+  googleScript.then(() => {
+    if (!config.googleClientId) return;
     google.accounts.id.initialize({
       client_id: config.googleClientId,
       callback: async ({ credential }) => {
@@ -271,7 +281,9 @@ function initializeGoogleSignIn() {
         }
       }
     });
-    google.accounts.id.renderButton(document.querySelector("#google-button"), {
+    const container = document.querySelector("#google-button");
+    container.replaceChildren();
+    google.accounts.id.renderButton(container, {
       type: "standard",
       theme: "outline",
       size: "large",
@@ -279,19 +291,21 @@ function initializeGoogleSignIn() {
       text: "signin_with",
       width: 258
     });
-  };
-  script.onerror = () => {
+  }, () => {
     setStatus(document.querySelector("#login-status"), "Google sign-in could not be loaded.", "error");
-  };
-  document.head.appendChild(script);
+  });
 }
 
 async function startApplication() {
+  // The backend can take over 10 s to start after a quiet spell, so the button doesn't wait for it.
+  initializeGoogleSignIn();
   try {
     await refreshCsrf();
     const publicConfig = await apiRequest("/api/config");
-    config.googleClientId = publicConfig.googleClientId || "";
-    initializeGoogleSignIn();
+    if ((publicConfig.googleClientId || "") !== config.googleClientId) {
+      config.googleClientId = publicConfig.googleClientId || "";
+      initializeGoogleSignIn();
+    }
     if (emailedLink?.kind === "reset") {
       showPanel("reset");
       return;
