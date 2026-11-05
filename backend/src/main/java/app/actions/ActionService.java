@@ -15,11 +15,13 @@ import app.sale.DailySaleRepository;
 import app.service.SoldOutDemand;
 import app.service.StallClosureService;
 import app.user.AppUserRepository;
+import app.weather.WeatherService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -42,6 +44,14 @@ public class ActionService {
     static final int SOLD_OUT_DAYS = 7;
     static final int MIN_SOLD_OUT_TIMES = 2;
     static final int MAX_SOLD_OUT_CARDS = 2;
+    static final int RAIN_LOOKBACK_WEEKS = 12;
+    // A day with at least this much rain (mm) is rainy, one with under DRY_MM dry; drizzly days are neither.
+    static final double RAINY_MM = 5;
+    static final double DRY_MM = 1;
+    static final int RAINY_DAYS_COMPARED = 4;
+    static final int MIN_DAYS_COMPARED = 2;
+    // A smaller difference isn't worth changing prep for: in the monsoon, most days have showers forecast.
+    static final int MIN_RAIN_CHANGE_PERCENT = 10;
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH);
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -53,13 +63,15 @@ public class ActionService {
     private final DishPriceService priceService;
     private final DismissedActionRepository dismissedRepository;
     private final AppUserRepository users;
+    private final WeatherService weatherService;
     private final Clock clock;
     private final boolean countSoldOutDemand;
 
     public ActionService(DishRepository dishRepository, DailySaleRepository saleRepository,
                          StallClosureService closureService, PublicHolidayRepository holidayRepository,
                          TrainingDataSourceRepository sourceRepository, DishPriceService priceService,
-                         DismissedActionRepository dismissedRepository, AppUserRepository users, Clock clock,
+                         DismissedActionRepository dismissedRepository, AppUserRepository users,
+                         WeatherService weatherService, Clock clock,
                          @Value("${app.forecast.count-sold-out-demand:false}") boolean countSoldOutDemand) {
         this.dishRepository = dishRepository;
         this.saleRepository = saleRepository;
@@ -69,6 +81,7 @@ public class ActionService {
         this.priceService = priceService;
         this.dismissedRepository = dismissedRepository;
         this.users = users;
+        this.weatherService = weatherService;
         this.clock = clock;
         this.countSoldOutDemand = countSoldOutDemand;
     }
@@ -90,6 +103,7 @@ public class ActionService {
         unpricedDishes(ownerId, today).ifPresent(cards::add);
         cards.addAll(soldOutDishes(ownerId, today, closures));
         tradingHours(ownerId, today, closures).ifPresent(cards::add);
+        rain(ownerId, today, closures).ifPresent(cards::add);
         upcomingHoliday(ownerId, today, closures).ifPresent(cards::add);
 
         Set<String> dismissed = dismissedRepository.findByOwnerId(ownerId).stream()
@@ -229,6 +243,69 @@ public class ActionService {
         return Optional.of(new ActionCard("trading-hours", "trading-hours", "Set your trading hours",
                 "Then forecasts can tell how early a dish sold out, and plan for the customers you missed.",
                 "Set hours", "data.html#trading-hours", null));
+    }
+
+    // The first day in NEA's 4-day outlook with showers forecast, the stall open, and a difference in
+    // sales on its past rainy days of that weekday (issue #96). Days where rain made no difference
+    // are skipped, and so is the card when the weather can't be fetched.
+    private Optional<ActionCard> rain(Long ownerId, LocalDate today, StallClosureService.StallClosures closures) {
+        Set<LocalDate> closed = closedDates(closures);
+        List<WeatherService.Forecast> wet = weatherService.outlook().stream()
+                .filter(day -> day.rain() && !day.date().isBefore(today) && !closed.contains(day.date())
+                        && !closures.restDays().contains(day.date().getDayOfWeek()))
+                .toList();
+        if (wet.isEmpty()) {
+            return Optional.empty();
+        }
+        LocalDate from = today.minusWeeks(RAIN_LOOKBACK_WEEKS);
+        Map<LocalDate, Double> rainfall = weatherService.rainfall(from, today.minusDays(1));
+        if (rainfall.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<LocalDate, Integer> totals = new HashMap<>();
+        saleRepository.findByDishOwnerIdAndSaleDateBetween(ownerId, from, today.minusDays(1))
+                .forEach(sale -> totals.merge(sale.getSaleDate(), sale.getQuantitySold(), Integer::sum));
+
+        for (WeatherService.Forecast day : wet) {
+            Optional<String> detail = rainyWeekdays(day.date().getDayOfWeek(), totals, rainfall);
+            if (detail.isPresent()) {
+                long days = ChronoUnit.DAYS.between(today, day.date());
+                String when = days == 0 ? "today" : days == 1 ? "tomorrow" : "for " + day.date().format(DAY);
+                String text = day.text().substring(0, 1).toUpperCase(Locale.ENGLISH) + day.text().substring(1).toLowerCase(Locale.ENGLISH);
+                return Optional.of(new ActionCard("rain:" + day.date(), "rain",
+                        text + " forecast " + when + (days <= 1 ? " (" + day.date().format(DAY) + ")" : ""),
+                        detail.get(), "See the forecast", "forecast.html", null));
+            }
+        }
+        return Optional.empty();
+    }
+
+    // "On your last 4 rainy Saturdays you sold 15% less than on dry ones." Compares the latest
+    // rainy days of that weekday with all its dry days, each day being all dishes' sales.
+    static Optional<String> rainyWeekdays(DayOfWeek weekday, Map<LocalDate, Integer> totals, Map<LocalDate, Double> rainfall) {
+        List<Integer> rainy = new ArrayList<>();
+        List<Integer> dry = new ArrayList<>();
+        totals.keySet().stream()
+                .filter(date -> date.getDayOfWeek() == weekday && totals.get(date) > 0 && rainfall.containsKey(date))
+                .sorted(Comparator.reverseOrder())
+                .forEach(date -> {
+                    double mm = rainfall.get(date);
+                    if (mm >= RAINY_MM && rainy.size() < RAINY_DAYS_COMPARED) rainy.add(totals.get(date));
+                    else if (mm < DRY_MM) dry.add(totals.get(date));
+                });
+        if (rainy.size() < MIN_DAYS_COMPARED || dry.size() < MIN_DAYS_COMPARED) {
+            return Optional.empty();
+        }
+        double wet = rainy.stream().mapToInt(Integer::intValue).average().orElse(0);
+        double usual = dry.stream().mapToInt(Integer::intValue).average().orElse(0);
+        long change = Math.round((wet - usual) / usual * 100);
+        if (Math.abs(change) < MIN_RAIN_CHANGE_PERCENT) {
+            return Optional.empty();
+        }
+        String weekdays = weekday.getDisplayName(TextStyle.FULL, Locale.ENGLISH) + "s";
+        return Optional.of("On your last " + rainy.size() + " rainy " + weekdays + " you sold " + Math.abs(change) + "% "
+                + (change > 0 ? "more" : "less") + " than on dry ones, so consider preparing "
+                + (change > 0 ? "extra" : "less") + ".");
     }
 
     // The next public holiday in the coming two weeks, unless the stall is closed that day. When
