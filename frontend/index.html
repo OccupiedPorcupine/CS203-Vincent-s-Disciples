@@ -6,8 +6,11 @@
   <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
   <style>@view-transition { navigation: auto; }</style>
 
-  <!-- Public runtime configuration. Google configuration is loaded from the backend. -->
+  <!-- Public runtime configuration. -->
   <meta name="api-base-url" content="http://localhost:8080">
+  <!-- Production's Google client ID (GOOGLE_CLIENT_ID), which is public, so the Google button shows
+       without waiting for the backend to start. /api/config still has the last word (js/auth.js). -->
+  <meta name="google-client-id" content="704664738768-t2iot0sqoe810ks8m65fr8rkvu6071gh.apps.googleusercontent.com">
 
 
   <title>Sign in to Chicky</title>
