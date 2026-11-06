@@ -21,6 +21,7 @@ import app.service.PublicHolidaySyncService;
 import app.service.StallClosureService;
 import app.user.AppUser;
 import app.user.AppUserRepository;
+import app.weather.WeatherService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,10 +35,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 // The Actions needed rules on H2, on Wednesday 4 November 2026 in Singapore, with sold-out days
 // counted in forecasts (so the trading-hours card can show).
@@ -58,6 +63,10 @@ class ActionServiceTest {
     // Stubbed so the test does not call data.gov.sg on startup.
     @MockitoBean
     PublicHolidaySyncService publicHolidaySyncService;
+
+    // No outlook and no rainfall unless a test says so, so no rain card.
+    @MockitoBean
+    WeatherService weatherService;
 
     @Autowired ActionService actionService;
     @Autowired DismissedActionRepository dismissedRepository;
@@ -233,5 +242,74 @@ class ActionServiceTest {
         saleService.setSale(charSiew.getId(), owner, TODAY, 30, LocalTime.of(13, 0), null);
         assertEquals("Char siew rice sold out 3 times this week",
                 actionService.actions(owner).stream().filter(c -> c.kind().equals("sold-out")).findFirst().orElseThrow().title());
+    }
+
+    // Sells 100 a day for the 12 weeks before today, except where sales says otherwise, and reports
+    // those days dry except where rain says otherwise.
+    private void weeks(Map<LocalDate, Integer> sales, Map<LocalDate, Double> rain) {
+        Map<LocalDate, Double> rainfall = new HashMap<>();
+        for (LocalDate day = TODAY.minusWeeks(12); day.isBefore(TODAY); day = day.plusDays(1)) {
+            saleService.setSale(chickenRice.getId(), owner, day, sales.getOrDefault(day, 100));
+            rainfall.put(day, rain.getOrDefault(day, 0.0));
+        }
+        when(weatherService.rainfall(any(), any())).thenReturn(rainfall);
+    }
+
+    private ActionCard rainCard() {
+        return actionService.actions(owner).stream().filter(card -> card.kind().equals("rain")).findFirst().orElse(null);
+    }
+
+    @Test
+    void showersTomorrowSayHowTheLastRainyDaysOfThatWeekdayWent() {
+        LocalDate thu = LocalDate.of(2026, 10, 29);
+        // The last 4 rainy Thursdays sold 80; an older rainy one (50) and a drizzly one (3 mm) don't count.
+        weeks(Map.of(thu, 80, thu.minusWeeks(1), 80, thu.minusWeeks(2), 80, thu.minusWeeks(3), 80, thu.minusWeeks(4), 50),
+                Map.of(thu, 12.0, thu.minusWeeks(1), 30.0, thu.minusWeeks(2), 5.0, thu.minusWeeks(3), 8.0,
+                        thu.minusWeeks(4), 20.0, thu.minusWeeks(5), 3.0));
+        when(weatherService.outlook()).thenReturn(List.of(
+                new WeatherService.Forecast(TODAY.plusDays(1), "Thundery Showers"),
+                new WeatherService.Forecast(TODAY.plusDays(2), "Fair")));
+
+        ActionCard card = rainCard();
+
+        assertEquals("rain:2026-11-05", card.key());
+        assertEquals("Thundery showers forecast tomorrow (Thu 5 Nov)", card.title());
+        assertEquals("On your last 4 rainy Thursdays you sold 20% less than on dry ones, so consider preparing less.", card.detail());
+        assertEquals("forecast.html", card.href());
+
+        actionService.dismiss(owner, card.key());
+        assertNull(rainCard());
+    }
+
+    @Test
+    void rainyDaysThatMadeNoDifferenceAndClosedDaysAreSkipped() {
+        LocalDate fri = LocalDate.of(2026, 10, 30);
+        LocalDate sat = LocalDate.of(2026, 10, 31);
+        // Rainy Fridays sold as usual; rainy Saturdays sold 30% more. Thursdays sold less, but the stall closes tomorrow.
+        weeks(Map.of(sat, 130, sat.minusWeeks(1), 130, LocalDate.of(2026, 10, 29), 50, LocalDate.of(2026, 10, 22), 50),
+                Map.of(fri, 15.0, fri.minusWeeks(1), 15.0, sat, 15.0, sat.minusWeeks(1), 15.0,
+                        LocalDate.of(2026, 10, 29), 15.0, LocalDate.of(2026, 10, 22), 15.0));
+        closureService.closeDate(owner, TODAY.plusDays(1), "Centre cleaning");
+        when(weatherService.outlook()).thenReturn(List.of(
+                new WeatherService.Forecast(TODAY.plusDays(1), "Thundery Showers"),
+                new WeatherService.Forecast(TODAY.plusDays(2), "Showers"),
+                new WeatherService.Forecast(TODAY.plusDays(3), "Showers")));
+
+        ActionCard card = rainCard();
+
+        assertEquals("rain:2026-11-07", card.key());
+        assertEquals("Showers forecast for Sat 7 Nov", card.title());
+        assertEquals("On your last 2 rainy Saturdays you sold 30% more than on dry ones, so consider preparing extra.", card.detail());
+    }
+
+    @Test
+    void noRainCardWithoutEnoughRainyDaysOrWithoutRainfall() {
+        LocalDate thu = LocalDate.of(2026, 10, 29);
+        weeks(Map.of(thu, 50), Map.of(thu, 15.0)); // only one rainy Thursday
+        when(weatherService.outlook()).thenReturn(List.of(new WeatherService.Forecast(TODAY.plusDays(1), "Thundery Showers")));
+        assertNull(rainCard());
+
+        when(weatherService.rainfall(any(), any())).thenReturn(Map.of()); // Open-Meteo unreachable
+        assertNull(rainCard());
     }
 }

@@ -103,6 +103,15 @@ than 20 hours old. A stall linked to a centre treats those dates as closed days.
 copied into `closed_dates`, so the owner's own days always win and unlinking drops only NEA's.
 Set `HAWKER_CENTRE_SYNC_ENABLED=false` to stop the fetch; tests have it off.
 
+The dashboard's rain card (`GET /api/actions`, kind `rain`) uses `WeatherService`.
+- **Days ahead:** NEA's 4-day outlook from data.gov.sg, kept for an hour.
+- **Past days:** each day's rainfall from Open-Meteo's archive, for the middle of Singapore, kept for 12 hours. data.gov.sg only has 5-minute readings.
+- **Rainy and dry:** a day is rainy at 5 mm or more, and dry under 1 mm.
+- **When the card shows:** the first open day with showers forecast where the stall's last 4 rainy days of that weekday, over 12 weeks, sold at least 10% more or less than its dry ones.
+- **Failures:** a failed fetch shows no card, and the fetch isn't retried for 10 minutes.
+- **Turning it off:** set `WEATHER_ENABLED=false`. Tests have it off.
+- **Licence:** Open-Meteo's free API is for non-commercial use, so a paying launch needs its commercial plan, or rainfall from elsewhere.
+
 ### Voice assistant
 
 The assistant turns what a user says or types ("yesterday chicken rice 42, 叉烧饭 30") into proposed
