@@ -7,13 +7,14 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
 
 # A new push to the same branch cancels the run still going for the previous push.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -117,7 +118,7 @@ jobs:
 
       - name: Validate production Compose configuration
         env:
-          ECR_REGISTRY: example.invalid
+          IMAGE_REGISTRY: example.invalid
           RELEASE_TAG: ci-validation
           APP_DOMAIN: example.invalid
           DATABASE_URL: jdbc:postgresql://db.invalid:5432/postgres
