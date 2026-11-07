@@ -1,6 +1,8 @@
 package app.controller;
 
+import app.document.DocumentRetriever;
 import app.document.DocumentService;
+import app.dto.RetrievedChunk;
 import app.dto.DocumentRequest;
 import app.dto.DocumentResponse;
 import app.dto.DocumentSummaryResponse;
@@ -22,15 +24,31 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService service;
+    private final DocumentRetriever retriever;
 
-    public DocumentController(DocumentService service) {
+    public DocumentController(DocumentService service, DocumentRetriever retriever) {
         this.service = service;
+        this.retriever = retriever;
     }
 
     @Operation(summary = "List documents", description = "Titles, source, index status, size and last edit, newest first. No text.")
     @GetMapping
     public List<DocumentSummaryResponse> list(@AuthenticationPrincipal AuthenticatedUser user) {
         return service.list(user.id());
+    }
+
+    @Operation(summary = "Search documents", description = "The parts of your documents most similar to q, best first, "
+            + "with their scores: the search the assistant uses. all=true leaves out the similarity floor, for tuning it.")
+    @GetMapping("/search")
+    public List<RetrievedChunk> search(@AuthenticationPrincipal AuthenticatedUser user, @RequestParam("q") String query,
+                                       @RequestParam(value = "k", defaultValue = "5") int k,
+                                       @RequestParam(value = "all", defaultValue = "false") boolean all) {
+        if (query.length() > 1000 || k < 1 || k > 20) {
+            throw new IllegalArgumentException("q must be at most 1,000 characters and k from 1 to 20.");
+        }
+        return retriever.retrieve(user.id(), query, k, all ? -1 : retriever.minSimilarity()).stream()
+                .map(hit -> new RetrievedChunk(hit.documentId(), hit.title(), hit.chunkId(), hit.score(), null, hit.content()))
+                .toList();
     }
 
     @Operation(summary = "Get a document", description = "One document with its text.")

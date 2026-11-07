@@ -51,6 +51,10 @@ public class DocumentRetriever {
     // A reply's text without its [doc:N] tags, and the documents those tags named.
     public record Cited(String text, List<Long> documentIds) {}
 
+    public double minSimilarity() {
+        return embeddings.minSimilarity();
+    }
+
     public boolean hasDocuments(Long ownerId) {
         return documents.existsByOwnerIdAndIndexStatus(ownerId, StallDocument.IndexStatus.INDEXED);
     }
@@ -58,6 +62,11 @@ public class DocumentRetriever {
     // The owner's best chunks for the query, best first; empty if none pass the similarity floor
     // or the embedding model can't be reached.
     public List<Hit> retrieve(Long ownerId, String query) {
+        return retrieve(ownerId, query, topK, embeddings.minSimilarity());
+    }
+
+    // Any k and floor, for tuning them (GET /api/documents/search, assistant-eval #155).
+    public List<Hit> retrieve(Long ownerId, String query, int k, double minSimilarity) {
         String text = query.strip();
         if (text.isEmpty()) return List.of();
         if (text.length() > MAX_QUERY_CHARACTERS) text = text.substring(text.length() - MAX_QUERY_CHARACTERS);
@@ -69,7 +78,7 @@ public class DocumentRetriever {
             return List.of();
         }
         usage.recordEmbeddingTokens(ownerId, embedded.tokens());
-        List<Hit> hits = search.top(ownerId, embedded.vectors().getFirst(), embeddings.modelName(), topK, embeddings.minSimilarity());
+        List<Hit> hits = search.top(ownerId, embedded.vectors().getFirst(), embeddings.modelName(), k, minSimilarity);
         log.info("Documents searched for user {}: {} chunks (best {})", ownerId, hits.size(),
                 hits.isEmpty() ? "none" : String.format("%.3f", hits.getFirst().score()));
         return hits;
