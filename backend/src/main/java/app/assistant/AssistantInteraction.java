@@ -51,7 +51,7 @@ public class AssistantInteraction {
     @Column(nullable = false, length = 16)
     private Outcome outcome;
 
-    // SALES or PRICE when there is a proposal; see V16.
+    // SALES, PRICE or NOTE (#154) when there is a proposal; see V16.
     @Column(length = 16)
     private String proposalType;
 
@@ -150,6 +150,10 @@ public class AssistantInteraction {
     // Proposals saved before V16 have no type and are sales.
     public boolean isPriceProposal() {
         return "PRICE".equals(proposalType);
+    }
+
+    public boolean isNoteProposal() {
+        return "NOTE".equals(proposalType);
     }
 
     public String getProposalJson() {

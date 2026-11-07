@@ -8,8 +8,10 @@ import app.assistant.guide.AppGuide;
 import app.assistant.guide.GuideRetriever;
 import app.assistant.guide.GuideStep;
 import app.dish.Dish;
+import app.document.DocumentException;
 import app.document.DocumentRetriever;
 import app.document.DocumentSearch;
+import app.document.DocumentService;
 import app.dish.DishAlias;
 import app.dish.DishRepository;
 import app.dto.*;
@@ -76,6 +78,7 @@ public class AssistantService {
     private final SpeechCache speechCache;
     private final DishPriceService priceService;
     private final DocumentRetriever documentRetriever;
+    private final DocumentService documentService;
     private final JsonMapper jsonMapper;
     private final Clock clock;
     private final String baseUrl;
@@ -88,7 +91,7 @@ public class AssistantService {
                             DishAliasService dishAliasService, StallClosureService stallClosureService,
                             GuideRetriever guideRetriever, AppGuide appGuide,
                             SpeechCache speechCache, DishPriceService priceService, DocumentRetriever documentRetriever,
-                            JsonMapper jsonMapper, Clock clock,
+                            DocumentService documentService, JsonMapper jsonMapper, Clock clock,
                             @Value("${app.base-url}") String baseUrl) {
         this.modelClient = modelClient;
         this.tools = tools;
@@ -108,6 +111,7 @@ public class AssistantService {
         this.speechCache = speechCache;
         this.priceService = priceService;
         this.documentRetriever = documentRetriever;
+        this.documentService = documentService;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
@@ -277,13 +281,17 @@ public class AssistantService {
         ProposedPrice priceChange = context.priceChange();
         List<ProposedClosure> closures = context.closures();
         List<GuideStep> guide = context.guide();
+        // A note has its own card, only when there are no sales, closed days or price to confirm.
+        ProposedNote note = proposal == null && closures == null && priceChange == null ? context.note() : null;
         if (reply == null || reply.isBlank()) {
             reply = proposal != null || closures != null ? "Please check these and press Confirm to save them."
                     : priceChange != null ? "Please check the new price and press Confirm to save it."
+                    : note != null ? "Please check the note and press Confirm to save it."
                     : guide != null ? "Let me show you."
                     : "Sorry, I couldn't work that out. Please try again.";
         }
-        String proposalType = proposal != null || closures != null ? "SALES" : priceChange != null ? "PRICE" : null;
+        String proposalType = proposal != null || closures != null ? "SALES" : priceChange != null ? "PRICE"
+                : note != null ? "NOTE" : null;
         conversations.save(ownerId, conversationId, items);
 
         // [doc:N] tags become sources, and only for documents found this turn (so for this owner).
@@ -305,6 +313,7 @@ public class AssistantService {
                 (int) Duration.ofNanos(System.nanoTime() - started).toMillis(),
                 proposalType,
                 "PRICE".equals(proposalType) ? jsonMapper.writeValueAsString(priceChange)
+                        : "NOTE".equals(proposalType) ? jsonMapper.writeValueAsString(note)
                         : proposal == null ? null : jsonMapper.writeValueAsString(proposal),
                 closures == null ? null : jsonMapper.writeValueAsString(closures),
                 clock.instant());
@@ -317,6 +326,7 @@ public class AssistantService {
                 ownerId, request.inputMode() == null ? "text" : request.inputMode(), request.page(), request.text().strip().length(), interaction.getDetectedLanguages(),
                 modelCalls, tokens.inputTokens(), tokens.cachedTokens(), tokens.outputTokens(), toolsCalled, proposalType == null ? "none"
                         : "PRICE".equals(proposalType) ? "#" + interaction.getId() + " price of dish " + priceChange.dishId()
+                        : "NOTE".equals(proposalType) ? "#" + interaction.getId() + " note"
                         : "#" + interaction.getId() + " with " + (proposal == null ? 0 : proposal.size()) + " entries and "
                                 + (closures == null ? 0 : closures.size()) + " closures",
                 guide == null ? 0 : guide.size(), context.documents().size(), cited.documentIds(), millisSince(started));
@@ -327,7 +337,7 @@ public class AssistantService {
                 interaction.getId(), proposalType,
                 sales ? (proposal == null ? List.of() : proposal) : null,
                 sales ? (closures == null ? List.of() : closures) : null,
-                priceChange, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
+                priceChange, note, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
         return new AssistantMessageResponse(conversationId, reply, proposalView, guide, sources, usage.today(ownerId));
     }
 
@@ -366,9 +376,11 @@ public class AssistantService {
         switch (interaction.getOutcome()) {
             case CONFIRMED, EDITED -> {
                 return interaction.isPriceProposal()
-                        ? new ConfirmProposalResponse(interaction.getOutcome().name(), null, null, readPrice(interaction.getFinalJson()))
+                        ? new ConfirmProposalResponse(interaction.getOutcome().name(), null, null, readPrice(interaction.getFinalJson()), null)
+                        : interaction.isNoteProposal()
+                        ? new ConfirmProposalResponse(interaction.getOutcome().name(), null, null, null, readNote(interaction.getFinalJson()))
                         : new ConfirmProposalResponse(interaction.getOutcome().name(),
-                                readEntries(interaction.getFinalJson()), readClosures(interaction.getClosuresJson()), null);
+                                readEntries(interaction.getFinalJson()), readClosures(interaction.getClosuresJson()), null, null);
             }
             case CANCELLED, EXPIRED -> throw closed(interaction);
             default -> {
@@ -382,6 +394,9 @@ public class AssistantService {
         }
         if (interaction.isPriceProposal()) {
             return confirmPrice(ownerId, interaction, request, now);
+        }
+        if (interaction.isNoteProposal()) {
+            return confirmNote(ownerId, interaction, request, now);
         }
 
         List<ProposedEntry> proposed = readEntries(interaction.getProposalJson());
@@ -439,7 +454,7 @@ public class AssistantService {
         interaction.resolve(outcome, jsonMapper.writeValueAsString(saved), now);
         log.info("Proposal #{} for user {}: {}, {} entries and {} closures saved", proposalId, ownerId, outcome,
                 saved.size(), closures.size());
-        return new ConfirmProposalResponse(outcome.name(), saved, closures, null);
+        return new ConfirmProposalResponse(outcome.name(), saved, closures, null, null);
     }
 
     // The price as proposed or as the user edited it on the card. A cost the user didn't give
@@ -462,7 +477,35 @@ public class AssistantService {
         interaction.resolve(outcome, jsonMapper.writeValueAsString(result), now);
         log.info("Proposal #{} for user {}: {}, price of dish {} set to {} from {}",
                 interaction.getId(), ownerId, outcome, proposed.dishId(), saved.price(), saved.effectiveFrom());
-        return new ConfirmProposalResponse(outcome.name(), null, null, result);
+        return new ConfirmProposalResponse(outcome.name(), null, null, result, null);
+    }
+
+    // Saves the note, as proposed or as the owner edited it on the card, as one of their documents
+    // (source ASSISTANT), and indexes it so the assistant can answer from it straight away (#154).
+    private ConfirmProposalResponse confirmNote(Long ownerId, AssistantInteraction interaction,
+                                                ConfirmProposalRequest request, Instant now) {
+        ProposedNote proposed = readNote(interaction.getProposalJson());
+        String title = request != null && request.noteTitle() != null ? request.noteTitle().strip() : proposed.title();
+        String text = request != null && request.noteText() != null ? request.noteText().strip() : proposed.text();
+        if (!documentService.hasRoom(ownerId)) {
+            throw new AssistantException(HttpStatus.CONFLICT, "TOO_MANY_DOCUMENTS", "You have " + DocumentService.MAX_DOCUMENTS
+                    + " documents, the most a stall can have. Delete one on the Documents page, then confirm again.");
+        }
+        Long documentId;
+        try {
+            documentId = documentService.createNote(ownerId, title, text).id();
+        } catch (DocumentException exception) {
+            throw new AssistantException(exception.getStatus(), exception.getCode(), exception.getMessage());
+        }
+        ProposedNote saved = new ProposedNote(documentId, title, text);
+        Outcome outcome = title.equals(proposed.title()) && text.equals(proposed.text()) ? Outcome.CONFIRMED : Outcome.EDITED;
+        interaction.resolve(outcome, jsonMapper.writeValueAsString(saved), now);
+        log.info("Proposal #{} for user {}: {}, note saved as document #{}", interaction.getId(), ownerId, outcome, documentId);
+        return new ConfirmProposalResponse(outcome.name(), null, null, null, saved);
+    }
+
+    private ProposedNote readNote(String json) {
+        return jsonMapper.readValue(json, ProposedNote.class);
     }
 
     // 5 and 5.00 are the same amount; null only equals null.

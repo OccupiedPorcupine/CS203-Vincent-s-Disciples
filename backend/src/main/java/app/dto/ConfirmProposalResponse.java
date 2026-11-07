@@ -2,6 +2,7 @@ package app.dto;
 
 import app.assistant.ProposedClosure;
 import app.assistant.ProposedEntry;
+import app.assistant.ProposedNote;
 import app.assistant.ProposedPrice;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -11,5 +12,6 @@ public record ConfirmProposalResponse(
         @Schema(description = "CONFIRMED if saved as proposed, EDITED if the user changed it first", example = "CONFIRMED") String outcome,
         @Schema(description = "Sales proposals: what was saved; previousQuantity shows any quantity that was replaced") List<ProposedEntry> saved,
         @Schema(description = "Sales proposals: closed days that were marked closed or opened again") List<ProposedClosure> closures,
-        @Schema(description = "Price proposals: the price that was saved") ProposedPrice priceChange
+        @Schema(description = "Price proposals: the price that was saved") ProposedPrice priceChange,
+        @Schema(description = "Note proposals: the note that was saved, with its document's ID") ProposedNote note
 ) {}

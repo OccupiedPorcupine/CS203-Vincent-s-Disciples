@@ -28,6 +28,9 @@ public final class ChatProposalText {
     }
 
     public static String proposal(AssistantMessageResponse.Proposal proposal) {
+        if (proposal.note() != null) {
+            return "Save this note?\n" + proposal.note().title() + ": " + proposal.note().text();
+        }
         if (proposal.priceChange() != null) {
             return "Change this price?\n" + price(proposal.priceChange());
         }
@@ -35,6 +38,9 @@ public final class ChatProposalText {
     }
 
     public static String saved(ConfirmProposalResponse response) {
+        if (response.note() != null) {
+            return "Saved as a note: " + response.note().title() + ". You can edit or delete it on the Documents page.";
+        }
         if (response.priceChange() != null) {
             return "Saved.\n" + price(response.priceChange());
         }
