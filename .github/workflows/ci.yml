@@ -105,3 +105,34 @@ jobs:
       # Tests that need the trained model skip themselves, because ml/artifacts is not in Git.
       # scripts/tests covers scripts/prune_container_images.py's choice of images (no Vercel calls).
       - run: python -m pytest ml/tests scripts/tests
+
+  aws-config:
+    name: AWS deployment configuration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate production Compose configuration
+        env:
+          ECR_REGISTRY: example.invalid
+          RELEASE_TAG: ci-validation
+          APP_DOMAIN: example.invalid
+          DATABASE_URL: jdbc:postgresql://db.invalid:5432/postgres
+          DATABASE_USERNAME: ci-placeholder
+          DATABASE_PASSWORD: ci-placeholder
+          ML_SHARED_SECRET: ci-placeholder
+          MAIL_HOST: smtp.example.invalid
+          MAIL_PORT: "587"
+          MAIL_USERNAME: ci-placeholder
+          MAIL_FROM: ci@example.invalid
+          MAIL_PASSWORD: ci-placeholder
+        run: docker compose -f deploy/aws/compose.yaml config --quiet
+
+      - name: Build web image
+        run: docker build -f deploy/aws/web.Dockerfile -t chicky-web:ci .
+
+      - name: Validate Nginx configuration
+        run: docker run --rm --network none chicky-web:ci nginx -t

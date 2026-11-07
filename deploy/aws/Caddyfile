@@ -1,0 +1,7 @@
+{
+    admin off
+}
+
+{$APP_DOMAIN} {
+    reverse_proxy web:80
+}

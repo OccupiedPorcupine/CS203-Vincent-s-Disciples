@@ -1,0 +1,13 @@
+**
+!frontend/
+!frontend/*.html
+!frontend/css/
+!frontend/css/**
+!frontend/js/
+!frontend/js/**
+!frontend/images/
+!frontend/images/**
+!frontend/manifest.webmanifest
+!deploy/
+!deploy/aws/
+!deploy/aws/nginx.conf

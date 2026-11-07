@@ -1,0 +1,113 @@
+name: chicky-ec2
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  ml:
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY}/chicky-ml:${RELEASE_TAG:?Set RELEASE_TAG}
+    environment:
+      PORT: "8080"
+      ML_SHARED_SECRET: ${ML_SHARED_SECRET:?Set ML_SHARED_SECRET}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json, urllib.request; d=json.load(urllib.request.urlopen('http://localhost:8080/health')); assert d['forecast_model']=='ready', d"
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 2g
+    logging: *logging
+
+  backend:
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY}/chicky-backend:${RELEASE_TAG:?Set RELEASE_TAG}
+    environment:
+      SPRING_PROFILES_ACTIVE: supabase,prod
+      SPRING_CONFIG_IMPORT: classpath:health.properties
+      PORT: "8080"
+
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:?Set DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD}
+
+      ML_SERVICE_URL: http://ml:8080
+      ML_SHARED_SECRET: ${ML_SHARED_SECRET:?Set ML_SHARED_SECRET}
+
+      APP_BASE_URL: https://${APP_DOMAIN:?Set APP_DOMAIN}
+      APP_CORS_ALLOWED_ORIGINS: https://${APP_DOMAIN:?Set APP_DOMAIN}
+      SESSION_COOKIE_SECURE: "true"
+      FORWARD_HEADERS_STRATEGY: framework
+
+      MAIL_HOST: ${MAIL_HOST:?Set MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:?Set MAIL_USERNAME}
+      MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?Set MAIL_PASSWORD}
+
+      ASSISTANT_PROVIDER: ${ASSISTANT_PROVIDER:-offline}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      CRON_SECRET: ${CRON_SECRET:-}
+      HAWKER_CENTRE_SYNC_ENABLED: "false"
+
+    depends_on:
+      ml:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 1g
+    logging: *logging
+
+  web:
+    image: ${ECR_REGISTRY:?Set ECR_REGISTRY}/chicky-web:${RELEASE_TAG:?Set RELEASE_TAG}
+    depends_on:
+      backend:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1/api/health
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 20
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
+
+  caddy:
+    image: caddy:2
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 256m
+    logging: *logging
+
+volumes:
+  caddy-data:
+    external: true
+    name: chicky-ec2_caddy-data
+  caddy-config:
+    external: true
+    name: chicky-ec2_caddy-config
