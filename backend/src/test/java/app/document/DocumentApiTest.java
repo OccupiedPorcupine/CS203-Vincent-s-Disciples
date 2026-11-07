@@ -66,7 +66,7 @@ class DocumentApiTest {
         assertEquals("Ah Huat Poultry", document.path("title").asString());
         assertEquals("Order by 9pm.\n\nCall 9123 4567.", document.path("body").asString());
         assertEquals("TYPED", document.path("source").asString());
-        assertEquals("PENDING", document.path("indexStatus").asString());
+        assertEquals("INDEXED", document.path("indexStatus").asString());
 
         JsonNode list = JSON.readTree(owner.get("/api/documents").body());
         assertEquals(1, list.size());

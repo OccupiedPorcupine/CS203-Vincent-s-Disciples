@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -20,6 +21,8 @@ import java.util.regex.Pattern;
 // The owner's documents for the assistant (issue #151): write, upload, edit and delete. Every
 // lookup is by owner, so another account's document is "not found". Documents are reference
 // material for the assistant only; they never change forecasts, prep lists or prices.
+// A document is saved first, then indexed for search (DocumentIndexer, #152) outside the
+// transaction, so a slow or failed embedding call never loses the owner's text.
 @Service
 public class DocumentService {
 
@@ -36,11 +39,16 @@ public class DocumentService {
 
     private final StallDocumentRepository documents;
     private final DocumentTextExtractor extractor;
+    private final DocumentIndexer indexer;
+    private final TransactionTemplate transactions;
     private final Clock clock;
 
-    public DocumentService(StallDocumentRepository documents, DocumentTextExtractor extractor, Clock clock) {
+    public DocumentService(StallDocumentRepository documents, DocumentTextExtractor extractor, DocumentIndexer indexer,
+                           TransactionTemplate transactions, Clock clock) {
         this.documents = documents;
         this.extractor = extractor;
+        this.indexer = indexer;
+        this.transactions = transactions;
         this.clock = clock;
     }
 
@@ -54,13 +62,11 @@ public class DocumentService {
         return DocumentResponse.of(find(ownerId, id));
     }
 
-    @Transactional
     public DocumentResponse create(Long ownerId, String title, String body) {
-        return DocumentResponse.of(save(ownerId, title, body, Source.TYPED, null));
+        return indexed(ownerId, save(ownerId, title, body, Source.TYPED, null));
     }
 
     // The original file isn't kept: only its text, which the owner can then edit.
-    @Transactional
     public DocumentResponse upload(Long ownerId, MultipartFile file, String title) {
         if (file == null || file.isEmpty()) {
             throw DocumentException.invalid("NO_FILE", "Choose a file to upload.");
@@ -78,17 +84,26 @@ public class DocumentService {
         }
         String text = extractor.extract(content, fileName);
         String chosenTitle = title == null || title.isBlank() ? titleFromFileName(fileName) : title;
-        DocumentResponse created = DocumentResponse.of(save(ownerId, chosenTitle, text, Source.UPLOAD, fileName));
-        log.info("Document #{} for user {} from {} ({} bytes): {} characters", created.id(), ownerId,
-                fileName, content.length, created.characters());
-        return created;
+        Long id = save(ownerId, chosenTitle, text, Source.UPLOAD, fileName);
+        log.info("Document #{} for user {} from {} ({} bytes): {} characters", id, ownerId, fileName, content.length, text.length());
+        return indexed(ownerId, id);
     }
 
-    @Transactional
     public DocumentResponse update(Long ownerId, Long id, String title, String body) {
-        StallDocument document = find(ownerId, id);
-        document.edit(cleanTitle(title), cleanBody(body), clock.instant());
-        return DocumentResponse.of(document);
+        String cleanTitle = cleanTitle(title);
+        String cleanBody = cleanBody(body);
+        boolean changed = Boolean.TRUE.equals(transactions.execute(transaction -> {
+            StallDocument document = find(ownerId, id);
+            document.edit(cleanTitle, cleanBody, clock.instant());
+            return document.getIndexStatus() == StallDocument.IndexStatus.PENDING;
+        }));
+        return changed ? indexed(ownerId, id) : get(ownerId, id);
+    }
+
+    // "Try again" on a document that couldn't be indexed.
+    public DocumentResponse reindex(Long ownerId, Long id) {
+        get(ownerId, id);
+        return indexed(ownerId, id);
     }
 
     @Transactional
@@ -97,9 +112,19 @@ public class DocumentService {
         log.info("Document #{} for user {} deleted", id, ownerId);
     }
 
-    private StallDocument save(Long ownerId, String title, String body, Source source, String fileName) {
-        checkRoom(ownerId);
-        return documents.save(new StallDocument(ownerId, cleanTitle(title), cleanBody(body), source, fileName, clock.instant()));
+    // Saves a new document (in its own transaction) and returns its ID.
+    private Long save(Long ownerId, String title, String body, Source source, String fileName) {
+        String cleanTitle = cleanTitle(title);
+        String cleanBody = cleanBody(body);
+        return transactions.execute(transaction -> {
+            checkRoom(ownerId);
+            return documents.save(new StallDocument(ownerId, cleanTitle, cleanBody, source, fileName, clock.instant())).getId();
+        });
+    }
+
+    private DocumentResponse indexed(Long ownerId, Long id) {
+        indexer.index(id);
+        return get(ownerId, id);
     }
 
     private void checkRoom(Long ownerId) {

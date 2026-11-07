@@ -39,7 +39,7 @@ public class AssistantUsageService {
 
     // OpenAI list prices in USD, for estimates only (app.assistant.prices.*).
     record Prices(double inputPerMillion, double cachedInputPerMillion, double outputPerMillion,
-                  double transcriptionPerMinute, double speechPerThousandCharacters) {}
+                  double transcriptionPerMinute, double speechPerThousandCharacters, double embeddingPerMillion) {}
 
     public AssistantUsageService(
             AssistantDailyUsageRepository usage, AppUserRepository users, AssistantPlans plans, Clock clock,
@@ -47,13 +47,14 @@ public class AssistantUsageService {
             @Value("${app.assistant.prices.cached-input-per-million-tokens}") double cachedInputPerMillion,
             @Value("${app.assistant.prices.output-per-million-tokens}") double outputPerMillion,
             @Value("${app.assistant.prices.transcription-per-minute}") double transcriptionPerMinute,
-            @Value("${app.assistant.prices.speech-per-thousand-characters}") double speechPerThousandCharacters) {
+            @Value("${app.assistant.prices.speech-per-thousand-characters}") double speechPerThousandCharacters,
+            @Value("${app.assistant.prices.embedding-per-million-tokens}") double embeddingPerMillion) {
         this.usage = usage;
         this.users = users;
         this.plans = plans;
         this.clock = clock;
         this.prices = new Prices(inputPerMillion, cachedInputPerMillion, outputPerMillion,
-                transcriptionPerMinute, speechPerThousandCharacters);
+                transcriptionPerMinute, speechPerThousandCharacters, embeddingPerMillion);
     }
 
     public void useMessage(Long ownerId) {
@@ -100,6 +101,12 @@ public class AssistantUsageService {
         }
     }
 
+    public void recordEmbeddingTokens(Long ownerId, long tokens) {
+        if (tokens > 0) {
+            usage.addEmbeddingTokens(ownerId, todaysRow(ownerId), tokens);
+        }
+    }
+
     public void recordTranscribedSeconds(Long ownerId, double seconds) {
         if (seconds > 0) {
             usage.addTranscribedSeconds(ownerId, todaysRow(ownerId), (int) Math.ceil(seconds));
@@ -127,7 +134,7 @@ public class AssistantUsageService {
                 .map(totals -> new AccountUsageResponse(totals.userId(), totals.email(), totals.name(), totals.plan(),
                         totals.messages(), totals.transcriptions(), totals.spokenReplies(),
                         totals.inputTokens(), totals.cachedTokens(), totals.outputTokens(),
-                        totals.transcribedSeconds(), totals.spokenCharacters(), estimatedCost(totals)))
+                        totals.transcribedSeconds(), totals.spokenCharacters(), totals.embeddingTokens(), estimatedCost(totals)))
                 .sorted(Comparator.comparing(AccountUsageResponse::estimatedCostUsd).reversed())
                 .limit(limit)
                 .toList();
@@ -155,7 +162,8 @@ public class AssistantUsageService {
                 + totals.cachedTokens() * prices.cachedInputPerMillion() / 1_000_000
                 + totals.outputTokens() * prices.outputPerMillion() / 1_000_000
                 + totals.transcribedSeconds() / 60.0 * prices.transcriptionPerMinute()
-                + totals.spokenCharacters() / 1000.0 * prices.speechPerThousandCharacters();
+                + totals.spokenCharacters() / 1000.0 * prices.speechPerThousandCharacters()
+                + totals.embeddingTokens() * prices.embeddingPerMillion() / 1_000_000;
         return BigDecimal.valueOf(cost).setScale(4, RoundingMode.HALF_UP);
     }
 

@@ -17,6 +17,7 @@ public record AccountUsageResponse(
         Long outputTokens,
         Long transcribedSeconds,
         Long spokenCharacters,
+        @Schema(description = "Tokens embedded for document search: documents when saved, questions when asked") Long embeddingTokens,
         @Schema(description = "Estimated at the list prices in app.assistant.prices.*; speech is estimated from characters", example = "0.4123")
         BigDecimal estimatedCostUsd
 ) {}
