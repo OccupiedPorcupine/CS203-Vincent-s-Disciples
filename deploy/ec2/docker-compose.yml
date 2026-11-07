@@ -1,0 +1,51 @@
+# Chicky on one server (an AWS EC2 instance), instead of Vercel. See README.md in this folder.
+#
+#   cd deploy/ec2 && docker compose up -d --build
+#
+# Caddy is the only service with open ports: it serves the frontend, gets the HTTPS certificate,
+# and passes /api to the backend. The backend and the ML service are only reachable inside this
+# Compose network, like the ML service on Vercel.
+name: chicky
+
+services:
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      CHICKY_DOMAIN: ${CHICKY_DOMAIN:?Set CHICKY_DOMAIN in deploy/ec2/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../frontend:/srv/frontend:ro
+      # The certificate and its account key, so a restart doesn't ask Let's Encrypt again.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+
+  backend:
+    build: ../../backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ML_SERVICE_URL: http://ml:8080
+      # Caddy sets X-Forwarded-For and -Proto, and is the only way in, so the backend can trust them.
+      FORWARD_HEADERS_STRATEGY: framework
+      SESSION_COOKIE_SECURE: "true"
+    # The image sizes its heap at 75% of this.
+    mem_limit: 1536m
+    depends_on:
+      - ml
+
+  ml:
+    build: ../../ml
+    restart: unless-stopped
+    # Chronos-2 peaked at 965 MiB in testing (ml/README.md).
+    mem_limit: 2g
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -3,7 +3,8 @@
 # every hour instead, and the backend sends whatever has come due. Owners pick an hour from 12 pm
 # to 11 pm on the Account page or with /remind, so this runs at five past each of those hours.
 #
-# Needs the repository secret CRON_SECRET, the same value as CRON_SECRET on Vercel Production.
+# Needs the repository secret CRON_SECRET, the same value as CRON_SECRET on the live site. The site
+# is the repository variable SITE_URL (deploy/ec2/README.md), or the Vercel address when it's unset.
 name: Chat reminders
 
 on:
@@ -40,13 +41,14 @@ jobs:
       - name: Run the job
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://chicky-zeta.vercel.app' }}
         run: |
           for attempt in 1 2 3; do
             status=$(curl -s -o response.json -w '%{http_code}' --max-time 120 -X POST \
-              -H "Authorization: Bearer $CRON_SECRET" https://chicky-zeta.vercel.app/api/channels/jobs/run)
+              -H "Authorization: Bearer $CRON_SECRET" "$SITE_URL/api/channels/jobs/run")
             echo "POST /api/channels/jobs/run: $status $(cat response.json 2>/dev/null)"
             [ "$status" = 200 ] && exit 0
-            [ "$status" = 401 ] && { echo "::error::The backend refused CRON_SECRET. Set the same value on Vercel Production and here."; exit 1; }
+            [ "$status" = 401 ] && { echo "::error::The backend refused CRON_SECRET. Set the same value on the live site and here."; exit 1; }
             sleep 20
           done
           exit 1

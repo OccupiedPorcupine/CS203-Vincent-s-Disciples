@@ -1,0 +1,25 @@
+# Chicky's front door on EC2 (see docker-compose.yml). It does what vercel.json does on Vercel:
+# /api goes to the backend, everything else is the static frontend, with the same security headers.
+# Caddy gets and renews the Let's Encrypt certificate for CHICKY_DOMAIN by itself, and redirects
+# http:// to https://.
+{$CHICKY_DOMAIN} {
+	encode zstd gzip
+
+	# The backend sets its own headers, HSTS included.
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		root * /srv/frontend
+		header {
+			Strict-Transport-Security "max-age=63072000; includeSubDomains"
+			X-Frame-Options DENY
+			Content-Security-Policy "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+			X-Content-Type-Options nosniff
+			Referrer-Policy strict-origin-when-cross-origin
+			Permissions-Policy "microphone=(self), camera=(), geolocation=(), payment=(), usb=()"
+		}
+		file_server
+	}
+}

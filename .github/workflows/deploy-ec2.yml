@@ -1,0 +1,65 @@
+# Deploys main to the EC2 instance after each merge, the way Vercel deploys it to Vercel: it logs
+# in over SSH and runs deploy/ec2/deploy.sh there. Until the EC2_* secrets below are set it does
+# nothing, so it's safe to have while the site is still on Vercel.
+#
+# Repository secrets (Settings → Secrets and variables → Actions), see deploy/ec2/README.md:
+#   EC2_HOST         the instance's address (its domain or Elastic IP)
+#   EC2_USER         the login user, e.g. ubuntu
+#   EC2_SSH_KEY      a private key whose public key is in that user's ~/.ssh/authorized_keys
+#   EC2_KNOWN_HOSTS  the server's host key line, from `ssh-keyscan -t ed25519 <EC2_HOST>`
+#   EC2_APP_DIR      where the repository is checked out on the server, e.g. /home/ubuntu/chicky
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer merge waits for the running one rather than cancelling a build.
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy main to EC2
+    runs-on: ubuntu-latest
+    if: github.repository == 'OccupiedPorcupine/CS203-Vincent-s-Disciples'
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+    steps:
+      - name: Skip until EC2 is set up
+        if: env.EC2_HOST == ''
+        run: echo "::notice::EC2_HOST isn't set, so there is nothing to deploy to. See deploy/ec2/README.md."
+      - name: Deploy
+        if: env.EC2_HOST != ''
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+          EC2_APP_DIR: ${{ secrets.EC2_APP_DIR }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/ec2 && chmod 600 ~/.ssh/ec2
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The first build of the ML image takes a while; later ones reuse cached layers.
+          ssh -i ~/.ssh/ec2 -o StrictHostKeyChecking=yes "$EC2_USER@$EC2_HOST" \
+            "\"$EC2_APP_DIR/deploy/ec2/deploy.sh\""
+      - name: Check the site
+        if: env.EC2_HOST != ''
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          [ -n "$SITE_URL" ] || { echo "::notice::SITE_URL isn't set; skipping the check."; exit 0; }
+          for attempt in 1 2 3 4 5 6; do
+            health=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$SITE_URL/api/health")
+            profile=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$SITE_URL/api/profile")
+            echo "health $health, profile $profile"
+            [ "$health" = 200 ] && [ "$profile" = 401 ] && exit 0
+            sleep 20
+          done
+          echo "::error::$SITE_URL isn't healthy after the deploy."
+          exit 1

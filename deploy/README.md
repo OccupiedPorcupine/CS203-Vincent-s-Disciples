@@ -2,6 +2,8 @@
 
 The app is hosted on Vercel's free Hobby plan as one project, `chicky`. `vercel.json` defines three [services](https://vercel.com/docs/services), all running in Singapore (`sin1`), next to the Supabase database.
 
+The app is moving to one AWS EC2 instance with Docker Compose, on the same Supabase database. [`ec2/README.md`](ec2/README.md) covers setting it up, switching over and deploying updates. Vercel stays as the fallback until the switch.
+
 | Service | Folder | Runs as | Reachable at |
 |---|---|---|---|
 | `web` | `frontend/` | Static files on Vercel's CDN | Every path except `/api/*` |
