@@ -5,6 +5,7 @@ FROM eclipse-temurin:21-jdk AS build
 WORKDIR /src
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
+RUN chmod +x mvnw
 # Download dependencies in their own layer, so code-only changes rebuild faster.
 RUN ./mvnw -B -q dependency:go-offline
 COPY src src
