@@ -12,6 +12,8 @@ import app.dish.DishRepository;
 import app.dto.ForecastResponse;
 import app.dto.PrepListResponse;
 import app.dto.ProposalEntryInput;
+import app.document.DocumentRetriever;
+import app.document.DocumentSearch;
 import app.exception.InvalidForecastDateException;
 import app.exception.StallClosedException;
 import app.holiday.PublicHoliday;
@@ -69,6 +71,7 @@ public class AssistantTools {
     private static final int EXPLAIN_SAME_WEEKDAYS = 4;
     private static final int EXPLAIN_RECENT_DAYS = 7;
     static final String GET_WEEKLY_SUMMARY = "get_weekly_summary";
+    static final String SEARCH_DOCUMENTS = "search_documents";
     private static final int MAX_SALES_DAYS = 120;
     private static final int MAX_GUIDE_STEPS = 8;
     private static final int MAX_STEP_MESSAGE = 240;
@@ -84,6 +87,7 @@ public class AssistantTools {
     private final WeeklySummaryService weeklySummaryService;
     private final PublicHolidayRepository holidayRepository;
     private final AppGuide appGuide;
+    private final DocumentRetriever documentRetriever;
     private final JsonMapper jsonMapper;
     private final List<ToolSpec> specs;
 
@@ -99,6 +103,8 @@ public class AssistantTools {
         ProposedPrice priceChange;
         List<ProposedClosure> closures;
         List<GuideStep> guide;
+        // Document chunks found this turn, with the message or by search_documents (issue #153).
+        final List<RetrievedChunk> documents = new ArrayList<>();
 
         public TurnContext(Long ownerId, LocalDate today, String page, Set<String> liveElementIds) {
             this.ownerId = ownerId;
@@ -122,13 +128,25 @@ public class AssistantTools {
         public List<GuideStep> guide() {
             return guide;
         }
+
+        public List<RetrievedChunk> documents() {
+            return documents;
+        }
+
+        public void addDocuments(List<DocumentSearch.Hit> hits, String via) {
+            hits.forEach(hit -> documents.add(new RetrievedChunk(hit, via)));
+        }
     }
+
+    // via: "message" for chunks retrieved with the user's message, "tool" for search_documents.
+    public record RetrievedChunk(DocumentSearch.Hit hit, String via) {}
 
     public AssistantTools(DishRepository dishRepository, DishAliasRepository dishAliasRepository,
                           DailySaleRepository dailySaleRepository, ProposalValidator proposalValidator,
                           DishPriceService priceService, StallClosureService stallClosureService,
                           PrepListService prepListService, ForecastService forecastService,
-                          WeeklySummaryService weeklySummaryService, PublicHolidayRepository holidayRepository, AppGuide appGuide, JsonMapper jsonMapper) {
+                          WeeklySummaryService weeklySummaryService, PublicHolidayRepository holidayRepository, AppGuide appGuide,
+                          DocumentRetriever documentRetriever, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
@@ -140,6 +158,7 @@ public class AssistantTools {
         this.weeklySummaryService = weeklySummaryService;
         this.holidayRepository = holidayRepository;
         this.appGuide = appGuide;
+        this.documentRetriever = documentRetriever;
         this.jsonMapper = jsonMapper;
         this.specs = List.of(
                 new ToolSpec(LIST_DISHES,
@@ -269,6 +288,17 @@ public class AssistantTools {
                                  "required": ["dish_id", "date"],
                                  "additionalProperties": false}
                                 """)),
+                new ToolSpec(SEARCH_DOCUMENTS,
+                        "Search the owner's own documents (suppliers, contacts, routines, house rules) with your own "
+                                + "wording, when the document parts in your instructions don't answer the question. Returns "
+                                + "the best matching parts as {tag, title, text}; cite a part by its tag, like [doc:12]. "
+                                + "Not for sales, prices, closures or forecasts.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {"query": {"type": "string", "description": "What to look for, in a few words"}},
+                                 "required": ["query"],
+                                 "additionalProperties": false}
+                                """)),
                 new ToolSpec(GET_WEEKLY_SUMMARY,
                         "Get the summary of the user's latest 7 days of sales, as on the dashboard: portions against the "
                                 + "week before, revenue, the best-selling dish, leftovers and sell-outs, with the summary "
@@ -278,11 +308,30 @@ public class AssistantTools {
                                 """)));
     }
 
-    // A chat app (page "chat") has nothing to highlight, so it doesn't get guide_user.
-    public List<ToolSpec> specs(String page) {
-        return AssistantService.CHAT_PAGE.equals(page)
-                ? specs.stream().filter(spec -> !GUIDE_USER.equals(spec.name())).toList()
-                : specs;
+    // A chat app (page "chat") has nothing to highlight, so it doesn't get guide_user. A stall
+    // without documents doesn't get search_documents, so nothing changes for it.
+    public List<ToolSpec> specs(String page, boolean hasDocuments) {
+        return specs.stream()
+                .filter(spec -> !(AssistantService.CHAT_PAGE.equals(page) && GUIDE_USER.equals(spec.name())))
+                .filter(spec -> hasDocuments || !SEARCH_DOCUMENTS.equals(spec.name()))
+                .toList();
+    }
+
+    // search_documents, kept out of execute's transaction so no database connection waits on the
+    // embedding call. Searches only the signed-in owner's documents.
+    public String searchDocuments(ToolCall call, TurnContext context) {
+        String query = call.arguments().path("query").asString("").strip();
+        if (query.isEmpty()) {
+            return jsonMapper.writeValueAsString(error("Give a query."));
+        }
+        List<DocumentSearch.Hit> hits = documentRetriever.retrieve(context.ownerId, query);
+        context.addDocuments(hits, "tool");
+        ObjectNode output = jsonMapper.createObjectNode();
+        output.set("results", jsonMapper.readTree(documentRetriever.json(hits)));
+        if (hits.isEmpty()) {
+            output.put("note", "Nothing in the owner's documents matches. Say the documents don't cover it.");
+        }
+        return jsonMapper.writeValueAsString(output);
     }
 
     // Returns the function_call_output text for the model. Problems are reported back to the

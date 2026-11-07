@@ -74,6 +74,11 @@ public class AssistantInteraction {
 
     private Integer outputTokens;
 
+    // The document chunks retrieved for this message and the documents the reply cited (JSON); null
+    // when the stall has no documents. See V40.
+    @Column(length = 8000)
+    private String retrievalJson;
+
     protected AssistantInteraction() {
     }
 
@@ -108,6 +113,14 @@ public class AssistantInteraction {
             cachedTokens = (int) usage.cachedTokens();
             outputTokens = (int) usage.outputTokens();
         }
+    }
+
+    public void recordRetrieval(String retrievalJson) {
+        this.retrievalJson = retrievalJson;
+    }
+
+    public String getRetrievalJson() {
+        return retrievalJson;
     }
 
     public Integer getInputTokens() {

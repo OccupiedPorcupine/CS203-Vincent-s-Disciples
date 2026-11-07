@@ -13,6 +13,8 @@ public interface StallDocumentRepository extends JpaRepository<StallDocument, Lo
 
     long countByOwnerId(Long ownerId);
 
+    boolean existsByOwnerIdAndIndexStatus(Long ownerId, StallDocument.IndexStatus indexStatus);
+
     @Query("select d.id from StallDocument d where d.indexStatus = :status")
     List<Long> findIdsByIndexStatus(StallDocument.IndexStatus status);
 

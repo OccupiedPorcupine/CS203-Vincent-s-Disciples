@@ -119,6 +119,9 @@
 .assistant-message.assistant { background: var(--neutral-soft, #f1f4f5); }
 .assistant-message.user { margin-left: auto; color: #fff; background: var(--assistant-teal); }
 .assistant-message.error { color: var(--assistant-error); background: var(--error-soft, #fdecea); }
+/* The documents a reply came from, under it. */
+.assistant-sources { max-width: 85%; margin: -4px 0 10px; font-size: 13px; color: var(--assistant-muted); overflow-wrap: anywhere; }
+.assistant-sources a { color: var(--assistant-teal); text-underline-offset: 2px; }
 
 .assistant-card {
   margin: 0 0 12px;

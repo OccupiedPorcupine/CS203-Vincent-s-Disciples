@@ -257,6 +257,7 @@
       debug("reply", { proposal: response.proposal?.id ?? null, guideSteps: response.guide?.length ?? 0 });
       showUsage(response.usage);
       addMessage("assistant", response.reply);
+      if (response.sources?.length) addSources(response.sources);
       if (response.proposal) addConfirmCard(response.proposal);
       if (response.guide?.length && window.chickyGuide) {
         // The tour reads its own steps aloud.
@@ -826,6 +827,20 @@
     const message = element("p", `assistant-message ${kind}`);
     message.textContent = text;
     log.append(message);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // "From: Ah Huat Poultry", linking to each document the reply came from (issue #153).
+  function addSources(sources) {
+    const line = element("p", "assistant-sources");
+    line.append("From: ");
+    sources.forEach((source, index) => {
+      if (index) line.append(", ");
+      const link = element("a", "", { href: `documents.html#document-${source.documentId}` });
+      link.textContent = source.title;
+      line.append(link);
+    });
+    log.append(line);
     log.scrollTop = log.scrollHeight;
   }
 
