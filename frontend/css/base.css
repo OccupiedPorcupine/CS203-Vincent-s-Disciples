@@ -287,6 +287,30 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .form-actions .status-text { flex: 1 1 240px; margin: 0; }
 .form-actions .status-text:empty { display: none; }
 
+/* A file picker you can also drop a file on (Data ingestion, Documents): a <label> around a hidden file input. */
+.drop-zone {
+  position: relative;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+.drop-zone:hover, .drop-zone.dragging { border-color: var(--teal); background: var(--teal-tint); }
+.drop-zone:focus-within { outline: 2px solid var(--teal); outline-offset: 2px; }
+.drop-zone input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.drop-zone strong { font-weight: 400; }
+.drop-hint { color: var(--muted); font-size: var(--text-sm); }
+.upload-mark { width: 28px; height: 28px; color: var(--teal-strong); }
+
 /* Small labels, e.g. "Used by active model" */
 .tag {
   display: inline-block;

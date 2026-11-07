@@ -3,6 +3,7 @@ package app.exception;
 import app.account.InvalidAccountTokenException;
 import app.account.TooManyRequestsException;
 import app.assistant.AssistantException;
+import app.document.DocumentException;
 import app.dto.ErrorResponse;
 import app.dto.SalesImportErrorResponse;
 import app.salesimport.SalesImportException;
@@ -63,6 +64,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(AssistantException.class)
     public ResponseEntity<ErrorResponse> assistantError(AssistantException exception) {
         log.warn("Assistant request failed: {} {} ({})", exception.getStatus().value(), exception.getCode(), exception.getMessage());
+        return ResponseEntity.status(exception.getStatus())
+                .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(DocumentException.class)
+    public ResponseEntity<ErrorResponse> documentError(DocumentException exception) {
         return ResponseEntity.status(exception.getStatus())
                 .body(new ErrorResponse(exception.getCode(), exception.getMessage()));
     }
