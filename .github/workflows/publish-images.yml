@@ -1,0 +1,95 @@
+name: Publish AWS images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-aws-images
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    name: Run CI
+    if: >-
+      github.repository == 'OccupiedPorcupine/CS203-Vincent-s-Disciples'
+      && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish ${{ matrix.service }}
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: web
+            context: .
+            dockerfile: deploy/aws/web.Dockerfile
+          - service: backend
+            context: backend
+            dockerfile: backend/Dockerfile
+          - service: ml
+            context: ml
+            dockerfile: ml/Dockerfile
+
+    env:
+      IMAGE_REGISTRY: ghcr.io/occupiedporcupine
+      RELEASE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Check out the tested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" |
+            docker login ghcr.io \
+              --username "$GITHUB_ACTOR" \
+              --password-stdin
+
+      - name: Build image
+        env:
+          SERVICE: ${{ matrix.service }}
+          BUILD_CONTEXT: ${{ matrix.context }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --file "$DOCKERFILE" \
+            --tag "$IMAGE_REGISTRY/chicky-$SERVICE:$RELEASE_TAG" \
+            "$BUILD_CONTEXT"
+
+      - name: Push image
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          docker push "$IMAGE_REGISTRY/chicky-$SERVICE:$RELEASE_TAG"
+
+      - name: Record published image
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          printf '%s\n' \
+            "Published: \`$IMAGE_REGISTRY/chicky-$SERVICE:$RELEASE_TAG\`" \
+            >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Log out
+        if: always()
+        run: docker logout ghcr.io
