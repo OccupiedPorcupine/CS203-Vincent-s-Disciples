@@ -8,6 +8,8 @@ import app.assistant.guide.AppGuide;
 import app.assistant.guide.GuideRetriever;
 import app.assistant.guide.GuideStep;
 import app.dish.Dish;
+import app.document.DocumentRetriever;
+import app.document.DocumentSearch;
 import app.dish.DishAlias;
 import app.dish.DishRepository;
 import app.dto.*;
@@ -73,6 +75,7 @@ public class AssistantService {
     private final AppGuide appGuide;
     private final SpeechCache speechCache;
     private final DishPriceService priceService;
+    private final DocumentRetriever documentRetriever;
     private final JsonMapper jsonMapper;
     private final Clock clock;
     private final String baseUrl;
@@ -84,7 +87,8 @@ public class AssistantService {
                             DishService dishService, DailySaleService dailySaleService,
                             DishAliasService dishAliasService, StallClosureService stallClosureService,
                             GuideRetriever guideRetriever, AppGuide appGuide,
-                            SpeechCache speechCache, DishPriceService priceService, JsonMapper jsonMapper, Clock clock,
+                            SpeechCache speechCache, DishPriceService priceService, DocumentRetriever documentRetriever,
+                            JsonMapper jsonMapper, Clock clock,
                             @Value("${app.base-url}") String baseUrl) {
         this.modelClient = modelClient;
         this.tools = tools;
@@ -103,6 +107,7 @@ public class AssistantService {
         this.appGuide = appGuide;
         this.speechCache = speechCache;
         this.priceService = priceService;
+        this.documentRetriever = documentRetriever;
         this.jsonMapper = jsonMapper;
         this.clock = clock;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
@@ -212,6 +217,7 @@ public class AssistantService {
         LocalDate today = LocalDate.now(clock);
 
         List<JsonNode> items = conversations.load(ownerId, conversationId);
+        String previousUserText = lastUserText(items);
         ObjectNode userMessage = jsonMapper.createObjectNode();
         userMessage.put("role", "user");
         userMessage.put("content", request.text().strip());
@@ -226,12 +232,22 @@ public class AssistantService {
                 .put("dish_id", request.forecast().dishId())
                 .put("date", request.forecast().date().toString());
 
+        // The owner's documents (issue #153): the previous message too, so "and for eggs?" still finds suppliers.
+        AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
+        boolean hasDocuments = documentRetriever.hasDocuments(ownerId);
+        String documentsSection = "";
+        if (hasDocuments) {
+            List<DocumentSearch.Hit> retrieved = documentRetriever.retrieve(ownerId,
+                    previousUserText == null ? request.text() : previousUserText + "\n" + request.text());
+            context.addDocuments(retrieved, "message");
+            documentsSection = AssistantPrompt.documents(documentRetriever.json(retrieved));
+        }
+
         boolean chat = CHAT_PAGE.equals(request.page());
         String instructions = AssistantPrompt.build(today, request.page(), tools.listDishes(ownerId, today).toString(),
                 guideRetriever.context(request.text(), request.page()),
                 chat ? appGuide.links(baseUrl) : jsonMapper.writeValueAsString(pageElements),
-                tools.closures(ownerId, today).toString(), String.valueOf(shownForecast));
-        AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
+                tools.closures(ownerId, today).toString(), String.valueOf(shownForecast), documentsSection);
         String reply = null;
         List<String> toolsCalled = new ArrayList<>();
         int modelCalls = 0;
@@ -239,7 +255,7 @@ public class AssistantService {
 
         for (int call = 0; call < MAX_MODEL_CALLS && reply == null; call++) {
             modelCalls++;
-            ModelResponse response = modelClient.respond(instructions, items, tools.specs(request.page()));
+            ModelResponse response = modelClient.respond(instructions, items, tools.specs(request.page(), hasDocuments));
             tokens = tokens.plus(response.usage());
             items.addAll(response.outputItems());
 
@@ -251,7 +267,8 @@ public class AssistantService {
                 ObjectNode output = jsonMapper.createObjectNode();
                 output.put("type", "function_call_output");
                 output.put("call_id", toolCall.callId());
-                output.put("output", tools.execute(toolCall, context));
+                output.put("output", AssistantTools.SEARCH_DOCUMENTS.equals(toolCall.name())
+                        ? tools.searchDocuments(toolCall, context) : tools.execute(toolCall, context));
                 items.add(output);
             }
         }
@@ -269,6 +286,13 @@ public class AssistantService {
         String proposalType = proposal != null || closures != null ? "SALES" : priceChange != null ? "PRICE" : null;
         conversations.save(ownerId, conversationId, items);
 
+        // [doc:N] tags become sources, and only for documents found this turn (so for this owner).
+        Map<Long, String> found = new LinkedHashMap<>();
+        context.documents().forEach(chunk -> found.putIfAbsent(chunk.hit().documentId(), chunk.hit().title()));
+        DocumentRetriever.Cited cited = DocumentRetriever.cite(reply, found);
+        reply = cited.text().isBlank() ? "Sorry, I couldn't work that out. Please try again." : cited.text();
+        List<DocumentSource> sources = cited.documentIds().stream().map(id -> new DocumentSource(id, found.get(id))).toList();
+
         AssistantInteraction record = new AssistantInteraction(
                 users.getReferenceById(ownerId),
                 conversationId,
@@ -285,16 +309,17 @@ public class AssistantService {
                 closures == null ? null : jsonMapper.writeValueAsString(closures),
                 clock.instant());
         record.recordTokens(tokens);
+        if (hasDocuments) record.recordRetrieval(retrievalJson(context, cited.documentIds()));
         AssistantInteraction interaction = interactions.save(record);
         usage.recordTokens(ownerId, tokens);
 
-        log.info("Message from user {} ({}, page {}, {} characters, {}): {} model calls ({} tokens in, {} cached, {} out), tools {}, proposal {}, guide {} steps, {} ms",
+        log.info("Message from user {} ({}, page {}, {} characters, {}): {} model calls ({} tokens in, {} cached, {} out), tools {}, proposal {}, guide {} steps, {} document chunks, sources {}, {} ms",
                 ownerId, request.inputMode() == null ? "text" : request.inputMode(), request.page(), request.text().strip().length(), interaction.getDetectedLanguages(),
                 modelCalls, tokens.inputTokens(), tokens.cachedTokens(), tokens.outputTokens(), toolsCalled, proposalType == null ? "none"
                         : "PRICE".equals(proposalType) ? "#" + interaction.getId() + " price of dish " + priceChange.dishId()
                         : "#" + interaction.getId() + " with " + (proposal == null ? 0 : proposal.size()) + " entries and "
                                 + (closures == null ? 0 : closures.size()) + " closures",
-                guide == null ? 0 : guide.size(), millisSince(started));
+                guide == null ? 0 : guide.size(), context.documents().size(), cited.documentIds(), millisSince(started));
         log.debug("Message from user {}: {} -> {}", ownerId, request.text().strip(), reply);
 
         boolean sales = "SALES".equals(proposalType);
@@ -303,7 +328,32 @@ public class AssistantService {
                 sales ? (proposal == null ? List.of() : proposal) : null,
                 sales ? (closures == null ? List.of() : closures) : null,
                 priceChange, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
-        return new AssistantMessageResponse(conversationId, reply, proposalView, guide, usage.today(ownerId));
+        return new AssistantMessageResponse(conversationId, reply, proposalView, guide, sources, usage.today(ownerId));
+    }
+
+    // {"retrieved": [{chunk, document, score, via}], "cited": [document IDs]}, kept with the
+    // interaction so retrieval can be measured (#155) and wrong answers traced.
+    private String retrievalJson(AssistantTools.TurnContext context, List<Long> cited) {
+        ObjectNode json = jsonMapper.createObjectNode();
+        var retrieved = json.putArray("retrieved");
+        context.documents().forEach(chunk -> retrieved.addObject()
+                .put("chunk", chunk.hit().chunkId())
+                .put("document", chunk.hit().documentId())
+                .put("score", Math.round(chunk.hit().score() * 1000) / 1000.0)
+                .put("via", chunk.via()));
+        var citedIds = json.putArray("cited");
+        cited.forEach(citedIds::add);
+        String text = jsonMapper.writeValueAsString(json);
+        return text.length() <= 8000 ? text : null;
+    }
+
+    private static String lastUserText(List<JsonNode> items) {
+        for (JsonNode item : items.reversed()) {
+            if ("user".equals(item.path("role").asString())) {
+                return item.path("content").asString();
+            }
+        }
+        return null;
     }
 
     // Saves a proposal, as proposed or as the user edited it. Confirming again returns the same

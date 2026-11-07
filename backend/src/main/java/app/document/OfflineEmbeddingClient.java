@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.CRC32;
@@ -15,6 +16,12 @@ public class OfflineEmbeddingClient implements EmbeddingClient {
 
     private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
     private static final Pattern HAN = Pattern.compile("\\p{IsHan}");
+    // Words too common to say what a text is about.
+    private static final Set<String> STOP_WORDS = Set.of(
+            "the", "and", "for", "you", "your", "are", "was", "were", "with", "from", "this", "that", "what", "when",
+            "who", "how", "where", "which", "why", "can", "does", "did", "have", "has", "not", "but", "all", "any",
+            "our", "their", "they", "them", "there", "then", "than", "into", "about", "will", "would", "should",
+            "must", "its", "his", "her", "one", "get", "got", "need", "want", "tell", "say", "said", "also", "just");
 
     private final int dimensions;
 
@@ -53,7 +60,7 @@ public class OfflineEmbeddingClient implements EmbeddingClient {
             if (HAN.matcher(token).find()) {
                 // Chinese has no spaces: count each character.
                 token.codePoints().forEach(codePoint -> vector[bucket(new String(Character.toChars(codePoint)))]++);
-            } else if (token.length() > 2) {
+            } else if (token.length() > 2 && !STOP_WORDS.contains(token)) {
                 vector[bucket(token.replaceAll("(?<=...)(s|es|ing|ed)$", ""))]++;
             }
         }
