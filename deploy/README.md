@@ -1,6 +1,12 @@
 # Deployment
 
-The app is hosted on Vercel's free Hobby plan as one project, `chicky`. `vercel.json` defines three [services](https://vercel.com/docs/services), all running in Singapore (`sin1`), next to the Supabase database.
+The app runs in two places, both using the same Supabase Production database:
+- **AWS EC2**, the main site, at `https://chicky-app.duckdns.org`, from `deploy/aws` (#156);
+- **Vercel**, the backup, at `https://chicky-zeta.vercel.app`.
+
+[Two hosts](#two-hosts-vercel-and-ec2) explains how they can drift apart. The rest of this file is about Vercel.
+
+On Vercel the app is hosted on the free Hobby plan as one project, `chicky`. `vercel.json` defines three [services](https://vercel.com/docs/services), all running in Singapore (`sin1`), next to the Supabase database.
 
 | Service | Folder | Runs as | Reachable at |
 |---|---|---|---|
@@ -15,8 +21,9 @@ Contents:
 1. [How it behaves](#how-it-behaves)
 2. [Environment variables](#environment-variables)
 3. [Deploying](#deploying)
-4. [Things to know](#things-to-know)
-5. [Assistant costs and limits](#assistant-costs-and-limits)
+4. [Two hosts: Vercel and EC2](#two-hosts-vercel-and-ec2)
+5. [Things to know](#things-to-know)
+6. [Assistant costs and limits](#assistant-costs-and-limits)
 
 ## How it behaves
 
@@ -79,6 +86,76 @@ Without the `SPRING_PROFILES_ACTIVE` and database variables, the backend uses an
 - **By hand:** run `vercel deploy` from the repository root for a preview, or `vercel deploy --prod` for production. `.vercelignore` keeps local `.env` files and build output out of the upload.
 
 Previews are protected by Vercel login. To call a protected preview from a script or a terminal, use `vercel curl /api/config --deployment <preview url>`.
+
+## Two hosts: Vercel and EC2
+
+Since 7 November 2026 the app also runs on one AWS EC2 instance. EC2 is the main site, and Vercel is kept as the backup.
+
+`deploy/aws/compose.yaml` runs four containers on the instance:
+- **Caddy** handles HTTPS on ports 80 and 443.
+- **`web`** is Nginx. It serves the pages and passes `/api/*` to the backend.
+- **`backend`** and **`ml`** are the same apps as on Vercel.
+
+The images come from ECR, tagged `RELEASE_TAG`. The settings are in `deploy/aws/.env` on the instance; `deploy/aws/.env.example` is the template.
+
+**Both hosts use the same Supabase Production database.** So the data is the same on both, and every difference below comes from the code or the settings.
+
+### How they can drift apart
+
+**Code.** Vercel deploys every merge to `main`. EC2 runs whatever images `RELEASE_TAG` points at. #156 doesn't publish those automatically, so until a pipeline does, EC2 changes only when someone deploys a new release. Even with a pipeline on each side, the two finish at different times, and one can fail while the other succeeds. Neither tells you about the other.
+
+**Migrations.** Flyway runs when a backend starts, so whichever host deploys a new migration first applies it to the shared database. Until the other host catches up, it runs older code against the newer tables:
+- Adding a table, or a column that is nullable or has a default, is safe.
+- Renaming or dropping a column, or adding a `NOT NULL` column without a default, breaks the older host.
+
+While both hosts are live, split such a change across two releases. Add the new column in the first. Remove the old one in a later release, once both hosts run the code that no longer uses it.
+
+An older backend that restarts still starts. Flyway ignores applied migrations it doesn't have yet (its default `ignoreMigrationPatterns` is `*:future`).
+
+**Settings.** Vercel keeps its environment variables in the project settings. EC2 takes some from `deploy/aws/.env` and has others written into `compose.yaml`. So a new setting has to be added on both hosts. As of 8 November 2026, these differ:
+
+| Setting | Vercel Production | EC2 |
+|---|---|---|
+| `prod` profile | Off: `APP_CORS_ALLOWED_ORIGINS` isn't set (#109) | On |
+| Assistant | OpenAI | `offline`, unless `ASSISTANT_PROVIDER` is set in `.env` |
+| Hawker centre closure sync | On | Off (`HAWKER_CENTRE_SYNC_ENABLED=false` in `compose.yaml`) |
+| ML service | Private, through Vercel's service binding | On the Compose network only, and it checks `ML_SHARED_SECRET` |
+| Telegram | Token, username and webhook secret set | `compose.yaml` passes only `TELEGRAM_BOT_TOKEN`. Without `TELEGRAM_BOT_USERNAME` and `TELEGRAM_WEBHOOK_SECRET`, the bot refuses every webhook call |
+| Security headers | `vercel.json` | `deploy/aws/nginx.conf` |
+
+**Things only one host can have.** Point each of these at the main site:
+- **The Telegram webhook.** A bot sends updates to a single URL. `POST /api/admin/telegram/webhook` registers the address of the host it's called on, so the last host to call it gets the bot.
+- **The chat reminders.** `.github/workflows/chat-reminders.yml` calls `https://chicky-zeta.vercel.app`. One call reminds every owner, because the database is shared, so don't add a second job for the other host: owners would get every reminder twice. To move it to EC2, change the URL and set the same `CRON_SECRET` in `deploy/aws/.env`.
+
+`prune-container-images.yml` only concerns Vercel's registry, so its health check stays on Vercel.
+
+**Jobs inside the backend.** The public holiday sync (on startup and monthly) and the hawker centre closure sync (daily, and on startup when stale) run on every host where they're on. Both rewrite public data from data.gov.sg, so running them on both hosts is harmless.
+
+**What users notice.**
+- Sign-in cookies belong to a domain, so signing in on one host doesn't sign you in on the other. The data is the same on both.
+- Google sign-in needs both addresses among the OAuth client's authorized JavaScript origins.
+- Password reset and verification emails link to the `APP_BASE_URL` of the host that sent them.
+- Login rate limits are counted separately on each host.
+
+### After each merge
+
+Check that both hosts are up:
+
+```bash
+curl -s https://chicky-app.duckdns.org/api/health
+curl -s https://chicky-zeta.vercel.app/api/health   # up to ~15 s if Vercel was asleep
+```
+
+After a merge that adds a migration, make sure both hosts run the new code before merging the next one.
+
+### Failing over to Vercel
+
+If EC2 is down:
+1. Use `https://chicky-zeta.vercel.app`. It already works against the same data.
+2. Move Telegram: sign in on Vercel as an admin and call `POST /api/admin/telegram/webhook` (see [Environment variables](#environment-variables)).
+3. Check the reminders job is calling Vercel.
+
+To move back to EC2, do the same steps on EC2.
 
 ## Things to know
 
