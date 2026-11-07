@@ -14,6 +14,7 @@ import app.dto.PrepListResponse;
 import app.dto.ProposalEntryInput;
 import app.document.DocumentRetriever;
 import app.document.DocumentSearch;
+import app.document.DocumentService;
 import app.exception.InvalidForecastDateException;
 import app.exception.StallClosedException;
 import app.holiday.PublicHoliday;
@@ -72,6 +73,8 @@ public class AssistantTools {
     private static final int EXPLAIN_RECENT_DAYS = 7;
     static final String GET_WEEKLY_SUMMARY = "get_weekly_summary";
     static final String SEARCH_DOCUMENTS = "search_documents";
+    static final String PROPOSE_NOTE = "propose_note";
+    static final int MAX_NOTE_TEXT = 2000;
     private static final int MAX_SALES_DAYS = 120;
     private static final int MAX_GUIDE_STEPS = 8;
     private static final int MAX_STEP_MESSAGE = 240;
@@ -88,6 +91,7 @@ public class AssistantTools {
     private final PublicHolidayRepository holidayRepository;
     private final AppGuide appGuide;
     private final DocumentRetriever documentRetriever;
+    private final DocumentService documentService;
     private final JsonMapper jsonMapper;
     private final List<ToolSpec> specs;
 
@@ -103,6 +107,7 @@ public class AssistantTools {
         ProposedPrice priceChange;
         List<ProposedClosure> closures;
         List<GuideStep> guide;
+        ProposedNote note;
         // Document chunks found this turn, with the message or by search_documents (issue #153).
         final List<RetrievedChunk> documents = new ArrayList<>();
 
@@ -129,6 +134,10 @@ public class AssistantTools {
             return guide;
         }
 
+        public ProposedNote note() {
+            return note;
+        }
+
         public List<RetrievedChunk> documents() {
             return documents;
         }
@@ -146,7 +155,7 @@ public class AssistantTools {
                           DishPriceService priceService, StallClosureService stallClosureService,
                           PrepListService prepListService, ForecastService forecastService,
                           WeeklySummaryService weeklySummaryService, PublicHolidayRepository holidayRepository, AppGuide appGuide,
-                          DocumentRetriever documentRetriever, JsonMapper jsonMapper) {
+                          DocumentRetriever documentRetriever, DocumentService documentService, JsonMapper jsonMapper) {
         this.dishRepository = dishRepository;
         this.dishAliasRepository = dishAliasRepository;
         this.dailySaleRepository = dailySaleRepository;
@@ -159,6 +168,7 @@ public class AssistantTools {
         this.holidayRepository = holidayRepository;
         this.appGuide = appGuide;
         this.documentRetriever = documentRetriever;
+        this.documentService = documentService;
         this.jsonMapper = jsonMapper;
         this.specs = List.of(
                 new ToolSpec(LIST_DISHES,
@@ -299,6 +309,18 @@ public class AssistantTools {
                                  "required": ["query"],
                                  "additionalProperties": false}
                                 """)),
+                new ToolSpec(PROPOSE_NOTE,
+                        "Show the owner a confirm card that saves a note to their documents, for something they asked you "
+                                + "to remember or note. This does NOT save anything; the owner confirms. Not for a dish's other "
+                                + "name, closed days or trading hours, which have their own tools.",
+                        schema("""
+                                {"type": "object",
+                                 "properties": {
+                                   "title": {"type": "string", "description": "A short title, a few words"},
+                                   "text": {"type": "string", "description": "The note in the owner's words, tidied but with the same meaning"}},
+                                 "required": ["title", "text"],
+                                 "additionalProperties": false}
+                                """)),
                 new ToolSpec(GET_WEEKLY_SUMMARY,
                         "Get the summary of the user's latest 7 days of sales, as on the dashboard: portions against the "
                                 + "week before, revenue, the best-selling dish, leftovers and sell-outs, with the summary "
@@ -351,6 +373,7 @@ public class AssistantTools {
                 case GET_PREP_LIST -> getPrepList(call.arguments(), context);
                 case EXPLAIN_FORECAST -> explainForecast(call.arguments(), context);
                 case GET_WEEKLY_SUMMARY -> jsonMapper.valueToTree(weeklySummaryService.weekly(context.ownerId));
+                case PROPOSE_NOTE -> proposeNote(call.arguments(), context);
                 default -> error("Unknown tool " + call.name());
             };
             return jsonMapper.writeValueAsString(result);
@@ -658,6 +681,30 @@ public class AssistantTools {
         output.put("ok", true);
         output.set("closures", jsonMapper.valueToTree(closures));
         output.put("note", "Shown to the user on the confirm card. Not saved until they confirm.");
+        return output;
+    }
+
+    // A note to save to the owner's documents (issue #154). Only shown on a card; nothing is saved.
+    private JsonNode proposeNote(JsonNode arguments, TurnContext context) {
+        String title = arguments.path("title").asString("").strip().replaceAll("\\s+", " ");
+        String text = arguments.path("text").asString("").strip();
+        List<String> problems = new ArrayList<>();
+        if (title.isEmpty() || title.length() > DocumentService.MAX_TITLE) problems.add("The title must be 1 to " + DocumentService.MAX_TITLE + " characters.");
+        if (text.isEmpty() || text.length() > MAX_NOTE_TEXT) problems.add("The note must be 1 to " + MAX_NOTE_TEXT + " characters.");
+        if (!documentService.hasRoom(context.ownerId)) {
+            problems.add("The owner already has " + DocumentService.MAX_DOCUMENTS + " documents, the most allowed. Tell them to "
+                    + "delete one or add this to an existing document on the Documents page.");
+        }
+        ObjectNode output = jsonMapper.createObjectNode();
+        if (!problems.isEmpty()) {
+            output.put("ok", false);
+            ArrayNode list = output.putArray("problems");
+            problems.forEach(list::add);
+            return output;
+        }
+        context.note = new ProposedNote(null, title, text);
+        output.put("ok", true);
+        output.put("note", "Shown to the owner on a confirm card. Not saved until they confirm.");
         return output;
     }
 

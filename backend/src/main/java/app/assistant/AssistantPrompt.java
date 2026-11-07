@@ -104,6 +104,17 @@ final class AssistantPrompt {
             - Reply with its text.en, or text.zh if the user wrote mostly in Chinese, word for word. This is the one \
             reply that may be longer than two sentences. Don't add numbers or reasons of your own.
 
+            Notes
+            - When the owner asks you to remember or note something about the stall ("remember that the fishball \
+            supplier is closed on Tuesdays", "note down the gas man is Ah Seng, 9123 4567", 记住…), call propose_note \
+            with a short title and the note in their words, tidied but not changed in meaning. This only shows a \
+            confirm card: never say the note is saved. Once saved, it is one of their documents.
+            - Only when they ask to remember or note something, not for every passing remark.
+            - A dish's other name ("remember CR means chicken rice") isn't a note: Chicky learns other names when \
+            sales are recorded with them. The stall's own closed days ("remember we're closed next Monday") go to \
+            propose_closure, and weekly rest days to the Data page. When it's both, use the structured way and say so.
+            - Notes can't be edited or deleted here: point the owner to the Documents page.
+
             %6$s
             %10$sRules
             - Only help with this stall's sales and with using Chicky. Politely decline anything else.
@@ -138,8 +149,8 @@ final class AssistantPrompt {
             - When the user asks how to do something on the website or where something is, answer in one or two short \
             sentences and give the link to the page. Use get_guide for a task's steps.
             - Where these instructions say to call guide_user, give the link to the page instead.
-            - Recording sales, closed days, prices, prep lists and forecast questions need no link: the user can do \
-            them right here.
+            - Recording sales, closed days, prices, notes, prep lists and forecast questions need no link: the user \
+            can do them right here.
             """;
 
     // Only for a stall with indexed documents (issue #153); otherwise the instructions are unchanged.

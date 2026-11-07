@@ -4,7 +4,7 @@
   "shared": [
     {
       "guideId": "assistant-button",
-      "description": "Round mic button in the bottom-right corner of every page. Opens the assistant, where the user can say or type their sales."
+      "description": "Round mic button in the bottom-right corner of every page. Opens the assistant, where the user can say or type their sales, ask about their own documents, or say \"remember that ...\" to save a note to Documents after confirming."
     }
   ],
   "pages": [

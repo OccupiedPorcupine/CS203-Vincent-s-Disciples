@@ -28,9 +28,9 @@ public class DocumentService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentService.class);
 
-    static final int MAX_DOCUMENTS = 30;
+    public static final int MAX_DOCUMENTS = 30;
     static final int MAX_CHARACTERS = 100_000;
-    static final int MAX_TITLE = 120;
+    public static final int MAX_TITLE = 120;
     static final long MAX_FILE_BYTES = 5L * 1024 * 1024;
 
     private static final Pattern CONTROL = Pattern.compile("[\\p{Cc}&&[^\\n\\t]]");
@@ -64,6 +64,15 @@ public class DocumentService {
 
     public DocumentResponse create(Long ownerId, String title, String body) {
         return indexed(ownerId, save(ownerId, title, body, Source.TYPED, null));
+    }
+
+    // A note the owner confirmed in the assistant (issue #154), indexed straight away.
+    public DocumentResponse createNote(Long ownerId, String title, String text) {
+        return indexed(ownerId, save(ownerId, title, text, Source.ASSISTANT, null));
+    }
+
+    public boolean hasRoom(Long ownerId) {
+        return documents.countByOwnerId(ownerId) < MAX_DOCUMENTS;
     }
 
     // The original file isn't kept: only its text, which the owner can then edit.
