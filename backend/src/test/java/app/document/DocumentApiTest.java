@@ -180,6 +180,19 @@ class DocumentApiTest {
     }
 
     @Test
+    void searchReturnsOnlyTheOwnersPartsWithScores() throws Exception {
+        Session ownerA = signUp();
+        Session ownerB = signUp();
+        ownerA.json("POST", "/api/documents", "{\"title\":\"Ah Huat Poultry\",\"body\":\"Order chicken by 9pm.\"}");
+
+        JsonNode forA = JSON.readTree(ownerA.get("/api/documents/search?q=order%20chicken").body());
+        assertEquals(1, forA.size());
+        assertEquals("Ah Huat Poultry", forA.get(0).path("title").asString());
+        assertTrue(forA.get(0).path("score").asDouble() > 0);
+        assertEquals(0, JSON.readTree(ownerB.get("/api/documents/search?q=order%20chicken&all=true").body()).size());
+    }
+
+    @Test
     void documentsNeedASignedInUser() throws Exception {
         assertEquals(401, new Session().get("/api/documents").statusCode());
     }

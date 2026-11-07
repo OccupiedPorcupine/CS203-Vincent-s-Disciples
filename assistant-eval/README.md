@@ -57,6 +57,26 @@ To test speech recognition as well, record a case and save it as `audio/<case id
 Recordings can be made in the browser's voice memo apps or with QuickTime. Ask before
 committing anyone's voice.
 
+## Stall documents (RAG)
+
+`run_rag_eval.py` measures the stall documents feature (#150–#155): retrieval, answers with
+citations, uncovered questions, conflicts with the app's data, prompt injection inside a document,
+and notes. It replaces the documents of `eval-rag@chicky.test` with the nine fixtures in
+`documents/` (the festive-period notes go up as a PDF the script makes), runs the 34 cases in
+`rag_cases.json`, and checks that no document, closed day or sale was saved. It then sweeps the
+similarity floor and k from unfiltered search scores, and sends the same questions from
+`eval-rag-nodocs@chicky.test` for the cost comparison. Results go to `results/<date>-<model>-rag.md`
+and `.json`. A run is about 60 messages.
+
+```bash
+python3 assistant-eval/run_rag_eval.py --api http://localhost:8080
+```
+
+For tokens and cost with and without documents, run the backend on a file database (as below) and
+then `rag_report.sql`. The write-up, with the threshold decision, is in
+[REPORT.md](REPORT.md#stall-documents-rag). Scan results for keys (`sk-[A-Za-z0-9]{20,}`) before
+pushing them.
+
 ## Real use
 
 Every message to the assistant is logged in `assistant_interactions`, with its outcome, time and
@@ -96,3 +116,4 @@ java -cp ~/.m2/repository/com/h2database/h2/2.4.240/h2-2.4.240.jar org.h2.tools.
 | 2026-11-02 | `gpt-6-luna` | 68/72 | 0 | Sold-out times and leftovers (#50): 8/8. en-05 and zh-08 ("on Monday") fail because the run was on a Monday, so the expected date is ambiguous; ask-01 as before; prep-03 because the eval account has no prep list. |
 | 2026-11-03 | `gpt-6-luna` | 76/77, then explain 6/6 | 0 | With `explain_forecast` (#55) and its prompt section. Full run 76/77, explain 5/5: every reply quoted only the real inputs (e.g. "the average of your last 4 Wednesdays: 52, 48, 55 and 50") and said weather and holidays weren't used; "is it because of the rain?" and "got event nearby is it" were both answered no. The explain cases were rerun after adding "why is the range so wide?" and the range's explanation to the tool: 6/6. The one failure is `ask-01` as before. |
 | 2026-11-04 | `gpt-6-luna` | 77/78 | 0 | A repeat of the full set, to see how much a run varies. The only failure is `ask-01` again (5 of 6 runs). Run against a file database, so `interactions_report.sql` could measure it: a median of 3.1 s per message on the server (90th percentile 4.4 s), and about US$0.00017 of language model per typed message, with 96% of input tokens cached. |
+| 2026-11-08 | `gpt-6-luna` | RAG 34/34 (33/34 at floor 0.30) | 0 | Stall documents (#155), `run_rag_eval.py`: hit rate@5 18/18, answers and citations 18/18, uncovered questions 4/4, conflicts 2/2, injection 3/3, notes 7/7. The similarity floor went from 0.30 to 0.25 after the sweep; see REPORT.md. |

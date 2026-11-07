@@ -338,7 +338,9 @@ public class AssistantService {
                 sales ? (proposal == null ? List.of() : proposal) : null,
                 sales ? (closures == null ? List.of() : closures) : null,
                 priceChange, note, interaction.getCreatedAt().plus(PROPOSAL_LIFETIME));
-        return new AssistantMessageResponse(conversationId, reply, proposalView, guide, sources, usage.today(ownerId));
+        List<RetrievedChunk> retrieved = context.documents().stream().map(chunk -> new RetrievedChunk(chunk.hit().documentId(),
+                chunk.hit().title(), chunk.hit().chunkId(), chunk.hit().score(), chunk.via(), chunk.hit().content())).toList();
+        return new AssistantMessageResponse(conversationId, reply, proposalView, guide, sources, retrieved, usage.today(ownerId));
     }
 
     // {"retrieved": [{chunk, document, score, via}], "cited": [document IDs]}, kept with the

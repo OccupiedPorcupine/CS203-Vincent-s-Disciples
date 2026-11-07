@@ -161,7 +161,8 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
                 return call(AssistantTools.EXPLAIN_FORECAST, arguments);
             }
             JsonNode documents = documentsIn(instructions);
-            boolean documentQuestion = documents != null && DOCUMENT_QUESTION.matcher(text).find();
+            // "Remember we're closed tomorrow" is a closure, not a question for the documents.
+            boolean documentQuestion = documents != null && !remember.matches() && DOCUMENT_QUESTION.matcher(text).find();
             if (documentQuestion && !documents.isEmpty()) {
                 JsonNode best = documents.get(0);
                 return message(quote(best.path("text").asString()) + " [" + best.path("tag").asString() + "]");
