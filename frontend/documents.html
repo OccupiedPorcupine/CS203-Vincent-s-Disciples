@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
+  <style>@view-transition { navigation: auto; }</style>
+  <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
+       follows it), so the page never shows undimmed between steps. Chrome; other browsers ignore it. -->
+  <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
+  <title>Documents · Chicky</title>
+  <!-- Home-screen app (see DESIGN.md, "Phones"). -->
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./images/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./images/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Chicky">
+  <meta name="theme-color" content="#a9dcd6">
+  <!-- Read by js/api.js to reach the backend. -->
+  <meta name="api-base-url" content="http://localhost:8080">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kaisei+HarunoUmi&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/documents.css">
+  <link rel="stylesheet" href="./css/assistant.css">
+  <link rel="stylesheet" href="./css/guide.css">
+</head>
+<body>
+  <header class="topbar">
+    <details class="navigation" data-guide-id="main-menu">
+      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""></summary>
+      <nav class="menu-panel" aria-label="Main navigation">
+        <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
+        <a href="forecast.html" data-guide-id="nav-forecast">Demand forecast</a>
+        <a href="prep.html" data-guide-id="nav-prep">Prep list</a>
+        <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
+        <a href="dishes.html" data-guide-id="nav-dishes">Dishes</a>
+        <a href="documents.html" aria-current="page">Documents</a>
+      </nav>
+    </details>
+    <a class="brand" href="dashboard.html">Chicky</a>
+    <details class="account-menu" data-guide-id="account-menu">
+      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""></summary>
+      <div class="menu-panel">
+        <p class="account-name">Signed in</p>
+        <p class="account-email"></p>
+        <a class="secondary-button account-link" href="account.html">Account and chat apps</a>
+        <button class="secondary-button" type="button" data-action="log-out">Log out</button>
+        <p class="status-text" role="status" aria-live="polite"></p>
+      </div>
+    </details>
+  </header>
+
+  <main class="page">
+    <section class="page-heading">
+      <div>
+        <h1>Documents</h1>
+        <p class="lede">Rules and information only you know, like supplier cut-offs, helper rules or what to do when the gas runs out. Chicky’s assistant answers from them and says which document it used. They don’t change forecasts, prep lists or prices.</p>
+      </div>
+      <span id="document-count" class="tag">0 of 30</span>
+    </section>
+
+    <section id="editor-section" class="card" aria-labelledby="editor-heading" data-guide-id="document-editor">
+      <div class="headline">
+        <h2 id="editor-heading" class="card-title">Add a document</h2>
+        <span id="editor-note" class="note">Write it here, or upload a .txt, .md, .pdf or .docx file of up to 5 MB.</span>
+      </div>
+
+      <div id="editor-mode" class="segmented editor-mode" role="group" aria-label="How to add it" data-guide-id="document-mode">
+        <button type="button" data-mode="write" aria-pressed="true">Write</button>
+        <button type="button" data-mode="upload" aria-pressed="false">Upload a file</button>
+      </div>
+
+      <form id="write-form" class="write-form">
+        <div class="field">
+          <label for="document-title">Title</label>
+          <input id="document-title" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Ah Huat Poultry" required data-guide-id="document-title">
+        </div>
+        <div class="field">
+          <label for="document-body">Text</label>
+          <textarea id="document-body" class="input document-body" maxlength="100000" placeholder="Order by 9pm for next-day delivery. Call 9123 4567. Closed on Tuesdays." required data-guide-id="document-body"></textarea>
+          <span id="body-count" class="field-note">0 of 100,000 characters</span>
+        </div>
+        <div class="form-actions">
+          <p id="write-status" class="status-text" role="status" aria-live="polite"></p>
+          <button id="cancel-edit" class="text-button" type="button" hidden>Cancel</button>
+          <button id="save-document" class="primary-button" type="submit" disabled data-guide-id="save-document">Save document</button>
+        </div>
+      </form>
+
+      <form id="upload-form" class="upload-form" hidden>
+        <label id="drop-zone" class="drop-zone" for="document-file" data-guide-id="document-dropzone">
+          <input id="document-file" name="file" type="file" accept=".txt,.md,.markdown,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+          <svg class="upload-mark" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6.5 9.5 12 4l5.5 5.5M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"/></svg>
+          <strong id="file-label">Choose a file or drop it here</strong>
+          <span class="drop-hint">Only the text is kept, and you can edit it after. A scanned PDF has no text: paste it instead.</span>
+        </label>
+        <div class="form-actions">
+          <p id="upload-status" class="status-text" role="status" aria-live="polite"></p>
+          <button id="remove-file" class="text-button" type="button" hidden>Remove</button>
+          <button id="upload-document" class="primary-button" type="submit" disabled data-guide-id="upload-document">Upload file</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="list-heading" data-guide-id="document-list">
+      <div class="headline">
+        <h2 id="list-heading" class="card-title">Your documents</h2>
+        <span id="list-note" class="note">Loading documents…</span>
+      </div>
+      <ul id="document-list" class="document-list"></ul>
+      <p id="list-status" class="status-text" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script src="js/motion.js"></script>
+  <script src="js/app-shell.js"></script>
+  <script src="js/documents.js"></script>
+  <script src="js/guide.js"></script>
+  <span id="guide-ready" hidden></span>
+  <script src="js/assistant.js"></script>
+</body>
+</html>

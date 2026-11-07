@@ -23,6 +23,7 @@
         <google-api-client.version>2.9.1</google-api-client.version>
         <google-http-client.version>2.2.0</google-http-client.version>
         <poi.version>5.5.1</poi.version>
+        <pdfbox.version>3.0.7</pdfbox.version>
         <!-- Tests tagged "integration" need external services (e.g. the ML API) and are
              skipped by default. Run them with: ./mvnw test -DexcludedGroups= -Dgroups=integration -->
         <excludedGroups>integration</excludedGroups>
@@ -79,6 +80,13 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>${poi.version}</version>
+        </dependency>
+
+        <!-- Reads the text of uploaded .pdf stall documents (issue #151). -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
         </dependency>
 
         <!-- Schema migrations. On Spring Boot 4 the starter is required: flyway-core alone
