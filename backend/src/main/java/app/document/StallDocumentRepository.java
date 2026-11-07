@@ -13,6 +13,9 @@ public interface StallDocumentRepository extends JpaRepository<StallDocument, Lo
 
     long countByOwnerId(Long ownerId);
 
+    @Query("select d.id from StallDocument d where d.indexStatus = :status")
+    List<Long> findIdsByIndexStatus(StallDocument.IndexStatus status);
+
     // The list on the Documents page, without loading every document's text.
     @Query("""
             select d.id as id, d.title as title, d.source as source, d.fileName as fileName,

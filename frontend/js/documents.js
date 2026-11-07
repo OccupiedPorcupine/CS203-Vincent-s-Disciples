@@ -78,6 +78,7 @@ function documentRow(item) {
   actions.className = "document-actions";
   const edit = actionButton("Edit", `Edit ${item.title}`, () => openForEditing(item.id));
   const remove = actionButton("Delete", `Delete ${item.title}`, () => confirmDelete(item, actions));
+  if (item.indexStatus === "FAILED") actions.append(actionButton("Try again", `Index ${item.title} again`, (event) => reindex(item, event.currentTarget)));
   actions.append(edit, remove);
 
   row.append(name, tag, actions);
@@ -113,6 +114,23 @@ function confirmDelete(item, actions) {
   const no = actionButton("Keep", `Keep ${item.title}`, () => renderList());
   actions.replaceChildren(question, yes, no);
   no.focus();
+}
+
+// Embeds a document that couldn't be indexed again (issue #152).
+async function reindex(item, button) {
+  button.disabled = true;
+  button.textContent = "Trying…";
+  try {
+    const result = await apiRequest(`/api/documents/${item.id}/index`, { method: "POST" });
+    showStatus(listStatus, result.indexStatus === "INDEXED"
+      ? `The assistant can search ${item.title} now.`
+      : `${item.title} still couldn’t be indexed. Try again in a few minutes.`, result.indexStatus === "INDEXED" ? "success" : "error");
+    await loadDocuments();
+  } catch (error) {
+    showStatus(listStatus, error.message || "Try again in a moment.", "error");
+    button.disabled = false;
+    button.textContent = "Try again";
+  }
 }
 
 function emptyState() {

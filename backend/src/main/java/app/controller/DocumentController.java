@@ -62,6 +62,13 @@ public class DocumentController {
         return service.update(user.id(), id, request.title(), request.body());
     }
 
+    @Operation(summary = "Index a document again", description = "For a document whose index status is FAILED: "
+            + "embeds its text again so the assistant can search it.")
+    @PostMapping("/{id}/index")
+    public DocumentResponse reindex(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id) {
+        return service.reindex(user.id(), id);
+    }
+
     @Operation(summary = "Delete a document")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long id) {

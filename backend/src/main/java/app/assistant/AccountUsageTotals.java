@@ -5,5 +5,5 @@ public record AccountUsageTotals(
         Long userId, String email, String name, String plan,
         Long messages, Long transcriptions, Long spokenReplies,
         Long inputTokens, Long cachedTokens, Long outputTokens,
-        Long transcribedSeconds, Long spokenCharacters
+        Long transcribedSeconds, Long spokenCharacters, Long embeddingTokens
 ) {}
