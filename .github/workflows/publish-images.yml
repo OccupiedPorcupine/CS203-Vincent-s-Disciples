@@ -93,3 +93,75 @@ jobs:
       - name: Log out
         if: always()
         run: docker logout ghcr.io
+
+  release:
+    name: Publish deployment record
+    needs: [checks, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Record exact published image digests
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          registry = "ghcr.io/occupiedporcupine"
+          tag = os.environ["RELEASE_TAG"]
+          images = {}
+
+          for service in ("web", "backend", "ml"):
+              image = f"{registry}/chicky-{service}"
+              result = subprocess.check_output(
+                  ["docker", "buildx", "imagetools", "inspect",
+                   f"{image}:{tag}"],
+                  text=True,
+              )
+              match = re.search(
+                  r"^Digest:\s+(sha256:[a-f0-9]{64})\s*$",
+                  result,
+                  re.MULTILINE,
+              )
+              if not match:
+                  raise SystemExit(f"Cannot determine digest for {service}")
+              images[service] = f"{image}@{match.group(1)}"
+
+          record = {
+              "schema_version": 1,
+              "commit": os.environ["GITHUB_SHA"],
+              "release_tag": tag,
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "images": images,
+          }
+          with open("deployment.json", "w") as file:
+              json.dump(record, file, indent=2)
+          print("Verified all three public images and recorded their digests.")
+          PY
+
+      - name: Create draft release with deployment record
+        run: |
+          gh release create "aws-$RELEASE_TAG" deployment.json \
+            --repo "$GH_REPO" \
+            --target "$GITHUB_SHA" \
+            --title "AWS deployment $RELEASE_TAG" \
+            --notes "CI passed and all three application images were published. This record does not confirm deployment to EC2." \
+            --draft \
+            --latest=false
+
+      - name: Publish completed release record
+        run: |
+          gh release edit "aws-$RELEASE_TAG" \
+            --repo "$GH_REPO" \
+            --draft=false \
+            --latest=false
