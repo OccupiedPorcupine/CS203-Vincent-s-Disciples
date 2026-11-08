@@ -165,11 +165,33 @@ def main(tag):
     )
     if not re.fullmatch(r"[a-f0-9]{40}", old_commit):
         raise RuntimeError("Cannot identify the running backend commit")
-    if migrations(old_commit) != migrations(commit):
-        raise RuntimeError(
-            "Migration files changed. Manual database review required; "
-            "nothing deployed."
-        )
+    before = migrations(old_commit)
+    after = migrations(commit)
+    if before != after:
+        import hashlib
+
+        def fingerprint(files):
+            return hashlib.sha256(
+                json.dumps(files, sort_keys=True).encode("utf-8")
+            ).hexdigest()
+
+        required = {
+            "from_commit": old_commit,
+            "to_commit": commit,
+            "release_tag": tag,
+            "before_sha256": fingerprint(before),
+            "after_sha256": fingerprint(after),
+        }
+        approval_path = STATE / "approvals" / f"{tag}.json"
+        if not approval_path.is_file():
+            raise RuntimeError("Migration approval missing; nothing deployed.")
+
+        approved = json.loads(approval_path.read_text())
+        if approved != required:
+            raise RuntimeError(
+                "Migration approval does not match; nothing deployed."
+            )
+        print("Verified approval for this exact migration transition.")
 
     attempt = STATE / f"attempt-{time.time_ns()}"
     attempt.mkdir()
