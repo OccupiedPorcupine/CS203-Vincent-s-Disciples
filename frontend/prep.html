@@ -34,6 +34,7 @@
         <a href="prep.html" aria-current="page">Prep list</a>
         <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
         <a href="dishes.html" data-guide-id="nav-dishes">Dishes</a>
+        <a href="documents.html" data-guide-id="nav-documents">Documents</a>
       </nav>
     </details>
     <a class="brand" href="dashboard.html">Chicky</a>
@@ -93,6 +94,15 @@
         <p id="missing-recipes" class="prep-note"></p>
       </section>
     </div>
+
+    <section class="section" aria-labelledby="inventory-heading">
+      <div class="section-header">
+        <h2 id="inventory-heading">Stock and purchase plan</h2>
+        <p>Count raw stock after closing to plan tomorrow. Use the earliest expiry if combining stock into one count.</p>
+      </div>
+      <div id="inventory-list"></div>
+      <p id="inventory-status" class="status-text" role="status" aria-live="polite"></p>
+    </section>
 
     <section class="section" aria-labelledby="recipes-heading" data-guide-id="recipe-list">
       <div class="section-heading">

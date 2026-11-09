@@ -60,6 +60,7 @@
       "url": "prep.html",
       "summary": "What to prepare for a day: portions of each dish from its forecast plus a safety margin, how much of each ingredient to buy or take from stock, a Share button, each dish's recipe, and each ingredient's yield and whether it is bought daily.",
       "elements": [
+        { "guideId": "nav-documents", "description": "Link to the Documents page, inside the top-left menu." },
         { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Data ingestion and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },

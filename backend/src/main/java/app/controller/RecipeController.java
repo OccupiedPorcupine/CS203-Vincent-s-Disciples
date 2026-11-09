@@ -5,6 +5,7 @@ import app.dto.PrepListResponse;
 import app.dto.RecipeResponse;
 import app.dto.SetIngredientRequest;
 import app.dto.SetRecipeRequest;
+import app.dto.SetStockRequest;
 import app.recipe.RecipeService;
 import app.service.PrepListService;
 import app.user.AuthenticatedUser;
@@ -74,6 +75,12 @@ public class RecipeController {
     public IngredientResponse setIngredient(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long ingredientId,
                                             @Valid @RequestBody SetIngredientRequest request) {
         return recipeService.setIngredient(user.id(), ingredientId, request);
+    }
+
+    @PutMapping("/ingredients/{ingredientId}/stock")
+    public void setStock(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable Long ingredientId,
+                         @Valid @RequestBody SetStockRequest request) {
+        recipeService.setStock(user.id(), ingredientId, request);
     }
 
     @Operation(summary = "Prep list for a day", description = "Portions to prepare of each dish sold in the last 28 days, and the ingredients they need "

@@ -97,6 +97,7 @@ public class PrepListService {
         List<PrepListResponse.Dish> dishes = new ArrayList<>();
         List<PrepListResponse.Skipped> skipped = new ArrayList<>();
         Map<Long, RecipeService.Line> ingredientsById = new LinkedHashMap<>();
+        Map<Long, BigDecimal> expectedTotals = new LinkedHashMap<>();
         Map<Long, BigDecimal> totals = new LinkedHashMap<>();
         Map<Long, Set<String>> usedBy = new LinkedHashMap<>();
         PriceBook prices = priceService.priceBook(ownerId);
@@ -150,6 +151,9 @@ public class PrepListService {
 
             for (RecipeService.Line line : recipe) {
                 ingredientsById.put(line.ingredientId(), line);
+                expectedTotals.merge(line.ingredientId(),
+                        line.quantity().multiply(BigDecimal.valueOf(Math.max(0, forecast.predictedDemand()))),
+                        BigDecimal::add);
                 totals.merge(line.ingredientId(), line.quantity().multiply(BigDecimal.valueOf(portions)), BigDecimal::add);
                 usedBy.computeIfAbsent(line.ingredientId(), id -> new TreeSet<>()).add(dish.getName());
             }
@@ -161,7 +165,8 @@ public class PrepListService {
                     BigDecimal cooked = totals.get(line.ingredientId());
                     return new PrepListResponse.Ingredient(line.ingredient(), line.unit(), RecipeService.plain(cooked),
                             List.copyOf(usedBy.get(line.ingredientId())), RecipeService.plain(line.yieldPercent()),
-                            RecipeService.plain(RecipeService.toBuy(cooked, line.yieldPercent())), line.perishable());
+                            RecipeService.plain(RecipeService.toBuy(cooked, line.yieldPercent())), line.perishable(),
+                            RecipeService.plain(RecipeService.toBuy(expectedTotals.get(line.ingredientId()), line.yieldPercent())));
                 })
                 .toList();
         return new PrepListResponse(date, null, bufferPercent, dishes, ingredients, skipped);

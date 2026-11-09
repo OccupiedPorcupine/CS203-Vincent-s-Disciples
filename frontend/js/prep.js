@@ -19,6 +19,12 @@ const MAX_DAYS_AHEAD = 7;
 const BUFFER_KEY = "chicky-prep-buffer";
 
 let shownList = null;
+let stockIngredients = null;
+let prepRequest = 0;
+let ingredientsRequest = 0;
+const inventoryList = document.getElementById("inventory-list");
+const inventoryStatus = document.getElementById("inventory-status");
+const purchaseOverrides = new Map();
 
 function showStatus(message, type, element) {
   element.textContent = message;
@@ -78,6 +84,7 @@ function listRow(main, amount, note) {
 
 function renderPrepList(list) {
   shownList = list;
+  renderInventory();
   shareButton.disabled = Boolean(list.closed) || !list.dishes.length;
   missingRecipes.textContent = "";
 
@@ -102,11 +109,32 @@ function renderPrepList(list) {
     ingredientList.replaceChildren(emptyState("Add recipes below to see how much of each ingredient you need."));
   } else {
     // What to buy for the day first, then what comes out of stock.
-    const groups = [["To buy", list.ingredients.filter(item => item.perishable)],
-      ["From stock", list.ingredients.filter(item => !item.perishable)]].filter(([, items]) => items.length);
+    const groups = [
+      ["Usually bought daily", list.ingredients.filter(item => item.perishable)],
+      ["Usually kept in stock", list.ingredients.filter(item => !item.perishable)]
+    ].filter(([, items]) => items.length);
+
     ingredientList.replaceChildren(...groups.flatMap(([title, items]) => [
       groupHeading(title),
-      ...items.map(item => listRow(item.ingredient, formatAmount(item.toBuy, item.unit), ingredientNote(item)))
+      ...items.map(item => {
+        const stock = stockIngredients?.find(entry =>
+          entry.name === item.ingredient && entry.unit === item.unit
+        );
+        const plan = inventoryPlan(list, item, stock);
+        const needed = formatAmount(item.toBuy, item.unit);
+
+        if (plan) {
+          const usable = formatAmount(plan.usable, item.unit);
+          return listRow(
+            item.ingredient,
+            `Buy ${formatAmount(plan.purchase, item.unit)}`,
+            `${needed} needed for prep − ${usable} usable stock · ${ingredientNote(item)}`
+          );
+        }
+
+        const stockNote = list.date === addDays(today, 1) ? "Stock unknown · " : "";
+        return listRow(item.ingredient, `${needed} needed`, stockNote + ingredientNote(item));
+      })
     ]));
   }
 
@@ -134,24 +162,37 @@ function ingredientNote(item) {
 function prepListText(list) {
   const lines = [`Prep for ${formatDay(list.date)}`, ""];
   list.dishes.forEach(dish => lines.push(`${dish.dish}: ${dish.portions}`));
-  [["To buy", list.ingredients.filter(item => item.perishable)],
-    ["From stock", list.ingredients.filter(item => !item.perishable)]].forEach(([title, items]) => {
+  [["Daily purchases before stock", list.ingredients.filter(item => item.perishable)],
+    ["Ingredients normally kept in stock", list.ingredients.filter(item => !item.perishable)]].forEach(([title, items]) => {
     if (!items.length) return;
     lines.push("", title);
-    items.forEach(item => lines.push(`${item.ingredient}: ${formatAmount(item.toBuy, item.unit)}`));
+    items.forEach(item => {
+      const stock = stockIngredients?.find(entry => entry.name === item.ingredient && entry.unit === item.unit);
+      const plan = inventoryPlan(list, item, stock);
+      const reviewed = stock ? purchaseOverrides.get(stock.id) : undefined;
+      const purchase = reviewed ?? plan?.purchase;
+      const note = purchase == null ? " · stock unverified" : ` · buy ${formatAmount(purchase, item.unit)}`;
+      lines.push(`${item.ingredient}: ${formatAmount(item.toBuy, item.unit)} for prep${note}`);
+    });
   });
   return lines.join("\n");
 }
 
 async function loadPrepList() {
+  const request = ++prepRequest;
+  purchaseOverrides.clear();
+  shownList = null;
+  renderInventory();
   shareButton.disabled = true;
   showStatus("", null, prepStatus);
   portionList.replaceChildren(emptyState("Working out the forecasts…"));
   ingredientList.replaceChildren(emptyState("Loading…"));
   const buffer = prepBuffer.value === "" ? "" : prepBuffer.value === "top" ? "&rule=top" : `&bufferPercent=${prepBuffer.value}`;
   try {
-    renderPrepList(await apiRequest(`/api/prep-list?date=${prepDate.value}${buffer}`));
+    const list = await apiRequest(`/api/prep-list?date=${prepDate.value}${buffer}`);
+    if (request === prepRequest) renderPrepList(list);
   } catch (error) {
+    if (request !== prepRequest) return;
     if (error.status === 401) {
       window.location.href = "index.html";
       return;
@@ -164,6 +205,7 @@ async function loadPrepList() {
 
 async function shareList() {
   if (!shownList) return;
+  if ([...inventoryList.querySelectorAll(".review-purchase")].some(input => !input.reportValidity())) return;
   const text = prepListText(shownList);
   try {
     if (navigator.share) {
@@ -196,9 +238,9 @@ function ingredientLine(dishName, item = { ingredient: "", quantity: "", unit: "
   quantity.min = "0";
   quantity.step = "any";
   quantity.inputMode = "decimal";
-  quantity.placeholder = "Amount";
+  quantity.placeholder = "Cooked amount per portion";
   quantity.value = item.quantity;
-  quantity.setAttribute("aria-label", `Amount per portion of ${dishName}`);
+  quantity.setAttribute("aria-label", `Cooked amount per portion of ${dishName}`);
 
   const unit = document.createElement("input");
   unit.className = "input";
@@ -401,8 +443,16 @@ function buyingRow(ingredient) {
 }
 
 async function loadIngredients() {
+  const request = ++ingredientsRequest;
   try {
     const ingredients = await apiRequest("/api/ingredients");
+    if (request !== ingredientsRequest) return;
+    stockIngredients = ingredients;
+    if (shownList) {
+      renderPrepList(shownList);
+    } else {
+      renderInventory();
+    }
     ingredientNames.replaceChildren(...ingredients.map(ingredient => {
       const option = document.createElement("option");
       option.value = ingredient.name;
@@ -413,8 +463,151 @@ async function loadIngredients() {
       ? ingredients.map(buyingRow)
       : [emptyState("Ingredients appear here once you add a recipe.")]));
   } catch (error) {
+    if (request !== ingredientsRequest) return;
+    stockIngredients = null;
+    renderInventory();
+    showStatus("Stock could not be loaded.", "error", inventoryStatus);
     if (error.status !== 401) buyingList.replaceChildren(emptyState("Ingredients could not be loaded."));
   }
+}
+
+function inventoryPlan(list, item, stock) {
+  if (!list || list.closed || list.date !== addDays(today, 1) || !item ||
+      stock?.stockCountedOn !== today || stock.stockQuantity == null) return null;
+
+  const counted = Number(stock.stockQuantity);
+  const expired = stock.stockExpiresOn && stock.stockExpiresOn < list.date;
+  const usable = expired ? 0 : counted;
+  const requirement = Number(item.toBuy);
+  const expectedUse = Number(item.expectedRawUse);
+  const purchase = Math.max(0, requirement - usable);
+  return {
+    usable,
+    purchase,
+    reduction: requirement - purchase,
+    excess: Math.max(0, usable - expectedUse),
+    expired: expired ? counted : 0
+  };
+}
+
+function stockField(label, type, value) {
+  const field = document.createElement("label");
+  field.textContent = label;
+  const input = document.createElement("input");
+  input.type = type;
+  input.className = "input";
+  input.value = value ?? "";
+  if (type === "number") {
+    input.min = "0";
+    input.max = "999999999.999";
+    input.step = "0.001";
+    input.inputMode = "decimal";
+  }
+  field.append(input);
+  return { field, input };
+}
+
+function renderInventory() {
+  if (!stockIngredients?.length) {
+    inventoryList.replaceChildren(emptyState(stockIngredients
+      ? "Add a recipe to start counting stock."
+      : "Stock counts are unavailable."));
+    return;
+  }
+
+  const list = shownList;
+  const planningTomorrow = list && !list.closed && list.date === addDays(today, 1);
+  const incomplete = planningTomorrow && (list.skipped.length || list.dishes.some(dish => !dish.hasRecipe));
+  const notes = [];
+  if (!planningTomorrow) notes.push(emptyState("Select tomorrow’s open prep day to see purchase recommendations."));
+  if (incomplete) notes.push(emptyState("Some dishes have no recipe or forecast. The ingredient totals may be low."));
+
+  inventoryList.replaceChildren(...notes, ...stockIngredients.map(stock => {
+    const row = document.createElement("details");
+    row.className = "recipe";
+    const summary = document.createElement("summary");
+    summary.className = "recipe-dish";
+    summary.textContent = `${stock.name} (${stock.unit})`;
+    row.append(summary);
+
+    const item = planningTomorrow && list.ingredients.find(entry =>
+      entry.ingredient === stock.name && entry.unit === stock.unit);
+    const plan = inventoryPlan(list, item, stock);
+    if (plan) {
+      summary.textContent =
+        `${stock.name} (${stock.unit}) · Buy ${formatAmount(plan.purchase, stock.unit)}`;
+    } else if (item) {
+      summary.textContent = `${stock.name} (${stock.unit}) · Stock unknown`;
+    }
+    if (item && !plan) {
+      row.append(listRow("Stock unknown", formatAmount(item.toBuy, item.unit),
+        "Gross prep requirement. Save a fresh count to estimate what to buy."));
+    }
+    if (plan) {
+      const amount = value => formatAmount(value, stock.unit);
+    row.append(listRow("Suggested purchase", amount(plan.purchase),
+      `${amount(item.toBuy)} needed − ${amount(plan.usable)} usable stock = ${amount(plan.purchase)} to buy`));
+      if (plan.expired > 0) {
+        row.append(listRow("Stock excluded", amount(plan.expired),
+          `Last usable ${formatDay(stock.stockExpiresOn)}. Prep is ${formatDay(list.date)}.`));
+      }
+      const expected = amount(Number(item.expectedRawUse));
+      const expiringSoon =
+        stock.stockExpiresOn && stock.stockExpiresOn <= addDays(list.date, 1);
+
+      const advice = plan.excess > 0 && expiringSoon && !incomplete
+        ? ` Use soon. Consider featuring ${item.dishes.join(", ")}.`
+        : "";
+
+      row.append(listRow(
+        "Usable stock above expected demand",
+        amount(plan.excess),
+        `${amount(plan.usable)} usable raw stock · ${expected} raw expected to be used.${advice}`
+      ));
+      const review = stockField(`Purchase to share (${stock.unit})`, "number",
+        purchaseOverrides.get(stock.id) ?? Math.round(plan.purchase * 1000) / 1000);
+      review.input.classList.add("review-purchase");
+      review.input.addEventListener("input", () => {
+        if (review.input.value === "") purchaseOverrides.delete(stock.id);
+        else purchaseOverrides.set(stock.id, review.input.valueAsNumber);
+      });
+      row.append(review.field);
+    }
+
+    const form = document.createElement("form");
+    form.className = "recipe-editor";
+    const quantity = stockField(`Raw count (${stock.unit})`, "number", stock.stockQuantity);
+    const expiry = stockField("Expiry date (optional)", "date", stock.stockExpiresOn);
+    const save = document.createElement("button");
+    save.className = "secondary-button";
+    save.textContent = "Save stock count";
+    const counted = stock.stockCountedOn ? `Last counted ${stock.stockCountedOn}. ` : "";
+    form.append(quantity.field, expiry.field, save,
+      emptyState(`${counted}Save a blank quantity to clear this count.`));
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      save.disabled = true;
+      try {
+        await apiRequest(`/api/ingredients/${stock.id}/stock`, {
+          method: "PUT",
+          body: JSON.stringify({
+            unit: stock.unit,
+            quantity: quantity.input.value === "" ? null : quantity.input.valueAsNumber,
+            expiresOn: expiry.input.value || null
+          })
+        });
+        purchaseOverrides.delete(stock.id);
+        showStatus(`Saved stock for ${stock.name}.`, "success", inventoryStatus);
+        await loadIngredients();
+      } catch (error) {
+        showStatus(error.message || "Stock could not be saved.", "error", inventoryStatus);
+      } finally {
+        save.disabled = false;
+      }
+    });
+    row.append(form);
+    return row;
+  }));
 }
 
 const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Singapore" });
