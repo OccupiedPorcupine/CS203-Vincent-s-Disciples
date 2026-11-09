@@ -57,8 +57,7 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* small overshoot: buttons popping in */
-  --duration-enter: 520ms;   /* cards and rows rising in when a page loads */
-  --stagger: 70ms;           /* gap between one card and the next as they rise in */
+  --duration-enter: 520ms;   /* sign-in page only: its picture and form rising in */
 }
 
 /* Base */
@@ -341,10 +340,8 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 @keyframes page-in { from { opacity: 0; transform: translateY(10px); } }
 
 /* ---- Motion and polish (DESIGN.md, "Motion") ----
-   Interaction feedback (hover, press, focus) applies everywhere. Entrance and ambient motion is
-   inside `prefers-reduced-motion: no-preference`, so it simply doesn't exist for people who
-   asked for less motion, and is off during the guided tour (.guide-active), which measures where
-   things are and must not chase a card that is still rising. */
+   Interaction feedback (hover, press, focus) applies everywhere. Nothing rises in, counts up,
+   shimmers or drifts on its own. */
 
 /* Controls: colour, lift and press. */
 .primary-button,
@@ -385,66 +382,15 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 
 /* Status lines settle in when they report a result. */
 .status-text:is(.is-success, .is-error):not(:empty) { animation: status-in var(--duration-base) var(--ease-out); }
-@keyframes status-in { from { opacity: 0; transform: translateY(-3px); } }
+@keyframes status-in { from { opacity: 0; } }
 
-/* "Loading…" text shimmers (js/motion.js adds .is-loading), and so does a card's "--" figure while
-   its caption is loading. A slow sweep, not a spinner. */
-.is-loading,
-.headline:has(.is-loading) .number {
-  background: linear-gradient(100deg, var(--muted) 40%, #b9c2c8 50%, var(--muted) 60%) 0 0 / 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.headline:has(.is-loading) .number { background-image: linear-gradient(100deg, var(--ink) 40%, #b9c2c8 50%, var(--ink) 60%); }
+/* "Loading…" text (js/motion.js adds .is-loading) is just muted, and a card's "--" figure waits in
+   the muted colour too. */
+.headline:has(.is-loading) .number { color: var(--subtle); }
 
-/* Order of arrival: each direct child of the page, and each card inside a grid wrapper, gets an
-   index; cards rise in that order. Rows in lists and tables have their own short sequence. */
-.page > :nth-child(2) { --enter: 1; } .page > :nth-child(3) { --enter: 2; } .page > :nth-child(4) { --enter: 3; }
-.page > :nth-child(5) { --enter: 4; } .page > :nth-child(6) { --enter: 5; } .page > :nth-child(n + 7) { --enter: 6; }
-.page > * > :nth-child(2) { --enter-step: 1; } .page > * > :nth-child(3) { --enter-step: 2; }
-.page > * > :nth-child(n + 4) { --enter-step: 3; }
-:is(.page ul, .page ol, .page tbody) > :nth-child(2) { --row: 1; } :is(.page ul, .page ol, .page tbody) > :nth-child(3) { --row: 2; }
-:is(.page ul, .page ol, .page tbody) > :nth-child(4) { --row: 3; } :is(.page ul, .page ol, .page tbody) > :nth-child(5) { --row: 4; }
-:is(.page ul, .page ol, .page tbody) > :nth-child(6) { --row: 5; } :is(.page ul, .page ol, .page tbody) > :nth-child(n + 7) { --row: 6; }
-
-@media (prefers-reduced-motion: no-preference) {
-  /* Page content rises in, card by card. `backwards` only, so once it has arrived hover can move it. */
-  :root:not(.guide-active) :is(.page-heading, .card, .section, .chat-box) {
-    animation: rise-in var(--duration-enter) var(--ease-out) backwards;
-    animation-delay: calc((var(--enter, 0) + var(--enter-step, 0)) * var(--stagger));
-  }
-  :root:not(.guide-active) .page-heading > div > * { animation: rise-in var(--duration-enter) var(--ease-out) backwards; }
-  :root:not(.guide-active) .page-heading .lede { animation-delay: 80ms; }
-
-  /* Rows arrive whenever a list is filled, including after it is refreshed. */
-  :root:not(.guide-active) :is(.page ul, .page ol, .page tbody) > :is(li, tr) {
-    animation: row-in 380ms var(--ease-out) backwards;
-    animation-delay: calc(var(--row, 0) * 45ms + 60ms);
-  }
-
-  /* The revenue heatmap fills week by week, left to right (js/motion.js sets --n). */
-  :root:not(.guide-active) .heatmap .heat-cell {
-    animation: cell-in 420ms var(--ease-out) backwards;
-    animation-delay: calc(var(--n, 0) * 14ms);
-  }
-
-  /* The header's gradient drifts very slowly between teal and sand. */
-  .topbar {
-    background: linear-gradient(90deg, #a9dcd6 0%, #dfe5dc 27.5%, #f5e3d2 50%, #dfe5dc 72.5%, #a9dcd6 100%) 0 0 / 200% 100%;
-    animation: header-drift 28s ease-in-out infinite alternate;
-  }
-  .guide-active .topbar { animation-play-state: paused; }
-
-  .is-loading, .headline:has(.is-loading) .number { animation: shimmer 1.6s linear infinite; }
-
-}
-
+/* The sign-in page (css/styles.css) still rises in. */
 @keyframes rise-in { from { opacity: 0; transform: translateY(14px); } }
-@keyframes row-in { from { opacity: 0; transform: translateY(6px); } }
-@keyframes cell-in { from { opacity: 0; transform: scale(0.4); } }
-@keyframes header-drift { to { background-position: 100% 0; } }
-@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
 /* Used by chickyMotion.leave() (js/motion.js) when a row is removed: fade, then fold away. */
 .is-leaving { overflow: hidden; pointer-events: none; }
 

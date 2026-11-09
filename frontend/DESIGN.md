@@ -319,23 +319,15 @@ Motion explains where something came from or went; it is never decoration. Every
 | `--ease-out` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Things appearing or arriving |
 | `--ease-in-out` | `cubic-bezier(0.65, 0, 0.35, 1)` | Things moving from one place to another |
 | `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | Small things popping in with a slight overshoot (send button, assistant bubble) |
-| `--duration-enter` | 520ms | Cards and rows rising in when a page loads |
-| `--stagger` | 70ms | The gap between one card and the next as they rise in |
+| `--duration-enter` | 520ms | Sign-in page only: its picture and form rising in |
 
-**Arriving on a page.** Content rises 14px and fades in, in reading order: the page heading,
-then each card, `--stagger` apart (cards inside a grid wrapper such as the dashboard's `.overview`
-follow their wrapper's place). The order comes from CSS `nth-child` in `base.css`, so new pages
-get it for free as long as their content sits in `.page-heading`, `.card` and `.section`. Rows in
-lists and tables (`li`, `tr` inside `.page`) rise in a shorter sequence whenever they are added,
-so a list filled by a fetch arrives row by row. The revenue heatmap fills week by week.
+**Nothing moves on its own.** Content is simply there when a page loads: no cards rising in, no
+figures counting up, no shimmering text, no drifting gradients. A number on screen is always the
+real number. The sign-in page's picture is the one exception: it still draws itself in.
 
-**Key figures count up.** When a page script writes a figure into `.headline .number` ("838",
-"$4,210"), [js/motion.js](js/motion.js) counts it up from zero, keeping the prefix, decimals and
-thousands separators. Nothing to wire up: set `textContent` as usual.
-
-**Loading text shimmers.** A `.note`, `.status-text`, `.empty-state` or `.lede` whose text starts with
-"Loading" or "Checking" gets `.is-loading`, a slow light sweep across the text; a card's `--`
-figure shimmers with it. Still no spinners.
+**Loading text** (a `.note`, `.status-text`, `.empty-state` or `.lede` starting with "Loading" or
+"Checking") gets `.is-loading` from [js/motion.js](js/motion.js) and a card's `--` figure waits in
+`--subtle`. Still no spinners.
 
 **Charts draw in** ([js/chart-theme.js](js/chart-theme.js)): points and bars arrive left to right,
 55ms apart. The recorded line has a faint ink wash beneath it, and hovered bars turn teal.
@@ -357,17 +349,11 @@ the assistant panel grows from the bubble, the Record sales dialog rises with a 
 and a dismissed action slides right, fades and folds its row away (`chickyMotion.leave(element)`).
 Status lines settle in when they report a result.
 
-**Ambient motion** is kept to two places and is very slow: the header's gradient drifts between
-teal and sand over 28 seconds, and the sign-in page's picture (a chart drawing itself, then two
-cards floating over it) has gently drifting colour. It pauses during the guided tour.
-
-**The guided tour wins.** Entrance animations are off while a tour is running (`.guide-active`):
-the tour measures where things are and must not chase a card that is still rising.
 
 Load `js/motion.js` on every page, after `base.css` and before the page's own script.
 
 **Moving between pages.** Pages cross-fade using the browser's View Transitions: the header stays
-still while the old content lifts away and the new content rises in. Every page opts in with an
+still while the old content fades out and the new content fades in. Every page opts in with an
 inline `<style>@view-transition { navigation: auto; }</style>` in its `<head>`, right after the
 viewport meta. Copy that line into any new page; from a stylesheet, Chrome sometimes applies it too
 late and skips the transition. Browsers without View Transitions just change page normally.
@@ -416,9 +402,8 @@ between steps, even across pages. Three pieces make that work, and each page nee
 
 **Reduced motion.** With `prefers-reduced-motion`, every transition and animation in `base.css`
 collapses to an instant change, page cross-fades are off, and the tour jumps straight to each step.
-Entrance, ambient and chart animations are written inside `@media (prefers-reduced-motion:
-no-preference)` (or checked in JS), so they don't exist at all, and figures appear without
-counting. Any new animation must do the same.
+The sign-in page's animation is written inside `@media (prefers-reduced-motion: no-preference)`
+and chart easing is checked in JS, so neither runs. Any new animation must respect it too.
 
 ## Phones
 
@@ -488,8 +473,8 @@ extra classes, so the look and the accessibility tree can't drift apart.
    subpage is linked from its parent and links back to it (see [Getting around](#getting-around)).
 4. Reach for an existing component before writing CSS. Page CSS is layout only, with tokens for
    every colour, size, radius and shadow. Put content in cards that open with a `.headline`.
-5. One primary button per view; sentence-case labels. Animations use the motion tokens and
-   respect reduced motion.
+5. One primary button per view; sentence-case labels. No entrance or ambient animation;
+   feedback motion uses the motion tokens and respects reduced motion.
 6. Forms follow [Forms](#forms): `<form>` + `submit`, a `.form-actions` row, the primary button
    disabled until it can run, and inline `.status-text` for feedback, never `alert()`.
 7. Charts: load `js/chart-theme.js` and use its presets.
