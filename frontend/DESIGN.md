@@ -150,7 +150,7 @@ white text on it. Use `--teal-strong` instead.
 | `--radius-md` | 8px | Buttons, inputs, menus |
 | `--radius-lg` | 10px | Cards, chat bubbles, drop zones, the tour bubble, cards inside the assistant |
 | `--radius-xl` | 12px | Floating panels and dialogs |
-| `--radius-pill` | 999px | Tags; circles use `50%` |
+| `--radius-pill` | 999px | The tour's progress bar only. Tags are 4px rectangles, not pills; circles use `50%` |
 
 **Shadow**
 
@@ -322,7 +322,7 @@ Motion explains where something came from or went; it is never decoration. Every
 | `--duration-slow` | 450ms | The tour's spotlight moving between elements |
 | `--ease-out` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Things appearing or arriving |
 | `--ease-in-out` | `cubic-bezier(0.65, 0, 0.35, 1)` | Things moving from one place to another |
-| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | Small things popping in with a slight overshoot (send button, assistant bubble) |
+| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | Sign-in page only: the forecast dot popping in |
 | `--duration-enter` | 520ms | Sign-in page only: its picture and form rising in |
 
 **Nothing moves on its own.** Content is simply there when a page loads: no cards rising in, no
@@ -340,12 +340,13 @@ real number. The sign-in page's picture is the one exception: it still draws its
 
 | Element | Hover | Press |
 | --- | --- | --- |
-| Primary and secondary buttons | Lift 1px with a soft shadow | Scale to 97% |
-| Fields | Border darkens to `--subtle` | Focus: `--teal` border and a soft teal halo |
-| Menu items | Nudge 4px right | – |
-| Avatar, assistant bubble, icon buttons | Grow slightly | Shrink slightly |
+| Primary button | Darkens to `--teal-hover` | – |
+| Secondary button | Border darkens to `--subtle` | – |
+| Fields | Border darkens to `--subtle` | Focus: `--teal` border and a thin teal halo |
+| Menu items, icon buttons | Tinted background | – |
+| Cards | Nothing: cards don't react to the pointer | – |
 
-Cards don't react to the pointer.
+Hover changes colour, never position or size.
 
 **Things that open** grow out of where they came from: menus drop and unshrink from their corner,
 the assistant panel grows from the bubble, the Record sales dialog rises with a blurred backdrop,
@@ -476,8 +477,8 @@ extra classes, so the look and the accessibility tree can't drift apart.
    subpage is linked from its parent and links back to it (see [Getting around](#getting-around)).
 4. Reach for an existing component before writing CSS. Page CSS is layout only, with tokens for
    every colour, size, radius and shadow. Put content in cards that open with a `.headline`.
-5. One primary button per view; sentence-case labels. No entrance or ambient animation;
-   feedback motion uses the motion tokens and respects reduced motion.
+5. One primary button per view; sentence-case labels. No entrance, ambient or hover-lift
+   animation; feedback motion uses the motion tokens and respects reduced motion.
 6. Forms follow [Forms](#forms): `<form>` + `submit`, a `.form-actions` row, the primary button
    disabled until it can run, and inline `.status-text` for feedback, never `alert()`.
 7. Charts: load `js/chart-theme.js` and use its presets.
