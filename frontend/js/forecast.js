@@ -49,7 +49,10 @@ const historyChart = new Chart(chartContext, {
 
         scales: {
             y: {
-                beginAtZero: true
+                beginAtZero: true,
+                ticks: {
+                    maxTicksLimit: 6
+                }
             },
 
             x: {
