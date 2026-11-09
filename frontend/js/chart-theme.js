@@ -19,55 +19,45 @@ const chickyChart = (() => {
   Chart.defaults.plugins.tooltip.padding = 8;
   Chart.defaults.plugins.tooltip.displayColors = false;
 
-  // Charts draw in: points and bars arrive one after another, left to right (DESIGN.md, "Motion").
-  // Redraws after new data animate between values instead. None of it with reduced motion.
+  // Charts appear as they are; only a redraw after new data eases between values.
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     Chart.defaults.animation = false;
   } else {
-    Chart.defaults.animation.duration = 900;
-    Chart.defaults.animation.easing = "easeOutQuart";
-    Chart.defaults.animation.delay = context =>
-      context.type === "data" && context.mode === "default" ? context.dataIndex * 55 + context.datasetIndex * 150 : 0;
+    Chart.defaults.animation.duration = 250;
+    Chart.defaults.animation.easing = "easeOutCubic";
   }
-
-  // A faint wash of ink under the recorded line, fading out towards the axis.
-  const inkWash = context => {
-    const { chart } = context;
-    if (!chart.chartArea) return "transparent";
-    const { top, bottom } = chart.chartArea;
-    const gradient = chart.ctx.createLinearGradient(0, top, 0, bottom);
-    gradient.addColorStop(0, `${ink}29`);
-    gradient.addColorStop(1, `${ink}00`);
-    return gradient;
-  };
+  // Axes are drawn by the gridlines and labels alone; no heavy axis line.
+  Chart.defaults.scale.border.display = false;
+  Chart.defaults.scale.ticks.padding = 8;
 
   return {
+    ink,
     recordedLine: {
       borderColor: ink,
-      backgroundColor: inkWash,
-      fill: "origin",
-      borderWidth: 2,
-      tension: 0.35,
+      backgroundColor: ink,
+      fill: false,
+      borderWidth: 1.75,
+      // Straight segments between days: a smoothed curve invents values between the points.
+      tension: 0,
       pointBackgroundColor: ink,
       pointBorderColor: "#fff",
-      pointBorderWidth: 1.5,
-      pointRadius: 3.5,
-      pointHoverRadius: 6,
-      pointHoverBorderWidth: 2
+      pointBorderWidth: 1,
+      pointRadius: 2.5,
+      pointHoverRadius: 4.5
     },
     recordedBar: {
       backgroundColor: ink,
       hoverBackgroundColor: token("--teal-strong"),
-      borderRadius: 6,
+      borderRadius: 2,
       borderSkipped: false,
-      maxBarThickness: 32
+      maxBarThickness: 20
     },
     predictedLine: {
       borderColor: teal,
       backgroundColor: teal,
       borderWidth: 2,
       borderDash: [6, 5],
-      tension: 0.3,
+      tension: 0,
       pointRadius: 3
     }
   };

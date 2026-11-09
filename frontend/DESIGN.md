@@ -333,8 +333,9 @@ real number. The sign-in page's picture is the one exception: it still draws its
 "Checking") gets `.is-loading` from [js/motion.js](js/motion.js) and a card's `--` figure waits in
 `--subtle`. Still no spinners.
 
-**Charts draw in** ([js/chart-theme.js](js/chart-theme.js)): points and bars arrive left to right,
-55ms apart. The recorded line has a faint ink wash beneath it, and hovered bars turn teal.
+**Charts** ([js/chart-theme.js](js/chart-theme.js)) appear without drawing in; only a redraw after
+new data eases between values (250ms). Lines are straight between days (a smoothed curve invents
+values that weren't sold), with no fill under them; hovered bars turn teal.
 
 **Feedback on interaction.**
 

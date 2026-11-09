@@ -56,16 +56,22 @@ function drawChart(canvasId, type, label, labels, values) {
         }
       },
 
+      // Gridlines run across the value axis only: horizontal for the line, vertical for the bars.
       scales: {
         x: {
           beginAtZero: true,
           grid: {
-            display: false
-          }
+            display: type === "bar"
+          },
+          ticks: type === "bar" ? { maxTicksLimit: 5 } : {}
         },
 
         y: {
-          beginAtZero: true
+          beginAtZero: true,
+          grid: {
+            display: type !== "bar"
+          },
+          ticks: type === "bar" ? { color: chickyChart.ink } : { maxTicksLimit: 5 }
         }
       }
     }

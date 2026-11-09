@@ -53,14 +53,13 @@
 /* Zero height, so the labels never make their row taller than a square (which would leave
    gaps around the Mon, Wed and Fri rows when the squares are small); the text still shows. */
 .heatmap-weekday { grid-column: 1; align-self: center; height: 0; line-height: 0; overflow: visible; }
-.heat-cell { aspect-ratio: 1; border-radius: 3px; background: var(--neutral-soft); }
+.heat-cell { aspect-ratio: 1; border-radius: 2px; background: var(--neutral-soft); }
 .heat-cell.level-1 { background: var(--heat-1); }
 .heat-cell.level-2 { background: var(--heat-2); }
 .heat-cell.level-3 { background: var(--heat-3); }
 .heat-cell.level-4 { background: var(--heat-4); }
 .heat-cell.is-closed { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
-.heatmap .heat-cell { transition: transform var(--duration-fast) var(--ease-out); }
-.heatmap .heat-cell:hover { outline: 2px solid var(--ink); outline-offset: 1px; transform: scale(1.25); }
+.heatmap .heat-cell:hover { outline: 1.5px solid var(--ink); outline-offset: 1px; }
 .heatmap-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 12px; color: var(--muted); font-size: var(--text-xs); }
 .heatmap-legend .heat-cell { width: 12px; }
 .heatmap-legend .legend-gap { margin-left: 12px; }
