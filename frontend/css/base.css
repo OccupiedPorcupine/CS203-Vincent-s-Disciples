@@ -11,7 +11,8 @@
   --teal-soft: #d9efec;      /* selected state */
   --teal-tint: #ebf6f5;      /* hover state */
   --neutral-soft: #f1f4f5;   /* neutral hover, assistant bubbles, inactive tags */
-  --border: #d8dce1;         /* control and card outlines */
+  --border: #d8dce1;         /* control outlines */
+  --card-border: #e9e4da;    /* warm hairline around cards on the cream page */
   --divider: #e6e8eb;        /* rules between rows and sections */
   --page: #fffcf5;           /* warm cream page background */
   --surface: #fff;           /* cards, controls, menus */
@@ -41,13 +42,15 @@
   /* Shape */
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-pill: 999px;
-  --shadow-card: 0 1px 2px rgb(66 86 100 / 7%), 0 6px 20px rgb(66 86 100 / 8%);
-  --shadow-card-hover: 0 2px 4px rgb(66 86 100 / 8%), 0 14px 32px rgb(66 86 100 / 14%);
-  --shadow-menu: 0 8px 24px rgb(66 86 100 / 13%);
-  --shadow-float: 0 8px 24px rgb(0 0 0 / 18%);
+  /* Depth is kept for things that sit above the page (menus, dialogs, the assistant). Cards sit
+     on the page, so they get a hairline and the faintest contact shadow, not a float. */
+  --shadow-card: 0 1px 1px rgb(66 86 100 / 4%);
+  --shadow-card-hover: 0 2px 4px rgb(66 86 100 / 8%), 0 14px 32px rgb(66 86 100 / 14%); /* sign-in page only */
+  --shadow-menu: 0 6px 20px rgb(66 86 100 / 12%);
+  --shadow-float: 0 8px 24px rgb(66 86 100 / 16%);
   --control-height: 40px;
 
   /* Motion. js/guide.js mirrors these durations. */
@@ -91,8 +94,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   min-height: 64px;
   padding: max(12px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 12px max(24px, env(safe-area-inset-left));
   background: var(--header-gradient);
+  box-shadow: inset 0 -1px 0 rgb(66 86 100 / 8%);
 }
-.brand { color: var(--teal-strong); font-size: 24px; text-decoration: none; }
+.brand { color: var(--teal-strong); font-size: 24px; letter-spacing: -0.01em; text-decoration: none; }
 /* Both header menus are <details>: js/app-shell.js closes them on an outside click or Escape. */
 .topbar details { position: relative; }
 .topbar summary { list-style: none; cursor: pointer; }
@@ -161,7 +165,7 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
   padding: 40px 0 calc(96px + env(safe-area-inset-bottom));
 }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
-.page-heading h1 { font-size: var(--text-xl); }
+.page-heading h1 { font-size: var(--text-xl); letter-spacing: -0.01em; }
 .lede { margin-top: 4px; color: var(--muted); }
 .eyebrow { color: var(--teal-strong); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; }
 
@@ -172,19 +176,18 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 /* Cards */
 .card {
   padding: 20px 24px;
-  border: 1px solid #f0ece4;
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-card);
-  transition: box-shadow var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
 }
 .card-title { margin-bottom: 12px; font-size: var(--text-md); }
 
 /* A big figure with its caption, e.g. "838 portions". */
 .headline { font-size: var(--text-sm); }
 .headline .card-title { margin-bottom: 0; }
-.headline .number { display: block; margin-top: 4px; font-size: var(--text-number); line-height: 1.1; color: var(--ink); }
-.headline .unit { font-size: var(--text-md); }
+.headline .number { display: block; margin-top: 4px; font-size: var(--text-number); line-height: 1.1; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.headline .unit { margin-left: 2px; font-size: var(--text-md); letter-spacing: 0; }
 .headline .note { display: block; color: var(--muted); }
 
 /* Buttons */
@@ -365,12 +368,6 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .input:hover:not(:disabled, :focus) { border-color: var(--subtle); }
 /* Replaces the outline on fields: a teal border (3.2:1) plus a soft halo. */
 .input:focus-visible { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgb(27 160 152 / 22%); }
-
-/* Cards lift a little under the pointer, so it's clear which one you're reading. Cards holding a
-   form stay put: a card that moves while you type in it is unsettling. */
-@media (hover: hover) {
-  .card:not(:has(form)):hover { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
-}
 
 /* Header: the avatar and menu button respond, menu items nudge towards the pointer. */
 .avatar { transition: box-shadow var(--duration-fast), transform var(--duration-fast) var(--ease-out); }

@@ -25,7 +25,7 @@ in `base.css` instead.
 Chicky is a planning tool for hawker and F&B owners. It should feel calm, warm and a little
 hand-made, not like an analytics dashboard.
 
-- **Warm, quiet surfaces.** A cream page (`--page`), white cards with a soft shadow, and one
+- **Warm, quiet surfaces.** A cream page (`--page`), white cards with a warm hairline edge, and one
   gradient: the header, which runs from teal to sand.
 - **One accent.** Teal marks what is interactive, selected or predicted. Everything else is ink
   on cream. Don't introduce a second accent colour; use the status colours only for status.
@@ -101,6 +101,7 @@ All colours are tokens in `base.css`. Don't write hex values in page stylesheets
 | `--teal-tint` | `#ebf6f5` | Hover state on light surfaces |
 | `--neutral-soft` | `#f1f4f5` | Neutral hover, inactive tags, segmented track, assistant bubbles |
 | `--border` | `#d8dce1` | Outlines of controls, menus and dashed drop zones |
+| `--card-border` | `#e9e4da` | The warm hairline around cards on the cream page |
 | `--divider` | `#e6e8eb` | Rules between rows, sections and chart gridlines |
 | `--page` | `#fffcf5` | Page background |
 | `--surface` | `#fff` | Cards, controls, menus |
@@ -147,16 +148,19 @@ white text on it. Use `--teal-strong` instead.
 | --- | --- | --- |
 | `--radius-sm` | 6px | Things nested inside a control (segmented buttons, menu items) |
 | `--radius-md` | 8px | Buttons, inputs, menus |
-| `--radius-lg` | 12px | Cards, chat bubbles, drop zones, the tour bubble, cards inside the assistant |
-| `--radius-xl` | 16px | Floating panels and the dashboard chat box |
+| `--radius-lg` | 10px | Cards, chat bubbles, drop zones, the tour bubble, cards inside the assistant |
+| `--radius-xl` | 12px | Floating panels and dialogs |
 | `--radius-pill` | 999px | Tags; circles use `50%` |
 
 **Shadow**
 
+Depth is for things that really sit above the page. Cards sit *on* the page, so they're drawn with a
+hairline, not a float, and they never move under the pointer.
+
 | Token | Use for |
 | --- | --- |
-| `--shadow-card` | Cards sitting on the page: a soft, layered shadow tinted with `--ink` |
-| `--shadow-card-hover` | A card under the pointer, and cards floating over a picture (sign-in page) |
+| `--shadow-card` | Cards sitting on the page: a 1px contact shadow. The card's edge is its `--card-border` |
+| `--shadow-card-hover` | Sign-in page only: the sign-in card and the cards floating over its picture |
 | `--shadow-menu` | Drop-down menus |
 | `--shadow-float` | Things floating above everything: assistant panel and bubble, tour bubble |
 
@@ -337,12 +341,11 @@ real number. The sign-in page's picture is the one exception: it still draws its
 | Element | Hover | Press |
 | --- | --- | --- |
 | Primary and secondary buttons | Lift 1px with a soft shadow | Scale to 97% |
-| Cards (without a form) | Lift 2px, `--shadow-card-hover` | – |
 | Fields | Border darkens to `--subtle` | Focus: `--teal` border and a soft teal halo |
 | Menu items | Nudge 4px right | – |
 | Avatar, assistant bubble, icon buttons | Grow slightly | Shrink slightly |
 
-Cards that hold a form don't lift: a card that moves while you type in it is unsettling.
+Cards don't react to the pointer.
 
 **Things that open** grow out of where they came from: menus drop and unshrink from their corner,
 the assistant panel grows from the bubble, the Record sales dialog rises with a blurred backdrop,
