@@ -75,10 +75,16 @@ public interface AssistantDailyUsageRepository extends JpaRepository<AssistantDa
             + "where u.owner.id = :ownerId and u.usageDate = :date")
     int addSpokenCharacters(@Param("ownerId") Long ownerId, @Param("date") LocalDate date, @Param("characters") int characters);
 
+    @Transactional
+    @Modifying
+    @Query("update AssistantDailyUsage u set u.embeddingTokens = u.embeddingTokens + :tokens "
+            + "where u.owner.id = :ownerId and u.usageDate = :date")
+    int addEmbeddingTokens(@Param("ownerId") Long ownerId, @Param("date") LocalDate date, @Param("tokens") long tokens);
+
     @Query("select new app.assistant.AccountUsageTotals(o.id, o.email, o.name, o.plan, "
             + "sum(u.messages), sum(u.transcriptions), sum(u.spokenReplies), "
             + "sum(u.inputTokens), sum(u.cachedTokens), sum(u.outputTokens), "
-            + "sum(u.transcribedSeconds), sum(u.spokenCharacters)) "
+            + "sum(u.transcribedSeconds), sum(u.spokenCharacters), sum(u.embeddingTokens)) "
             + "from AssistantDailyUsage u join u.owner o where u.usageDate >= :from "
             + "group by o.id, o.email, o.name, o.plan")
     List<AccountUsageTotals> totalsSince(@Param("from") LocalDate from);

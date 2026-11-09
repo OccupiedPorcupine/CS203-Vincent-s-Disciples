@@ -4,7 +4,7 @@
   "shared": [
     {
       "guideId": "assistant-button",
-      "description": "Round mic button in the bottom-right corner of every page. Opens the assistant, where the user can say or type their sales."
+      "description": "Round mic button in the bottom-right corner of every page. Opens the assistant, where the user can say or type their sales, ask about their own documents, or say \"remember that ...\" to save a note to Documents after confirming."
     }
   ],
   "pages": [
@@ -14,11 +14,12 @@
       "url": "dashboard.html",
       "summary": "Home page: total portions sold in the latest 7 days, sales by dish, a weekly summary to read or play aloud, revenue and gross profit for those days, the dishes that earn the most, leftovers and sell-outs, and a box to talk to the assistant.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Prep list, Data ingestion and Dishes pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Demand forecast, Prep list, Data ingestion, Dishes and Documents pages." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
         { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
+        { "guideId": "nav-documents", "description": "Link to the Documents page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "demand-chart", "description": "Line chart and total of portions sold per day, all dishes combined, for the 7 days ending on the latest recorded sale." },
         { "guideId": "dish-chart", "description": "Bar chart of portions sold per dish over the same 7 days." },
@@ -39,11 +40,12 @@
       "url": "forecast.html",
       "summary": "Predicts how many portions of a dish will sell on a date, from its past sales and public holidays (with a few weeks of sales, by the Chronos-2 forecast model). For all dishes at once and the ingredients, see the Prep list.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Prep list, Data ingestion and Dishes pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Prep list, Data ingestion, Dishes and Documents pages." },
         { "guideId": "nav-dashboard", "description": "Link back to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
+        { "guideId": "nav-documents", "description": "Link to the Documents page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "dish-select", "description": "Drop-down to choose which dish to forecast." },
         { "guideId": "forecast-date", "description": "Date to forecast, from today up to 7 days ahead." },
@@ -60,12 +62,12 @@
       "url": "prep.html",
       "summary": "What to prepare for a day: portions of each dish from its forecast plus a safety margin, how much of each ingredient to buy or take from stock, a Share button, each dish's recipe, and each ingredient's yield and whether it is bought daily.",
       "elements": [
-        { "guideId": "nav-documents", "description": "Link to the Documents page, inside the top-left menu." },
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Data ingestion and Dishes pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Data ingestion, Dishes, and Documents pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
+        { "guideId": "nav-documents", "description": "Link to the Documents page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "prep-date", "description": "Day to prepare for, from today up to 7 days ahead. Starts on tomorrow." },
         { "guideId": "prep-buffer", "description": "How many portions to prepare: Best for your margins (the default: each dish by its price and cost, enough for more days when a plate earns a lot and costs little; dishes without a price and cost get the forecast, or the top of the range when the forecast is an average of past sales), the top of the likely range, the forecast only, or the forecast plus 10, 20 or 30%." },
@@ -82,11 +84,12 @@
       "url": "data.html",
       "summary": "Upload CSV or Excel files of past sales and import them into daily sales, see the files uploaded so far, and set the stall's opening days (weekly rest days, trading hours and one-off closed days).",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list and Dishes pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list, Dishes and Documents pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
         { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
+        { "guideId": "nav-documents", "description": "Link to the Documents page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "upload-dropzone", "description": "Area to drop a CSV or XLSX file onto, or click to choose one (maximum 25 MB)." },
         { "guideId": "upload-button", "description": "Uploads the chosen file. Disabled until a file is chosen." },
@@ -106,11 +109,12 @@
       "url": "dishes.html",
       "summary": "Each dish's selling price and cost per portion, used for revenue and gross profit on the Dashboard.",
       "elements": [
-        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list and Data ingestion pages." },
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list, Data ingestion and Documents pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
         { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "nav-documents", "description": "Link to the Documents page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
         { "guideId": "price-list", "description": "Each dish's price and cost per portion in S$, the margin per plate, and a Save button per dish. A new price applies from today; earlier sales keep their price." }
       ]
@@ -121,6 +125,25 @@
       "url": "account.html",
       "summary": "The signed-in account, and linking chat apps like Telegram to record sales by chatting from a phone.",
       "elements": [
+        { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list, Data ingestion, Dishes and Documents pages." },
+        { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
+        { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
+        { "guideId": "nav-prep", "description": "Link to the Prep list page, inside the top-left menu." },
+        { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
+        { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
+        { "guideId": "nav-documents", "description": "Link to the Documents page, inside the top-left menu." },
+        { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
+        { "guideId": "account-details", "description": "The name and email the user signed in with." },
+        { "guideId": "session-settings", "description": "Sign-in duration settings: idle timeout in minutes and maximum sign-in duration in hours. Defaults are 60 minutes and 8 hours. Save settings applies them on the next sign-in, across devices; Use defaults fills in the defaults before saving." },
+        { "guideId": "chat-apps", "description": "Chat apps set up on this server, such as Telegram, each with Connect or Disconnect. Connect shows a link (and a QR code on a computer) that opens the chat app; after tapping Start there, the user can send sales by text or voice note and confirm them in the chat." }
+      ]
+    },
+    {
+      "id": "documents",
+      "title": "Documents",
+      "url": "documents.html",
+      "summary": "The owner's own rules and information (suppliers and order cut-offs, helper rules, what to do when something breaks), typed or uploaded, which the assistant answers from. They don't change forecasts, prep lists or prices.",
+      "elements": [
         { "guideId": "main-menu", "description": "Menu button at the top left. Opens links to the Dashboard, Demand forecast, Prep list, Data ingestion and Dishes pages." },
         { "guideId": "nav-dashboard", "description": "Link to the Dashboard, inside the top-left menu." },
         { "guideId": "nav-forecast", "description": "Link to the Demand forecast page, inside the top-left menu." },
@@ -128,9 +151,14 @@
         { "guideId": "nav-data", "description": "Link to the Data ingestion page, inside the top-left menu." },
         { "guideId": "nav-dishes", "description": "Link to the Dishes page, inside the top-left menu." },
         { "guideId": "account-menu", "description": "Profile picture at the top right. Opens the user's name and email, a link to the Account page (chat apps) and the Log out button." },
-        { "guideId": "account-details", "description": "The name and email the user signed in with." },
-        { "guideId": "session-settings", "description": "Sign-in duration settings: idle timeout in minutes and maximum sign-in duration in hours. Defaults are 60 minutes and 8 hours. Save settings applies them on the next sign-in, across devices; Use defaults fills in the defaults before saving." },
-        { "guideId": "chat-apps", "description": "Chat apps set up on this server, such as Telegram, each with Connect or Disconnect. Connect shows a link (and a QR code on a computer) that opens the chat app; after tapping Start there, the user can send sales by text or voice note and confirm them in the chat." }
+        { "guideId": "document-editor", "description": "Card for adding a document (or editing one opened from the list): write it, or upload a file." },
+        { "guideId": "document-mode", "description": "Write or Upload a file: switches the card between typing a document and uploading one." },
+        { "guideId": "document-title", "description": "The document's title, such as the supplier's name or \"Helper rules\"." },
+        { "guideId": "document-body", "description": "The document's text, up to 100,000 characters." },
+        { "guideId": "save-document", "description": "Saves the typed document (Save changes when editing)." },
+        { "guideId": "document-dropzone", "description": "Drop a .txt, .md, .pdf (with text, not a scan) or .docx file of up to 5 MB here, or click to choose it. Only the text is kept." },
+        { "guideId": "upload-document", "description": "Uploads the chosen file, then opens its text to check and edit." },
+        { "guideId": "document-list", "description": "The owner's documents (at most 30), with \"From Chicky\" for notes saved from the assistant, when each was last edited, whether the assistant can search it yet, and Edit and Delete." }
       ]
     }
   ],
@@ -222,6 +250,16 @@
       "summary": "Link Telegram (or another chat app) to record sales and ask about forecasts by chatting from a phone.",
       "steps": [
         { "page": "account", "guideId": "chat-apps", "message": "Tap Connect next to Telegram, then open the link on your phone (or scan the QR code) and tap Start." }
+      ]
+    },
+    {
+      "id": "add-document",
+      "summary": "Add a document of the stall's own rules or information (suppliers, helper rules, what to do when something breaks) for the assistant to answer from.",
+      "steps": [
+        { "page": "documents", "guideId": "document-mode", "message": "Choose Write to type it, or Upload a file for a .txt, .md, .pdf or .docx." },
+        { "page": "documents", "guideId": "document-title", "message": "Give it a short title, like the supplier's name or \"Helper rules\"." },
+        { "page": "documents", "guideId": "document-body", "message": "Write what you'd tell a new helper: who to call, cut-off times, what to do when something goes wrong." },
+        { "page": "documents", "guideId": "save-document", "message": "Press Save document. After that, ask me about it any time and I'll answer from it." }
       ]
     }
   ]

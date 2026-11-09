@@ -119,6 +119,9 @@
 .assistant-message.assistant { background: var(--neutral-soft, #f1f4f5); }
 .assistant-message.user { margin-left: auto; color: #fff; background: var(--assistant-teal); }
 .assistant-message.error { color: var(--assistant-error); background: var(--error-soft, #fdecea); }
+/* The documents a reply came from, under it. */
+.assistant-sources { max-width: 85%; margin: -4px 0 10px; font-size: 13px; color: var(--assistant-muted); overflow-wrap: anywhere; }
+.assistant-sources a { color: var(--assistant-teal); text-underline-offset: 2px; }
 
 .assistant-card {
   margin: 0 0 12px;
@@ -153,6 +156,19 @@
 .assistant-prices td:nth-child(2) { width: auto; color: var(--assistant-muted); }
 .assistant-prices td:last-child { width: 96px; }
 .assistant-dish { overflow-wrap: anywhere; }
+.assistant-note-field { display: grid; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--assistant-muted); }
+.assistant-note-field :is(input, textarea) {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--assistant-border);
+  border-radius: 6px;
+  font: 14px/1.4 Inter, Arial, sans-serif;
+  color: var(--assistant-ink);
+  background: #fff;
+  resize: vertical;
+}
+.assistant-card-note a { color: var(--assistant-teal); }
 .assistant-heard,
 .assistant-previous { display: block; margin-top: 2px; font-size: 12px; color: var(--assistant-muted); }
 /* "Sold out at" or "Left over" with its field, under the dish name. */
@@ -274,6 +290,7 @@
   .assistant-primary, .assistant-secondary { min-height: 44px; }
   .assistant-mic, .assistant-send { width: 44px; height: 44px; }
   .assistant-entries input { min-height: 44px; font-size: 16px; }
+  .assistant-note-field :is(input, textarea) { min-height: 44px; font-size: 16px; }
   .assistant-input textarea { min-height: 44px; font-size: 16px; }
 }
 

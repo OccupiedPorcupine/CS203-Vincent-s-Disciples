@@ -1,0 +1,42 @@
+/* Documents layout. Shared tokens and components are in base.css. */
+.page > .card { margin-top: 32px; }
+.page-heading .tag { white-space: nowrap; }
+#list-status:empty { display: none; }
+.editor-mode { margin-top: 16px; }
+.write-form, .upload-form { display: grid; gap: 16px; margin-top: 16px; }
+.write-form .form-actions, .upload-form .form-actions { margin-top: 0; }
+.document-body { height: auto; min-height: 240px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
+.field-note { color: var(--muted); font-size: var(--text-xs); }
+.field-note.is-error { color: var(--error); }
+
+/* One row per document: title and details, its status, then Edit and Delete. */
+.document-list { margin-top: 16px; padding: 0; border-top: 1px solid var(--divider); list-style: none; }
+.document-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px 16px;
+  align-items: center;
+  min-height: 64px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--divider);
+  font-size: var(--text-sm);
+}
+.document-row:target, .document-row.is-editing { background: var(--teal-tint); }
+.document-name { min-width: 0; }
+.document-name strong { display: block; font-weight: 400; overflow-wrap: anywhere; }
+.document-name span { display: block; margin-top: 4px; color: var(--muted); font-size: var(--text-xs); }
+.document-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 16px; }
+.document-actions .text-button { min-height: 32px; }
+.document-actions p { margin: 0; color: var(--ink); }
+
+/* Ideas for a stall with no documents yet. */
+.document-examples { width: fit-content; max-width: 520px; margin: -16px auto 0; padding: 0 0 32px 20px; color: var(--muted); font-size: var(--text-sm); }
+.document-examples li { margin-top: 8px; }
+
+@media (max-width: 760px) {
+  .document-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .document-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+@media (pointer: coarse) {
+  .document-actions .text-button { min-height: 44px; min-width: 44px; }
+}

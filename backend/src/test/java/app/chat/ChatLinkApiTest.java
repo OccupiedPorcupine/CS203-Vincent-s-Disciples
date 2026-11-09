@@ -217,8 +217,8 @@ class ChatLinkApiTest {
 
     @Test
     void onlyTheWebGetsGuidedTours() {
-        assertTrue(tools.specs("dashboard").stream().map(ToolSpec::name).toList().contains("guide_user"));
-        assertFalse(tools.specs("chat").stream().map(ToolSpec::name).toList().contains("guide_user"));
+        assertTrue(tools.specs("dashboard", false).stream().map(ToolSpec::name).toList().contains("guide_user"));
+        assertFalse(tools.specs("chat", false).stream().map(ToolSpec::name).toList().contains("guide_user"));
     }
 
     @Test

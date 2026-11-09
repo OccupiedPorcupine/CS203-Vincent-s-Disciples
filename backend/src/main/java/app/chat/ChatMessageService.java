@@ -5,6 +5,7 @@ import app.assistant.AssistantService;
 import app.assistant.SpeechFormat;
 import app.dto.AssistantMessageRequest;
 import app.dto.AssistantMessageResponse;
+import app.dto.DocumentSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -104,14 +106,22 @@ public class ChatMessageService {
             AssistantMessageResponse response = assistant.handleMessage(ownerId, new AssistantMessageRequest(
                     conversationId, text, AssistantService.CHAT_PAGE,
                     channel.name().toLowerCase(Locale.ROOT) + "-" + mode, null, null));
+            String reply = withSources(response.reply(), response.sources());
             if (response.proposal() == null) {
-                return new ChatReply(heard, response.reply(), null, null);
+                return new ChatReply(heard, reply, null, null);
             }
-            return new ChatReply(heard, response.reply(), ChatProposalText.proposal(response.proposal()), response.proposal().id());
+            return new ChatReply(heard, reply, ChatProposalText.proposal(response.proposal()), response.proposal().id());
         } catch (AssistantException exception) {
             log.info("{} message for user {} not handled: {}", channel, ownerId, exception.getCode());
             return new ChatReply(heard, exception.getMessage(), null, null);
         }
+    }
+
+    // A chat can't show the web's source chips, so the documents a reply came from follow it:
+    // "Order by 9pm. (from: Ah Huat Poultry)" (issue #153).
+    static String withSources(String reply, List<DocumentSource> sources) {
+        if (sources == null || sources.isEmpty()) return reply;
+        return reply + " (from: " + String.join(", ", sources.stream().map(DocumentSource::title).toList()) + ")";
     }
 
     // A reply as a voice note (Ogg Opus), for owners who sent one. Empty when the chat isn't linked,

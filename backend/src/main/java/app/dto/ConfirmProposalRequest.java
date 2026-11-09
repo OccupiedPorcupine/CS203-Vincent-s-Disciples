@@ -14,5 +14,11 @@ public record ConfirmProposalRequest(
         @DecimalMin("0") @DecimalMax("10000") @Digits(integer = 5, fraction = 2)
         @Schema(description = "Price proposals: the price as the user edited it; omit to save the proposed price") BigDecimal price,
         @DecimalMin("0") @DecimalMax("10000") @Digits(integer = 5, fraction = 2)
-        @Schema(description = "Price proposals: the unit cost as the user edited it; omit to keep the proposed or current cost") BigDecimal unitCost
-) {}
+        @Schema(description = "Price proposals: the unit cost as the user edited it; omit to keep the proposed or current cost") BigDecimal unitCost,
+        @Size(max = 120) @Schema(description = "Note proposals: the title as the user edited it; omit to save the proposed one") String noteTitle,
+        @Size(max = 4000) @Schema(description = "Note proposals: the text as the user edited it; omit to save the proposed one") String noteText
+) {
+    public ConfirmProposalRequest(List<ProposalEntryInput> entries, BigDecimal price, BigDecimal unitCost) {
+        this(entries, price, unitCost, null, null);
+    }
+}

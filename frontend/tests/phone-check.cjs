@@ -1,5 +1,5 @@
 // Phone check for issue #47: signs in, records sales through the assistant and from an Actions
-// needed card, gets a forecast, prices a dish, opens the prep list and follows a guided tour, in
+// needed card, gets a forecast, prices a dish, writes a document, opens the prep list and follows a guided tour, in
 // WebKit (Safari's engine) at phone sizes from 360px to 414px, with a mocked API (no backend or login
 // needed). On every page it fails if the home-screen app tags are missing, the page scrolls
 // sideways, a field would make iOS zoom in (text under 16px), a control is smaller than 44px, or
@@ -101,6 +101,10 @@ async function settle(page) {
 
 async function mockApi(context) {
   let signedIn = false;
+  const documents = [
+    { id: 1, title: "Ah Huat Poultry", source: "UPLOAD", fileName: "suppliers-and-cut-off-times.docx", indexStatus: "INDEXED", characters: 1840, updatedAt: "2026-10-29T03:00:00Z" },
+    { id: 2, title: "Fishball supplier is closed on Tuesdays", source: "ASSISTANT", fileName: null, indexStatus: "PENDING", characters: 52, updatedAt: "2026-10-28T03:00:00Z" }
+  ];
   const json = (route, body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
   const day = offset => {
     const date = new Date("2026-10-30T00:00:00Z");
@@ -122,6 +126,12 @@ async function mockApi(context) {
       return json(route, { price, unitCost });
     }
     if (path.endsWith("/sales")) return json(route, Array.from({ length: 35 }, (_, i) => ({ date: day(i - 34), quantitySold: 30 + (i * 7) % 15 })));
+    if (path === "/api/documents" && route.request().method() === "POST") {
+      const { title, body } = route.request().postDataJSON();
+      documents.unshift({ id: documents.length + 1, title, source: "TYPED", fileName: null, indexStatus: "INDEXED", characters: body.length, updatedAt: "2026-10-30T02:00:00Z" });
+      return json(route, { ...documents[0], body }, 201);
+    }
+    if (path === "/api/documents") return json(route, documents);
     if (path === "/api/data-sources") return json(route, []);
     if (path === "/api/assistant/status") return json(route, { available: true, voice: false });
     if (path === "/api/assistant/messages") return json(route, {
@@ -259,6 +269,17 @@ async function mockApi(context) {
     await page.tap('[aria-label="Save the price of Char siew rice"]');
     await page.getByText("Saved Char siew rice").waitFor();
     await check("dishes page");
+
+    // Documents: write one
+    await page.tap(".navigation summary");
+    await page.tap('.navigation a[href="documents.html"]');
+    await page.waitForURL("**/documents.html");
+    await page.getByText("Ah Huat Poultry").waitFor();
+    await page.fill("#document-title", "Helper rules");
+    await page.fill("#document-body", "Wash hands before serving. Close the gas at night.");
+    await page.tap("#save-document");
+    await page.getByText("Added Helper rules.").waitFor();
+    await check("documents page");
 
     // Prep list, then a guided tour on it
     await page.tap(".navigation summary");

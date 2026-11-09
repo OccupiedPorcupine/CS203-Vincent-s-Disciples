@@ -61,7 +61,7 @@ teal forecast continuing it, and two cards (tomorrow's forecast, a prep-list nud
 
 **Every page must be reachable from every other page.** The rule:
 
-- **Top-level pages** (Dashboard, Demand forecast, Prep list, Data ingestion, Dishes) are listed in the top-left menu
+- **Top-level pages** (Dashboard, Demand forecast, Prep list, Data ingestion, Dishes, Documents) are listed in the top-left menu
   on **every** signed-in page, in that order, with those labels. The current page is in the list
   too, with `aria-current="page"`; the others get `data-guide-id="nav-<page>"` so the guided tour
   can point at them.
@@ -76,8 +76,8 @@ Menus are `<details>` elements. `js/app-shell.js` keeps only one open at a time 
 an outside click or Escape, so new header menus get that for free if they live in `.topbar`.
 
 ```
-Sign in ──► Dashboard ◄──► Demand forecast ◄──► Prep list ◄──► Data ingestion ◄──► Dishes
-               ▲            (menu on every page links all five)                  ▲
+Sign in ──► Dashboard ◄──► Demand forecast ◄──► Prep list ◄──► Data ingestion ◄──► Dishes ◄──► Documents
+               ▲            (menu on every page links all six)                   ▲
                └──────────────────── avatar menu: Log out ──► Sign in
 ```
 

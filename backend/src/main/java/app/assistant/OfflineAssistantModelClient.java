@@ -20,8 +20,10 @@ import java.util.regex.Pattern;
 // development and tests without an OpenAI key. It is not AI: it only understands typed sales
 // like "yesterday chicken rice 42, char siew 30" (with "sold out at 12:40" or "3 left over"), closures like "closed tomorrow" (today,
 // tomorrow or yesterday only), "what do I prep for tomorrow?", "why ...?" about the forecast on screen,
-// and "how do I ..." questions that share words with a task in the app guide (in a chat app, answered
-// with the task's link). It drives the same tools
+// "how do I ..." questions that share words with a task in the app guide (in a chat app, answered
+// with the task's link), and questions answered from the owner's documents (quoting the best part
+// found, with its [doc:N] tag, or saying the documents don't cover it), and "remember that ..." as a
+// note to confirm (unless it's the stall's own closed day or a dish's other name). It drives the same tools
 // a real model would (list_dishes then propose_sales_entry and/or propose_closure, get_prep_list,
 // explain_forecast, or guide_user), so the rest of the pipeline is real.
 public class OfflineAssistantModelClient implements AssistantModelClient {
@@ -71,6 +73,19 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
             "show", "help", "guide", "into", "use", "get", "want", "page", "one", "day");
     // The guide's heading line in the web and chat prompts; the index JSON is on the next line.
     private static final String GUIDE_MARKER = "App guide index";
+    // The documents section's heading line (AssistantPrompt.DOCUMENTS); the parts' JSON is on the next line.
+    private static final String DOCUMENTS_MARKER = "Parts of the owner's own documents";
+    private static final Pattern DOCUMENT_QUESTION = Pattern.compile(
+            "\\b(who|what|when|which|is|are|do|does|can|should)\\b|\\?|谁|什么|几点|吗|哪", Pattern.CASE_INSENSITIVE);
+    private static final int MAX_QUOTE = 300;
+    static final String NOT_IN_DOCUMENTS = "Your documents don't say. You can add it on the Documents page.";
+    // "remember that ...", "note down: ...", 记住...
+    private static final Pattern REMEMBER = Pattern.compile(
+            "^(?:please\\s+)?(?:remember|note(?:\\s+down)?|take note|记住)[,:：]?\\s*(?:that\\s+)?(.+)$",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern STALL_SUBJECT = Pattern.compile("\\b(we|we're|i|i'm|our|stall|shop)\\b|我们", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ALIAS = Pattern.compile("\\bmeans\\b|\\bis short for\\b|就是", Pattern.CASE_INSENSITIVE);
+    static final String ALIAS_REPLY = "Just use that name when you record sales, and I'll learn which dish it means.";
 
     private static final String HELP = "Offline demo mode: I only understand typed sales such as \"chicken rice 42, char siew rice 30\", "
             + "closures such as \"closed tomorrow\", \"what do I prep for tomorrow?\", \"why?\" about a forecast on screen, \"how was my week?\", "
@@ -116,6 +131,20 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
 
         if (!"function_call_output".equals(last.path("type").asString())) {
             String text = lastUserText(input);
+            Matcher remember = REMEMBER.matcher(text.strip());
+            if (remember.find()) {
+                String note = remember.group(1).strip();
+                if (ALIAS.matcher(note).find()) {
+                    return message(ALIAS_REPLY);
+                }
+                // The stall's own closed day is a closure, which the steps below propose.
+                if (!(STALL_SUBJECT.matcher(note).find() && CLOSED.matcher(note).find())) {
+                    ObjectNode arguments = jsonMapper.createObjectNode();
+                    arguments.put("title", noteTitle(note));
+                    arguments.put("text", sentence(note));
+                    return call(AssistantTools.PROPOSE_NOTE, arguments);
+                }
+            }
             if (PREP.matcher(text).find()) {
                 ObjectNode arguments = jsonMapper.createObjectNode();
                 arguments.put("date", find(TODAY_WORD.matcher(text).find() ? TODAY : TOMORROW, instructions));
@@ -131,8 +160,18 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
                 arguments.put("date", shown.group(2));
                 return call(AssistantTools.EXPLAIN_FORECAST, arguments);
             }
+            JsonNode documents = documentsIn(instructions);
+            // "Remember we're closed tomorrow" is a closure, not a question for the documents.
+            boolean documentQuestion = documents != null && !remember.matches() && DOCUMENT_QUESTION.matcher(text).find();
+            if (documentQuestion && !documents.isEmpty()) {
+                JsonNode best = documents.get(0);
+                return message(quote(best.path("text").asString()) + " [" + best.path("tag").asString() + "]");
+            }
             String taskId = EVERY_WEEKDAY.matcher(text).find() && CLOSED.matcher(text).find() ? "set-opening-days"
                     : QUESTION.matcher(text).find() ? matchTask(text, instructions) : null;
+            if (taskId == null && documentQuestion) {
+                return message(NOT_IN_DOCUMENTS);
+            }
             if (taskId != null && tools.stream().noneMatch(tool -> AssistantTools.GUIDE_USER.equals(tool.name()))) {
                 // In a chat app: no tour, so give the link to the task's page (AppGuide.links).
                 Matcher link = Pattern.compile("- task " + Pattern.quote(taskId) + ": (\\S+)").matcher(instructions);
@@ -194,6 +233,7 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
 
         if (output.path("ok").asBoolean()) {
             return message(AssistantTools.GUIDE_USER.equals(toolName) ? "Let me show you."
+                    : AssistantTools.PROPOSE_NOTE.equals(toolName) ? "Please check the note and press Confirm to save it."
                     : AssistantTools.PROPOSE_PRICE_CHANGE.equals(toolName) ? "Please check the new price and press Confirm to save it."
                     : "Please check these and press Confirm to save them.");
         }
@@ -306,6 +346,37 @@ public class OfflineAssistantModelClient implements AssistantModelClient {
         ObjectNode arguments = jsonMapper.createObjectNode();
         arguments.putArray("closures").add(closure);
         return call(AssistantTools.PROPOSE_CLOSURE, arguments);
+    }
+
+    // The first few words of a note, as its title: "Fishball supplier is closed on Tuesdays".
+    private static String noteTitle(String note) {
+        String[] words = note.replaceAll("[.!?。！？]+$", "").split("\\s+");
+        String title = String.join(" ", java.util.Arrays.copyOfRange(words, 0, Math.min(words.length, 7)));
+        title = title.replaceFirst("^(?i)the\\s+", "");
+        return title.isEmpty() ? "Note" : Character.toUpperCase(title.charAt(0)) + title.substring(1);
+    }
+
+    // The note as a sentence: a capital first letter and a full stop.
+    private static String sentence(String note) {
+        String text = Character.toUpperCase(note.charAt(0)) + note.substring(1);
+        return text.matches(".*[.!?。！？]$") ? text : text + ".";
+    }
+
+    // The document parts in the instructions, or null for a stall without documents.
+    private JsonNode documentsIn(String instructions) {
+        int markerAt = instructions.indexOf(DOCUMENTS_MARKER);
+        if (markerAt < 0) {
+            return null;
+        }
+        return jsonMapper.readTree(instructions.substring(markerAt).lines().skip(1).findFirst().orElse("[]").strip());
+    }
+
+    // The start of a part, up to the end of a sentence where it can.
+    private static String quote(String text) {
+        String flat = text.replaceAll("\\s+", " ").strip();
+        if (flat.length() <= MAX_QUOTE) return flat;
+        int end = Math.max(flat.lastIndexOf(". ", MAX_QUOTE), flat.lastIndexOf("。", MAX_QUOTE));
+        return end > 0 ? flat.substring(0, end + 1) : flat.substring(0, MAX_QUOTE) + "…";
     }
 
     // The task whose ID and summary share the most words with the question, from the guide index

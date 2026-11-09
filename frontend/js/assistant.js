@@ -170,7 +170,7 @@
     document.querySelectorAll("[data-assistant-ask]").forEach(card => {
       const askForm = card.querySelector("form");
       const askInput = askForm.querySelector("input, textarea");
-      card.querySelectorAll("input, button").forEach(control => {
+      card.querySelectorAll("input, textarea, button").forEach(control => {
         control.disabled = !status.available;
       });
 
@@ -257,6 +257,7 @@
       debug("reply", { proposal: response.proposal?.id ?? null, guideSteps: response.guide?.length ?? 0 });
       showUsage(response.usage);
       addMessage("assistant", response.reply);
+      if (response.sources?.length) addSources(response.sources);
       if (response.proposal) addConfirmCard(response.proposal);
       if (response.guide?.length && window.chickyGuide) {
         // The tour reads its own steps aloud.
@@ -550,6 +551,10 @@
       addPriceCard(proposal);
       return;
     }
+    if (proposal.type === "NOTE") {
+      addNoteCard(proposal);
+      return;
+    }
     const closures = proposal.closures || [];
     const card = element("div", "assistant-card");
     const heading = element("p", "assistant-card-title");
@@ -710,6 +715,76 @@
     }
   }
 
+  // "Save this note?" with the title and text editable before confirming (issue #154).
+  function addNoteCard(proposal) {
+    const card = element("div", "assistant-card");
+    const heading = element("p", "assistant-card-title");
+    heading.textContent = "Save this note?";
+
+    const titleLabel = element("label", "assistant-note-field");
+    titleLabel.append("Title");
+    const title = element("input", "", { type: "text", maxlength: "120", required: "" });
+    title.value = proposal.note.title;
+    titleLabel.append(title);
+
+    const textLabel = element("label", "assistant-note-field");
+    textLabel.append("Note");
+    const text = element("textarea", "", { rows: "3", maxlength: "2000", required: "" });
+    text.value = proposal.note.text;
+    textLabel.append(text);
+
+    const hint = element("p", "assistant-previous");
+    hint.textContent = "Saved to your Documents, where you can edit or delete it.";
+
+    const actions = element("div", "assistant-card-actions");
+    const cancel = element("button", "assistant-secondary", { type: "button" });
+    cancel.textContent = "Cancel";
+    const confirm = element("button", "assistant-primary", { type: "button" });
+    confirm.textContent = "Confirm";
+    actions.append(cancel, confirm);
+
+    card.append(heading, titleLabel, textLabel, hint, actions);
+    log.append(card);
+    log.scrollTop = log.scrollHeight;
+    confirm.focus();
+
+    confirm.addEventListener("click", async () => {
+      if (!title.value.trim()) return title.reportValidity();
+      if (!text.value.trim()) return text.reportValidity();
+      setCardEnabled(card, false);
+      try {
+        const result = await apiRequest(`/api/assistant/proposals/${proposal.id}/confirm`, {
+          method: "POST",
+          body: JSON.stringify({ noteTitle: title.value, noteText: text.value })
+        });
+        closeCard(card, "");
+        const saved = card.querySelector(".assistant-card-note");
+        saved.append("Saved as a note: ");
+        const link = element("a", "", { href: `documents.html#document-${result.note.documentId}` });
+        link.textContent = result.note.title;
+        saved.append(link, ".");
+        window.dispatchEvent(new CustomEvent("chicky:documents-saved", { detail: result.note }));
+      } catch (error) {
+        addMessage("error", errorMessage(error));
+        if (error.status === 409 || error.status === 404) {
+          closeCard(card, "Not saved.");
+        } else {
+          setCardEnabled(card, true);
+        }
+      }
+    });
+
+    cancel.addEventListener("click", async () => {
+      setCardEnabled(card, false);
+      try {
+        await apiRequest(`/api/assistant/proposals/${proposal.id}/cancel`, { method: "POST" });
+      } catch (error) {
+        // Unsaved either way; an expired proposal can't be cancelled or saved.
+      }
+      closeCard(card, "Cancelled. Nothing was saved.");
+    });
+  }
+
   function amountInput(value, label, placeholder = "") {
     const input = element("input", "", { type: "number", min: "0", max: "10000", step: "0.01", inputmode: "decimal", "aria-label": label });
     input.placeholder = placeholder;
@@ -797,7 +872,7 @@
   }
 
   function setCardEnabled(card, enabled) {
-    card.querySelectorAll("input, button").forEach(control => {
+    card.querySelectorAll("input, textarea, button").forEach(control => {
       control.disabled = !enabled;
     });
   }
@@ -826,6 +901,20 @@
     const message = element("p", `assistant-message ${kind}`);
     message.textContent = text;
     log.append(message);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // "From: Ah Huat Poultry", linking to each document the reply came from (issue #153).
+  function addSources(sources) {
+    const line = element("p", "assistant-sources");
+    line.append("From: ");
+    sources.forEach((source, index) => {
+      if (index) line.append(", ");
+      const link = element("a", "", { href: `documents.html#document-${source.documentId}` });
+      link.textContent = source.title;
+      line.append(link);
+    });
+    log.append(line);
     log.scrollTop = log.scrollHeight;
   }
 

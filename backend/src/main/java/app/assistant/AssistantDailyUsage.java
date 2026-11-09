@@ -47,6 +47,10 @@ public class AssistantDailyUsage {
     @Column(nullable = false)
     private int spokenCharacters;
 
+    // Tokens embedded for document search (issue #152): documents when saved, questions when asked.
+    @Column(nullable = false)
+    private long embeddingTokens;
+
     protected AssistantDailyUsage() {
     }
 
@@ -85,5 +89,9 @@ public class AssistantDailyUsage {
 
     public int getSpokenCharacters() {
         return spokenCharacters;
+    }
+
+    public long getEmbeddingTokens() {
+        return embeddingTokens;
     }
 }
