@@ -26,9 +26,13 @@ def run(args, capture=False):
     )
 
 
-def fetch(url, limit):
+def fetch(url, limit, accept="application/vnd.github+json"):
     request = urllib.request.Request(
-        url, headers={"User-Agent": "chicky-deployer"}
+        url,
+        headers={
+            "User-Agent": "chicky-deployer",
+            "Accept": accept,
+        },
     )
     with urllib.request.urlopen(request, timeout=60) as response:
         data = response.read(limit + 1)
@@ -36,6 +40,38 @@ def fetch(url, limit):
         raise RuntimeError("Download exceeded size limit")
     return data
 
+def fetch_manifest(tag):
+    release = json.loads(fetch(
+        f"https://api.github.com/repos/{REPO}/releases/tags/aws-{tag}",
+        1024 * 1024,
+    ))
+
+    if (
+        release.get("tag_name") != f"aws-{tag}"
+        or release.get("draft") is not False
+        or release.get("prerelease") is not False
+    ):
+        raise RuntimeError("Release is not a completed AWS release")
+
+    assets = [
+        asset
+        for asset in release.get("assets", [])
+        if asset.get("name") == "deployment.json"
+        and asset.get("state") == "uploaded"
+    ]
+    if len(assets) != 1:
+        raise RuntimeError("Expected exactly one deployment manifest")
+
+    asset_id = assets[0].get("id")
+    if type(asset_id) is not int or asset_id <= 0:
+        raise RuntimeError("Invalid manifest asset ID")
+
+    data = fetch(
+        f"https://api.github.com/repos/{REPO}/releases/assets/{asset_id}",
+        1024 * 1024,
+        accept="application/octet-stream",
+    )
+    return json.loads(data)
 
 def write_json(path, data):
     with path.open("x") as file:
@@ -126,10 +162,7 @@ def main(tag):
     lock = (STATE / "deploy.lock").open("a")
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-    record = json.loads(fetch(
-        f"https://github.com/{REPO}/releases/download/aws-{tag}/deployment.json",
-        1024 * 1024,
-    ))
+    record = fetch_manifest(tag)
     commit = record.get("commit", "")
     if (
         record.get("schema_version") != 1
