@@ -59,7 +59,7 @@
   --duration-slow: 450ms;    /* the tour's spotlight moving */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* small overshoot: buttons popping in */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* sign-in page only: the forecast dot popping in */
   --duration-enter: 520ms;   /* sign-in page only: its picture and form rising in */
 }
 
@@ -318,7 +318,7 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
   display: inline-block;
   width: fit-content;
   padding: 4px 10px;
-  border-radius: var(--radius-pill);
+  border-radius: 4px;
   background: var(--neutral-soft);
   color: var(--muted);
   font-size: var(--text-xs);
@@ -342,40 +342,31 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 @keyframes page-out { to { opacity: 0; transform: translateY(-6px); } }
 @keyframes page-in { from { opacity: 0; transform: translateY(10px); } }
 
-/* ---- Motion and polish (DESIGN.md, "Motion") ----
-   Interaction feedback (hover, press, focus) applies everywhere. Nothing rises in, counts up,
-   shimmers or drifts on its own. */
+/* ---- Motion (DESIGN.md, "Motion") ----
+   Motion is feedback, not decoration: colour changes on hover and press, menus and status lines
+   that settle in, and the cross-fade between pages. Nothing rises in, counts up, pulses or
+   drifts on its own. */
 
-/* Controls: colour, lift and press. */
 .primary-button,
 .secondary-button {
   transition:
     background-color var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
+    border-color var(--duration-fast) var(--ease-out);
 }
-.primary-button:hover:not(:disabled) { box-shadow: 0 6px 16px rgb(15 125 119 / 24%); transform: translateY(-1px); }
-.secondary-button:hover:not(:disabled) { border-color: #b9dcd8; box-shadow: 0 4px 12px rgb(66 86 100 / 8%); transform: translateY(-1px); }
-:is(.primary-button, .secondary-button):active:not(:disabled) { box-shadow: none; transform: translateY(0) scale(0.97); transition-duration: 60ms; }
+.secondary-button:hover:not(:disabled) { border-color: var(--subtle); }
 .text-button { text-decoration-color: rgb(15 125 119 / 40%); transition: text-decoration-color var(--duration-fast), color var(--duration-fast); }
 .text-button:hover:not(:disabled) { color: var(--teal-hover); text-decoration-color: currentColor; }
 .segmented button { transition: background-color var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
 .segmented button:hover:not([aria-pressed="true"]) { color: var(--ink); }
-.tag { transition: background-color var(--duration-fast), color var(--duration-fast); }
 
-.input { transition: border-color var(--duration-fast), box-shadow var(--duration-fast), background-color var(--duration-fast); }
+.input { transition: border-color var(--duration-fast), box-shadow var(--duration-fast); }
 .input:hover:not(:disabled, :focus) { border-color: var(--subtle); }
-/* Replaces the outline on fields: a teal border (3.2:1) plus a soft halo. */
-.input:focus-visible { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgb(27 160 152 / 22%); }
+/* Replaces the outline on fields: a teal border (3.2:1) plus a thin halo. */
+.input:focus-visible { outline: none; border-color: var(--teal); box-shadow: 0 0 0 2px rgb(27 160 152 / 20%); }
 
-/* Header: the avatar and menu button respond, menu items nudge towards the pointer. */
-.avatar { transition: box-shadow var(--duration-fast), transform var(--duration-fast) var(--ease-out); }
-.avatar:hover { transform: scale(1.05); }
 .navigation summary img { transition: opacity var(--duration-fast); }
 .navigation summary:hover img, .navigation[open] summary img { opacity: 0.9; }
-.navigation a { transition: background-color var(--duration-fast), padding-left var(--duration-fast) var(--ease-out); }
-.navigation a:hover:not([aria-current="page"]) { padding-left: 16px; }
+.navigation a { transition: background-color var(--duration-fast); }
 
 /* Status lines settle in when they report a result. */
 .status-text:is(.is-success, .is-error):not(:empty) { animation: status-in var(--duration-base) var(--ease-out); }

@@ -25,23 +25,22 @@
   z-index: 1000;
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   color: #fff;
   background: var(--assistant-teal);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  box-shadow: 0 2px 8px rgb(66 86 100 / 22%);
   cursor: pointer;
   /* Kept out of the page cross-fade (base.css) so it never disappears behind the content. */
   view-transition-name: assistant-bubble;
 }
 .assistant-bubble {
-  transition: background-color var(--duration-fast, 160ms), transform var(--duration-fast, 160ms) var(--ease-out, ease-out), box-shadow var(--duration-fast, 160ms);
+  transition: background-color var(--duration-fast, 160ms);
 }
-.assistant-bubble:hover { background: var(--assistant-teal-dark); transform: scale(1.06); box-shadow: 0 8px 22px rgb(15 125 119 / 32%); }
-.assistant-bubble:active { transform: scale(0.95); }
+.assistant-bubble:hover { background: var(--assistant-teal-dark); }
 .guide-active .assistant-bubble { view-transition-name: none; }
 
 .assistant-panel {
