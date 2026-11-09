@@ -55,7 +55,7 @@ assistant bubble   added by js/assistant.js, bottom right
 
 The sign-in page is the exception: no header, one centred card on the soft brand gradient. Its
 left half is a decorative picture of what Chicky does: a sales line that draws itself, the dashed
-teal forecast continuing it, and two cards (tomorrow's forecast, a prep-list nudge) floating over it.
+teal forecast continuing it, and two facts under it (tomorrow's forecast, a prep-list nudge).
 
 ### Getting around
 
@@ -156,7 +156,7 @@ white text on it. Use `--teal-strong` instead.
 | Token | Use for |
 | --- | --- |
 | `--shadow-card` | Cards sitting on the page: a soft, layered shadow tinted with `--ink` |
-| `--shadow-card-hover` | A card under the pointer, and cards floating over a picture (sign-in page) |
+| `--shadow-card-hover` | A card under the pointer |
 | `--shadow-menu` | Drop-down menus |
 | `--shadow-float` | Things floating above everything: assistant panel and bubble, tour bubble |
 
@@ -357,9 +357,9 @@ the assistant panel grows from the bubble, the Record sales dialog rises with a 
 and a dismissed action slides right, fades and folds its row away (`chickyMotion.leave(element)`).
 Status lines settle in when they report a result.
 
-**Ambient motion** is kept to two places and is very slow: the header's gradient drifts between
-teal and sand over 28 seconds, and the sign-in page's picture (a chart drawing itself, then two
-cards floating over it) has gently drifting colour. It pauses during the guided tour.
+**Ambient motion** is kept to one place and is very slow: the header's gradient drifts between
+teal and sand over 28 seconds. It pauses during the guided tour. The sign-in page's picture is
+still.
 
 **The guided tour wins.** Entrance animations are off while a tour is running (`.guide-active`):
 the tour measures where things are and must not chase a card that is still rising.

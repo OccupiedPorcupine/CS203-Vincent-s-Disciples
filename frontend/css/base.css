@@ -164,7 +164,7 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .page-heading h1 { font-size: var(--text-xl); }
 .lede { margin-top: 4px; color: var(--muted); }
-.eyebrow { color: var(--teal-strong); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; }
+.eyebrow { color: var(--teal-strong); font-size: var(--text-sm); }
 
 .section { margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--divider); }
 .section-heading h2 { font-size: var(--text-lg); }
