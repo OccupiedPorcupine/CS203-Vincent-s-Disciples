@@ -5,10 +5,12 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Locale;
 
 // Something a dish is made from, in one unit so amounts across dishes add up. See V17__recipes.sql.
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(
         name = "ingredients",
         uniqueConstraints = @UniqueConstraint(
@@ -45,6 +47,29 @@ public class Ingredient {
 
     // Bought for each day (true) or kept in stock (false); null for the default.
     private Boolean perishable;
+
+    @Column(precision = 12, scale = 3)
+    private BigDecimal stockQuantity;
+    private LocalDate stockCountedOn;
+    private LocalDate stockExpiresOn;
+
+    public BigDecimal getStockQuantity() {
+        return stockQuantity;
+    }
+
+    public LocalDate getStockCountedOn() {
+        return stockCountedOn;
+    }
+
+    public LocalDate getStockExpiresOn() {
+        return stockExpiresOn;
+    }
+
+    public void setStock(BigDecimal quantity, LocalDate countedOn, LocalDate expiresOn) {
+        stockQuantity = quantity;
+        stockCountedOn = countedOn;
+        stockExpiresOn = expiresOn;
+    }
 
     protected Ingredient() {
     }

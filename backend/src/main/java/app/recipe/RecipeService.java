@@ -6,12 +6,14 @@ import app.dto.IngredientResponse;
 import app.dto.RecipeItemInput;
 import app.dto.RecipeResponse;
 import app.dto.SetIngredientRequest;
+import app.dto.SetStockRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -65,6 +67,20 @@ public class RecipeService {
         return toResponse(ingredient);
     }
 
+    @Transactional
+    public void setStock(Long ownerId, Long ingredientId, SetStockRequest request) {
+        Ingredient ingredient = ingredients.lockForStock(ingredientId, ownerId)
+                .orElseThrow(() -> new IllegalArgumentException("Ingredient not found"));
+        if (!ingredient.getUnit().equalsIgnoreCase(request.unit())) {
+            throw new IllegalArgumentException("The ingredient unit changed. Reload the Prep page.");
+        }
+        if (request.quantity() == null) {
+            ingredient.setStock(null, null, null);
+        } else {
+            ingredient.setStock(request.quantity(), LocalDate.now(clock), request.expiresOn());
+        }
+    }
+
     // One line of a recipe, detached from the database so it can be used outside a transaction.
     // yieldPercent and perishable are the ones in force, the owner's or the defaults.
     public record Line(Long ingredientId, String ingredient, String unit, BigDecimal quantity,
@@ -103,7 +119,8 @@ public class RecipeService {
         IngredientDefaults.Yield usual = defaultYield(ingredient);
         return new IngredientResponse(ingredient.getId(), ingredient.getName(), ingredient.getUnit(),
                 plain(yieldPercent(ingredient)), plain(usual.percent()), usual.basis(), perishable(ingredient),
-                ingredient.getYieldPercent() != null || ingredient.getPerishable() != null);
+                ingredient.getYieldPercent() != null || ingredient.getPerishable() != null,
+                ingredient.getStockQuantity(), ingredient.getStockCountedOn(), ingredient.getStockExpiresOn());
     }
 
     // Replaces a dish's recipe. An ingredient keeps one unit across dishes; its unit can only be
@@ -164,6 +181,7 @@ public class RecipeService {
                 throw new IllegalArgumentException(ingredient.getName() + " is measured in " + ingredient.getUnit()
                         + " in " + String.join(", ", others) + ". Use " + ingredient.getUnit() + " here too.");
             }
+            ingredients.clearStock(ingredient.getId());
             ingredient.setUnit(item.unit());
         }
         return ingredient;

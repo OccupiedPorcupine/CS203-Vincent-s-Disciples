@@ -36,8 +36,14 @@ public record PrepListResponse(
             List<String> dishes,
             @Schema(description = "Cooked or usable weight ÷ purchased weight, in percent", example = "70") BigDecimal yieldPercent,
             @Schema(description = "Amount to buy or take from stock: quantity ÷ yield, rounded up", example = "10285.715") BigDecimal toBuy,
-            @Schema(description = "Bought for this day (true), or kept in stock and bought weekly (false)") boolean perishable
-    ) {}
+            @Schema(description = "Bought for this day (true), or kept in stock and bought weekly (false)") boolean perishable,
+            BigDecimal expectedRawUse
+    ) {
+        public Ingredient(String ingredient, String unit, BigDecimal quantity, List<String> dishes,
+                          BigDecimal yieldPercent, BigDecimal toBuy, boolean perishable) {
+            this(ingredient, unit, quantity, dishes, yieldPercent, toBuy, perishable, null);
+        }
+    }
 
     public record Skipped(String dish, String reason) {}
 }
