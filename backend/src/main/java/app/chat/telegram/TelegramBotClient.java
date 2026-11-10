@@ -73,6 +73,16 @@ public class TelegramBotClient {
         call("setWebhook", request);
     }
 
+    // The username of the bot the token belongs to.
+    public String botUsername() {
+        return call("getMe", jsonMapper.createObjectNode()).path("username").asString();
+    }
+
+    // Where Telegram sends the bot's updates; blank without a webhook.
+    public String webhookUrl() {
+        return call("getWebhookInfo", jsonMapper.createObjectNode()).path("url").asString();
+    }
+
     public void setCommands(List<Command> commands) {
         ObjectNode request = jsonMapper.createObjectNode();
         ArrayNode list = request.putArray("commands");
