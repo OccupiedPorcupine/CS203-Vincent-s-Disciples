@@ -233,18 +233,30 @@ class SalesImportServiceTest {
     }
 
     @Test
-    void aFileWithBadRowsIsRefusedWithTheRowsListedAndNothingIsSaved() {
-        dishService.createDish("Chicken rice", owner);
-        Long source = upload("date,dish,quantity_sold\n2026-07-01,Chicken rice,40\n2026-07-02,Chicken rice,lots\n");
+    void aFileWithBadRowsIsRejectedDuringUploadAndNothingIsSaved() {
+        var dish = dishService.createDish("Chicken rice", owner);
 
-        var preview = importService.preview(owner, source);
-        assertEquals(1, preview.errorCount());
-        assertEquals(3, preview.errors().get(0).row());
+        long sourcesBefore = sourceRepository.count();
 
-        var error = assertThrows(SalesImportException.class,
-                () -> importService.importSales(owner, source, request(ExistingSales.SKIP)));
+        var error = assertThrows(
+                SalesImportException.class,
+                () -> upload(
+                        "date,dish,quantity_sold\n"
+                                + "2026-07-01,Chicken rice,40\n"
+                                + "2026-07-02,Chicken rice,lots\n"));
+
         assertEquals("IMPORT_INVALID", error.getCode());
-        assertTrue(saleRepository.findAll().isEmpty());
+        assertEquals(1, error.getErrorCount());
+        assertEquals(Integer.valueOf(3), error.getErrors().get(0).row());
+
+        // Rejection must not register a source or create sales.
+        assertEquals(sourcesBefore, sourceRepository.count());
+        assertTrue(
+                sourceRepository
+                        .findAllByOwnerIdOrderByUploadedAtDesc(owner)
+                        .isEmpty());
+        assertTrue(sourceService.list(owner).isEmpty());
+        assertTrue(sales(dish).isEmpty());
     }
 
     @Test
