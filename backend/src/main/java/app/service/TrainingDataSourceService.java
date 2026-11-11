@@ -9,6 +9,10 @@ import app.user.AppUserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import app.salesimport.SalesFileReader;
+import app.salesimport.SalesImportException;
+import java.time.Clock;
+import java.time.LocalDate;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,16 +32,22 @@ public class TrainingDataSourceService {
     private final TrainingDataSourceRepository sources;
     private final TrainingDataFileRepository files;
     private final AppUserRepository users;
+    private final Clock clock;
 
-    public TrainingDataSourceService(TrainingDataSourceRepository sources, TrainingDataFileRepository files,
-                                     AppUserRepository users) {
+    public TrainingDataSourceService(
+            TrainingDataSourceRepository sources,
+            TrainingDataFileRepository files,
+            AppUserRepository users,
+            Clock clock) {
         this.sources = sources;
         this.files = files;
         this.users = users;
+        this.clock = clock;
     }
 
     public List<TrainingDataSourceResponse> list(Long ownerId) {
         return sources.findAllByOwnerIdOrderByUploadedAtDesc(ownerId).stream()
+                .filter(this::hasValidSales)
                 .map(this::toResponse)
                 .toList();
     }
@@ -56,6 +66,7 @@ public class TrainingDataSourceService {
             throw new IllegalStateException("The file could not be stored", exception);
         }
 
+        validateSales(content, original);
         String sha256 = sha256(content);
         var existing = sources.findByOwnerIdAndSha256(ownerId, sha256);
         if (existing.isPresent()) {
@@ -89,6 +100,50 @@ public class TrainingDataSourceService {
             return Files.readAllBytes(path);
         } catch (IOException exception) {
             throw new IllegalStateException("The uploaded file could not be read", exception);
+        }
+    }
+
+    // Older uploads were registered before import validation. Keep those records,
+    // but do not advertise invalid or missing files as usable training sources.
+    private boolean hasValidSales(TrainingDataSource source) {
+        try {
+            validateSales(content(source), source.getOriginalFilename());
+            return true;
+        } catch (IllegalArgumentException | SalesImportException exception) {
+            return false;
+        }
+    }
+
+    private void validateSales(byte[] content, String filename) {
+        SalesFileReader.SalesFile sales;
+
+        try {
+            sales = SalesFileReader.read(
+                    content,
+                    filename,
+                    LocalDate.now(clock));
+        } catch (IOException exception) {
+            throw new IllegalArgumentException(
+                    "The uploaded file could not be read. "
+                            + "Save it as CSV or XLSX and try again.",
+                    exception);
+        }
+
+        if (sales.errorCount() > 0) {
+            var first = sales.errors().getFirst();
+            String detail = (first.row() == null
+                    ? ""
+                    : "Row " + first.row() + ": ") + first.message();
+
+            throw new SalesImportException(
+                    "IMPORT_INVALID",
+                    detail + " Fix the file and upload it again.",
+                    sales.errorCount(),
+                    sales.errors());
+        }
+
+        if (sales.rows().isEmpty()) {
+            throw new IllegalArgumentException("The file has no sales rows.");
         }
     }
 
