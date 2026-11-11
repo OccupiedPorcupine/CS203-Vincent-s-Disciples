@@ -238,6 +238,7 @@ public class AssistantService {
 
         // The owner's documents (issue #153): the previous message too, so "and for eggs?" still finds suppliers.
         AssistantTools.TurnContext context = new AssistantTools.TurnContext(ownerId, today, request.page(), liveElementIds);
+        context.repeatChecksAsked.addAll(AssistantTools.repeatChecksIn(items, jsonMapper));
         boolean hasDocuments = documentRetriever.hasDocuments(ownerId);
         String documentsSection = "";
         if (hasDocuments) {

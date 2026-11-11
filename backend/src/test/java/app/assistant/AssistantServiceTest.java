@@ -551,6 +551,39 @@ class AssistantServiceTest {
     }
 
     @Test
+    void theSameQuantityOnManyDaysIsCheckedWithTheUserBeforeACardIsShown() {
+        var jsonMapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        StringBuilder entries = new StringBuilder();
+        for (int day = 1; day <= 5; day++) {
+            if (day > 1) entries.append(", ");
+            entries.append("{\"dish_id\": ").append(chickenRice.getId()).append(", \"new_dish_name\": null, \"spoken_name\": \"chicken rice\", ")
+                    .append("\"date\": \"").append(TODAY.minusDays(day)).append("\", \"quantity\": 40, \"sold_out_at\": null, \"leftover\": null}");
+        }
+        java.util.function.BiFunction<Boolean, AssistantTools.TurnContext, tools.jackson.databind.JsonNode> propose = (confirmed, context) ->
+                jsonMapper.readTree(assistantTools.execute(new AssistantModelClient.ToolCall("c1", AssistantTools.PROPOSE_SALES_ENTRY,
+                        jsonMapper.readTree("{\"entries\": [" + entries + "], \"repeats_confirmed\": " + confirmed + "}")), context));
+
+        // First: nothing is shown, and the model is told to ask.
+        var first = new AssistantTools.TurnContext(owner, TODAY, "dashboard", java.util.Set.of());
+        var asked = propose.apply(false, first);
+        assertFalse(asked.path("ok").asBoolean());
+        assertTrue(asked.path("check_with_user").get(0).asString().contains("same quantity (40) on 5 days"));
+        assertNull(first.proposal());
+
+        // The model can't confirm in the same turn it was told to ask.
+        assertFalse(propose.apply(true, first).path("ok").asBoolean());
+        assertNull(first.proposal());
+
+        // In a later turn, after the check was asked, the user's yes shows the card.
+        var later = new AssistantTools.TurnContext(owner, TODAY, "dashboard", java.util.Set.of());
+        later.repeatChecksAsked.addAll(AssistantTools.repeatChecksIn(List.of(jsonMapper.createObjectNode()
+                .put("type", "function_call_output").put("call_id", "c1").put("output", asked.toString())), jsonMapper));
+        assertTrue(propose.apply(true, later).path("ok").asBoolean());
+        assertEquals(5, later.proposal().size());
+        assertEquals(0, saleRepository.findByDishIdOrderBySaleDateAsc(chickenRice.getId()).size());
+    }
+
+    @Test
     void customGuideStepsMustPointAtKnownOrVisibleElements() {
         var context = new AssistantTools.TurnContext(owner, TODAY, "data", java.util.Set.of("live-3"));
         var jsonMapper = tools.jackson.databind.json.JsonMapper.builder().build();

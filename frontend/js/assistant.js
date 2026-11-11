@@ -586,10 +586,17 @@
     confirm.textContent = "Confirm";
     actions.append(cancel, confirm);
 
-    card.append(heading, table, closureList, actions);
+    // A card that repeats one number on many days or replaces many saved days gets a warning,
+    // and Confirm isn't focused, so a quick Enter doesn't save it.
+    const warnings = cardWarnings(proposal.entries);
+    const warning = element("p", "assistant-card-warning", { role: "note" });
+    warning.textContent = warnings.join(" ");
+    warning.hidden = warnings.length === 0;
+
+    card.append(heading, warning, table, closureList, actions);
     log.append(card);
     log.scrollTop = log.scrollHeight;
-    confirm.focus();
+    if (warnings.length === 0) confirm.focus();
 
     confirm.addEventListener("click", async () => {
       const entries = [...rows.querySelectorAll("tr")].map(readRow);
@@ -800,6 +807,25 @@
     return closure.closed
       ? ["Closed", day, closure.reason].filter(Boolean).join(" · ")
       : `Open again · ${day}`;
+  }
+
+  // The same checks as the server (ProposalValidator): one dish with the same quantity on more
+  // than 3 days, or more than 3 days that already have sales and would change.
+  function cardWarnings(entries) {
+    const warnings = [];
+    const groups = new Map();
+    entries.forEach(entry => {
+      const key = `${entry.dishId ?? entry.dishName}|${entry.quantity}`;
+      groups.set(key, [...(groups.get(key) || []), entry]);
+    });
+    groups.forEach(group => {
+      const days = new Set(group.map(entry => entry.date)).size;
+      if (days > 3) warnings.push(`${group[0].dishName} is ${group[0].quantity} on all ${days} days. Check each day is right.`);
+    });
+    const replaced = entries.filter(entry => entry.previousQuantity !== null && entry.previousQuantity !== undefined
+      && entry.previousQuantity !== entry.quantity).length;
+    if (replaced > 3) warnings.push(`This replaces ${replaced} days you already saved.`);
+    return warnings;
   }
 
   function entryRow(entry) {
