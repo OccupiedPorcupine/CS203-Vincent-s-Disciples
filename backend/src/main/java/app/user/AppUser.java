@@ -18,7 +18,8 @@ public class AppUser {
     private Long id;
 
     // Google's `sub` claim is the stable identity key. Email is not.
-    @Column(unique = true, updatable = false)
+    // Allow saving it when an existing unverified account is claimed with Google.
+    @Column(unique = true)
     private String googleId;
 
     @Column(nullable = false, unique = true)
