@@ -147,6 +147,18 @@ class AccountSecurityApiTest {
         assertTrue(owner.get("/api/profile").body().contains("\"emailVerified\":true"));
         assertEquals(401, impostor.get("/api/profile").statusCode());
         assertEquals(401, login("owner@account.test", PASSWORD).statusCode());
+        assertEquals("google-owner", jdbc.queryForObject(
+                "SELECT google_id FROM app_users WHERE email = ?",
+                String.class,
+                "owner@account.test"
+        ));
+
+        HttpResponse<String> returning = new Session().send(
+                "POST",
+                "/api/auth/google",
+                "{\"credential\":\"owner-credential\"}"
+        );
+        assertEquals(200, returning.statusCode(), returning.body());
     }
 
     @Test
