@@ -95,32 +95,14 @@ body {
 .hero-prep-row span:last-child { color: var(--teal-strong); }
 .sign-in-visual .hero-chart { margin-bottom: 96px; }
 
+/* The sign-in page arrives complete: nothing draws in, rises or fades up. Only the slow drift of the two colour blobs
+   and the floating cards remains, and that is ambient, not tied to arriving on the page. */
 @media (prefers-reduced-motion: no-preference) {
   .hero-blob-teal { animation: blob-drift 18s ease-in-out infinite alternate; }
   .hero-blob-sand { animation: blob-drift 22s ease-in-out -6s infinite alternate-reverse; }
-  .hero-copy > * { animation: rise-in var(--duration-enter) var(--ease-out) backwards; }
-  .hero-title { animation-delay: 80ms; }
-  .hero-lede { animation-delay: 160ms; }
-  .hero-chart { animation: rise-in 600ms var(--ease-out) 200ms backwards; }
-  .hero-line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw-line 1.3s var(--ease-in-out) 500ms forwards; }
-  .hero-area { animation: fade-in 700ms ease-out 1.3s backwards; }
-  .hero-forecast { animation: reveal-right 700ms var(--ease-out) 1.75s backwards; }
-  .hero-dot { animation: dot-pop 420ms var(--ease-spring) 2.35s backwards; }
-  .hero-ring { animation: ring-pulse 2.4s ease-out 2.8s 4; }
-  .hero-today-label, .hero-today { animation: fade-in 400ms ease-out 1.6s backwards; }
-  .hero-float-forecast { animation: rise-in 600ms var(--ease-out) 2.3s backwards, float 7s ease-in-out 3s infinite; }
-  .hero-float-prep { animation: rise-in 600ms var(--ease-out) 2.6s backwards, float 8s ease-in-out 3.4s infinite reverse; }
-  .sign-in-card { animation: rise-in 600ms var(--ease-out) backwards; }
-  .sign-in-panel > * { animation: rise-in var(--duration-enter) var(--ease-out) backwards; }
-  .sign-in-panel > :nth-child(2) { animation-delay: 60ms; }
-  .sign-in-panel > :nth-child(3) { animation-delay: 120ms; }
-  .sign-in-panel > :nth-child(n + 4) { animation-delay: 180ms; }
+  .hero-float-forecast { animation: float 7s ease-in-out infinite; }
+  .hero-float-prep { animation: float 8s ease-in-out -2s infinite reverse; }
 }
-@keyframes draw-line { to { stroke-dashoffset: 0; } }
-@keyframes fade-in { from { opacity: 0; } }
-@keyframes reveal-right { from { clip-path: inset(-10px 100% -10px 0); } to { clip-path: inset(-10px 0 -10px 0); } }
-@keyframes dot-pop { from { transform: scale(0); } }
-@keyframes ring-pulse { from { opacity: 0.6; transform: scale(1); } to { opacity: 0; transform: scale(3.2); } }
 @keyframes float { 50% { transform: translateY(-6px); } }
 @keyframes blob-drift { to { transform: translate(60px, 40px) scale(1.15); } }
 

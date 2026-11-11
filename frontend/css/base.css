@@ -27,6 +27,18 @@
   --heat-3: #12827a;
   --heat-4: #0a5c57;
   --header-gradient: linear-gradient(90deg, #a9dcd6 0%, #dfe5dc 55%, #f5e3d2 100%);
+  --sidebar-gradient: linear-gradient(180deg, #a9dcd6 0%, #dfe5dc 52%, #f5e3d2 100%);
+  --sand: #f5e3d2;           /* the sand end of the header gradient */
+  --sand-soft: #fbf4ec;      /* sand, lightened for large surfaces; ink text only (muted drops under 4.5:1 on it) */
+  --sand-line: #efe2d3;
+  --card-line: #efe9df;      /* the outline of cards and sections */
+  /* The primary button: a light teal pill that a dark teal circle fills from the pointer. */
+  --move-surface: var(--teal-soft);   /* resting */
+  --move-ink: var(--heat-4);          /* text, outline and the expanding fill: the darkest teal */
+  --move-light: var(--teal-tint);     /* text and arrow once the fill has covered the button */
+  --move-duration: 500ms;
+  --sidebar-w: 248px;
+  --gutter: 24px;
 
   /* Type */
   --font-display: "Kaisei HarunoUmi", Georgia, "Times New Roman", serif;
@@ -57,8 +69,6 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* small overshoot: buttons popping in */
-  --duration-enter: 520ms;   /* cards and rows rising in when a page loads */
-  --stagger: 70ms;           /* gap between one card and the next as they rise in */
 }
 
 /* Base */
@@ -82,70 +92,88 @@ button, input, select, textarea { font: inherit; color: inherit; }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
-/* App header: menu, wordmark, account */
+/* ---- Browser surfaces in the brand (selection, caret, scrollbars) and tidy line breaks ---- */
+::selection { background: var(--teal-soft); color: var(--ink); }
+textarea, .input { caret-color: var(--teal-strong); }
+.chart, .heatmap-scroll { scrollbar-width: thin; scrollbar-color: var(--subtle) transparent; }
+:is(h1, h2) { text-wrap: balance; }
+:is(.lede, .note, .status-text) { text-wrap: pretty; }
+
+/* Lenis' recommended CSS (lenis@1.3.27 dist/lenis.css, MIT, darkroom.engineering): see js/motion.js and THIRD_PARTY_NOTICES.md */
+html.lenis, html.lenis body { height: auto; }
+.lenis:not(.lenis-autoToggle).lenis-stopped { overflow: clip; }
+.lenis [data-lenis-prevent], .lenis [data-lenis-prevent-wheel], .lenis [data-lenis-prevent-touch],
+.lenis [data-lenis-prevent-vertical], .lenis [data-lenis-prevent-horizontal] { overscroll-behavior: contain; }
+.lenis.lenis-smooth iframe { pointer-events: none; }
+
+/* ---- App shell: on wide screens a left sidebar (brand, the six pages, your account); below 1100px a sticky top bar with
+   a menu that opens as a sheet. One header, the same on every signed-in page (see DESIGN.md, "Getting around"). ---- */
+.skip-link {
+  position: absolute; z-index: 100; top: -120px; left: 16px;
+  padding: 10px 16px; border-radius: var(--radius-md);
+  background: var(--surface); color: var(--teal-strong); box-shadow: var(--shadow-float);
+}
+.skip-link:focus { top: max(12px, env(safe-area-inset-top)); }
+.page:focus { outline: none; }
+[data-guide-id] { scroll-margin-top: 88px; }
+
 .topbar {
-  position: relative;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-height: 64px;
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 8px; min-height: 64px;
   padding: max(12px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) 12px max(24px, env(safe-area-inset-left));
   background: var(--header-gradient);
 }
-.brand { color: var(--teal-strong); font-size: 24px; text-decoration: none; }
+.topbar :focus-visible { outline-color: var(--ink); }
+.brand { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-right: auto; color: var(--teal-strong); font-size: 26px; line-height: 1; text-decoration: none; }
+.brand-mark { width: 32px; height: 32px; border-radius: 9px; box-shadow: 0 1px 3px rgb(66 86 100 / 25%); }
 /* Both header menus are <details>: js/app-shell.js closes them on an outside click or Escape. */
 .topbar details { position: relative; }
+.topbar details.navigation { position: static; }
 .topbar summary { list-style: none; cursor: pointer; }
 .topbar summary::-webkit-details-marker { display: none; }
 .menu-panel {
-  position: absolute;
-  top: 48px;
-  left: 0;
-  width: 220px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-menu);
+  position: absolute; top: 48px; left: 0; width: 220px; padding: 8px;
+  border: 1px solid var(--card-line); border-radius: var(--radius-xl);
+  background: var(--surface); box-shadow: var(--shadow-menu);
 }
 details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease-out); }
 @keyframes menu-in { from { opacity: 0; transform: translateY(-4px); } }
 
 .navigation summary {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
+  display: flex; align-items: center; gap: 8px; width: auto; height: 44px; padding: 0 14px 0 12px;
+  border-radius: var(--radius-lg); background: rgb(255 255 255 / 55%);
   transition: background var(--duration-fast);
 }
-.navigation summary:hover { background: rgb(255 255 255 / 40%); }
-.navigation summary img { width: 24px; height: 24px; opacity: 0.6; }
-.navigation a {
-  display: block;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  color: var(--ink);
-  text-decoration: none;
+.navigation summary:hover { background: rgb(255 255 255 / 80%); }
+.navigation summary img { width: 22px; height: 22px; opacity: 0.75; }
+.menu-label { font-size: var(--text-md); }
+.navigation .menu-panel {
+  position: fixed; top: calc(max(12px, env(safe-area-inset-top)) + 56px); left: 12px; right: 12px; width: auto;
+  display: grid; gap: 4px; padding: 10px; box-shadow: var(--shadow-float);
+  max-height: calc(100dvh - 96px); overflow: auto;
 }
-.navigation a:hover { background: var(--teal-tint); }
-.navigation a[aria-current="page"] { background: var(--teal-soft); }
+.navigation a {
+  position: relative; display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 14px;
+  border-radius: var(--radius-lg); color: var(--ink); font-size: 17px; text-decoration: none;
+  transition: background-color var(--duration-fast), color var(--duration-fast);
+}
+.navigation a:hover:not([aria-current="page"]) { background: var(--teal-tint); }
+.navigation a[aria-current="page"] { background: var(--teal-soft); color: var(--teal-hover); }
+.navigation a[aria-current="page"]::before {
+  content: ""; position: absolute; left: 0; top: 50%; width: 4px; height: 24px; border-radius: 0 4px 4px 0;
+  background: var(--teal-strong); transform: translateY(-50%);
+}
+.nav-icon { flex: none; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-.account-menu { margin-left: auto; }
-.account-menu .menu-panel { right: 0; left: auto; width: 240px; padding: 16px; }
+.account-menu { margin-left: 0; }
+.account-menu .menu-panel { top: 56px; right: 0; left: auto; width: min(280px, calc(100vw - 32px)); padding: 16px; }
 .avatar {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--ink);
+  display: grid; place-items: center; width: 44px; height: 44px;
+  border-radius: 50%; overflow: hidden; background: var(--ink); box-shadow: 0 0 0 2px rgb(255 255 255 / 70%);
   transition: box-shadow var(--duration-fast);
 }
-.avatar:hover, .account-menu[open] .avatar { box-shadow: 0 0 0 3px rgb(255 255 255 / 60%); }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-label { display: none; }
 .account-name { overflow-wrap: anywhere; }
 .account-email { margin-bottom: 12px; color: var(--muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
 .account-unconfirmed { margin: -4px 0 12px; color: var(--warning); font-size: var(--text-xs); }
@@ -154,41 +182,91 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
 .account-menu .account-link { margin-bottom: 8px; }
 .account-menu .status-text:empty { display: none; }
 
-/* Page layout */
+/* ---- Page frame: the content beside the sidebar. Its right edge leaves room for the assistant button, and the bottom
+   room keeps the last controls clear of it and of the iPhone home bar. ---- */
 .page {
-  width: min(1120px, 100% - 48px);
-  margin: 0 auto;
-  /* Bottom room so the assistant button never covers content, plus the iPhone home bar. */
-  padding: 40px 0 calc(96px + env(safe-area-inset-bottom));
+  display: grid; align-content: start; gap: 24px;
+  width: 100%; max-width: 1180px; margin-inline: auto;   /* 100%, or a grid item with auto margins shrinks to its content */
+  padding: 28px var(--gutter) calc(104px + env(safe-area-inset-bottom));
 }
+.page > :not(dialog) { min-width: 0; margin-top: 0; }
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
-.page-heading h1 { font-size: var(--text-xl); }
-.lede { margin-top: 4px; color: var(--muted); }
+.page-heading h1 { font-size: 36px; line-height: 1.2; }
+.lede { margin-top: 6px; color: var(--muted); }
 .eyebrow { color: var(--teal-strong); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; }
 
-.section { margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--divider); }
+/* Sections (a closing area of a page: a long list or a table) look like cards. */
+.section { padding: 24px 28px; border: 1px solid var(--card-line); border-radius: var(--radius-xl); background: var(--surface); box-shadow: 0 1px 2px rgb(66 86 100 / 6%); }
 .section-heading h2 { font-size: var(--text-lg); }
 .section-heading p { margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
 
-/* Cards */
+/* ---- Cards ---- */
 .card {
-  padding: 20px 24px;
-  border: 1px solid #f0ece4;
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  transition: box-shadow var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
+  position: relative; padding: 24px 28px;
+  border: 1px solid var(--card-line); border-radius: var(--radius-xl);
+  background: var(--surface); box-shadow: 0 1px 2px rgb(66 86 100 / 6%);
 }
 .card-title { margin-bottom: 12px; font-size: var(--text-md); }
+.card:has(> .card-icon) .card-title { padding-right: 48px; }
 
 /* A big figure with its caption, e.g. "838 portions". */
-.headline { font-size: var(--text-sm); }
+.headline { font-size: 15px; }
 .headline .card-title { margin-bottom: 0; }
-.headline .number { display: block; margin-top: 4px; font-size: var(--text-number); line-height: 1.1; color: var(--ink); }
-.headline .unit { font-size: var(--text-md); }
-.headline .note { display: block; color: var(--muted); }
+.headline .number { display: block; margin-top: 6px; font-size: 44px; line-height: 1.1; color: var(--ink); }
+.headline .unit { font-size: var(--text-md); color: var(--muted); }
+.headline .note { display: block; margin-top: 2px; color: var(--muted); }
 
-/* Buttons */
+/* A small teal chip at the corner of a figure card. Decorative. */
+.card-icon {
+  position: absolute; top: 18px; right: 18px; z-index: 1;
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px;
+  background: var(--teal-tint); color: var(--teal-strong);
+}
+.card-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* A pointer light on cards marked data-spotlight (adapted from React Bits SpotlightCard; js/motion.js sets --spot-x and --spot-y). */
+@media (hover: hover) and (pointer: fine) {
+  [data-spotlight] { isolation: isolate; overflow: hidden; }
+  [data-spotlight]::before,
+  [data-spotlight]::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    opacity: 0; transition: opacity var(--duration-base) var(--ease-out);
+  }
+  [data-spotlight]::before {
+    z-index: -1;
+    background: radial-gradient(220px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgb(27 160 152 / 7%), transparent 70%);
+  }
+  [data-spotlight]::after {
+    padding: 1px;
+    background: radial-gradient(170px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgb(27 160 152 / 50%), transparent 70%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  [data-spotlight].is-lit::before,
+  [data-spotlight].is-lit::after { opacity: 1; }
+}
+
+/* ---- Chart cards: the chart fills .chart-inner, which fills .chart (no percentage heights, so a chart can't resize itself) ---- */
+.graph { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.graph .chart { position: relative; flex: 1; min-height: 300px; margin-top: 16px; overflow-x: hidden; overflow-y: auto; }
+.chart-inner { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+.chart canvas { display: block; }
+.chart-caption { min-height: 1.5em; margin-top: 12px; color: var(--muted); font-size: 14px; }
+/* A long list scrolls inside its card; the fade at the bottom says there is more. */
+.graph .chart.is-scrollable { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent); }
+/* A tooltip that is an element (not canvas drawing), placed by js so it stays clear of labels (the by-dish chart). */
+.chart-tip {
+  position: absolute; z-index: 6; display: grid; gap: 2px; max-width: 250px; padding: 8px 12px;
+  border-radius: var(--radius-md); background: var(--ink); color: #fff; font-size: 13px; pointer-events: none;
+}
+.chart-tip strong { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 400; overflow-wrap: anywhere; }
+.tip-swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--swatch); box-shadow: 0 0 0 1px rgb(255 255 255 / 70%); }
+
+/* Buttons. The primary button is the approved "Record sales" look: a light teal pill with a dark teal outline. On hover,
+   focus or press a dark teal circle grows from where the pointer entered (the centre for keyboard and touch) until it
+   covers the button, and the text turns light. js/motion.js sets the circle's origin and size and toggles .is-filled; only
+   the circle's transform animates. Secondary buttons stay plain, and destructive ones are text buttons. */
 .primary-button,
 .secondary-button {
   display: inline-flex;
@@ -203,8 +281,34 @@ details[open] > .menu-panel { animation: menu-in var(--duration-fast) var(--ease
   white-space: nowrap;
   cursor: pointer;
 }
-.primary-button { border: 1px solid var(--teal-strong); background: var(--teal-strong); color: #fff; }
-.primary-button:hover { border-color: var(--teal-hover); background: var(--teal-hover); }
+.primary-button {
+  position: relative; overflow: hidden; isolation: isolate;
+  min-height: 44px; padding: 0 20px; gap: 10px;
+  border: 1px solid var(--move-ink); border-radius: var(--radius-pill);
+  background: var(--move-surface); color: var(--move-ink);
+  font-size: var(--text-md); -webkit-tap-highlight-color: transparent;
+  transition: color var(--move-duration) var(--ease-in-out);
+}
+.primary-button::before {
+  content: ""; position: absolute; z-index: -1; border-radius: 50%; pointer-events: none;
+  left: var(--fill-x, 50%); top: var(--fill-y, 50%);
+  width: var(--fill-d, 0); height: var(--fill-d, 0);
+  background: var(--move-ink);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform var(--move-duration) var(--ease-in-out);
+}
+.primary-button.is-filled { color: var(--move-light); }
+.primary-button.is-filled::before { transform: translate(-50%, -50%) scale(1); }
+.primary-button:focus-visible { outline: 2px solid var(--move-ink); outline-offset: 3px; }   /* outside the box, so overflow can't clip it */
+/* A button that can't be used shows its resting look, never the fill. */
+.primary-button:disabled.is-filled { color: var(--move-ink); }
+.primary-button:disabled::before { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  /* No growing circle: the fill just appears (and every transition below is instant under this setting). */
+  .primary-button::before { left: 0; top: 0; width: 100%; height: 100%; border-radius: 0; transform: none; opacity: 0; transition: opacity 120ms linear; }
+  .primary-button.is-filled::before { transform: none; opacity: 1; }
+}
+.button-arrow { flex: none; width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .secondary-button { border: 1px solid var(--border); background: var(--surface); color: var(--ink); }
 .secondary-button:hover { background: var(--teal-tint); }
 .text-button {
@@ -326,28 +430,15 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 
 .empty-state { padding: 40px 4px; color: var(--muted); text-align: center; }
 
-/* Moving between pages: the header stays put while the page content cross-fades. The guided tour
-   skips the fade (js/guide.js) because it carries its own dimmed screen over to the next page;
-   the names are off during tours too, in case a browser runs the fade anyway.
-   The opt-in, @view-transition { navigation: auto; }, is an inline <style> in each page's <head>:
-   from this file Chrome sometimes reads it too late and skips the transition. */
-.topbar { view-transition-name: topbar; }
-.page { view-transition-name: page; }
-.guide-active :is(.topbar, .page) { view-transition-name: none; }
-::view-transition-old(page) { animation: page-out var(--duration-fast) ease-in both; }
-::view-transition-new(page) { animation: page-in var(--duration-base) var(--ease-out) 60ms both; }
-::view-transition-group(page) { animation-duration: var(--duration-base); }
-@keyframes page-out { to { opacity: 0; transform: translateY(-6px); } }
-@keyframes page-in { from { opacity: 0; transform: translateY(10px); } }
+/* Moving between pages is instant: no cross-fade, slide or view transition (DESIGN.md, "Motion"). */
 
 /* ---- Motion and polish (DESIGN.md, "Motion") ----
-   Interaction feedback (hover, press, focus) applies everywhere. Entrance and ambient motion is
-   inside `prefers-reduced-motion: no-preference`, so it simply doesn't exist for people who
-   asked for less motion, and is off during the guided tour (.guide-active), which measures where
-   things are and must not chase a card that is still rising. */
+   Interaction feedback (hover, press, focus) applies everywhere. Moving to a page, or arriving on one, is never
+   animated: no cross-fade, no cards rising in, no figures counting up. Ambient motion (the header's slow drift and
+   the loading shimmer) is inside `prefers-reduced-motion: no-preference`, so it doesn't exist for people who asked
+   for less motion, and is paused during the guided tour (.guide-active). */
 
-/* Controls: colour, lift and press. */
-.primary-button,
+/* Controls: colour, lift and press. (The primary button's feedback is its fill.) */
 .secondary-button {
   transition:
     background-color var(--duration-fast) var(--ease-out),
@@ -355,9 +446,8 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
     box-shadow var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out);
 }
-.primary-button:hover:not(:disabled) { box-shadow: 0 6px 16px rgb(15 125 119 / 24%); transform: translateY(-1px); }
 .secondary-button:hover:not(:disabled) { border-color: #b9dcd8; box-shadow: 0 4px 12px rgb(66 86 100 / 8%); transform: translateY(-1px); }
-:is(.primary-button, .secondary-button):active:not(:disabled) { box-shadow: none; transform: translateY(0) scale(0.97); transition-duration: 60ms; }
+.secondary-button:active:not(:disabled) { box-shadow: none; transform: translateY(0) scale(0.97); transition-duration: 60ms; }
 .text-button { text-decoration-color: rgb(15 125 119 / 40%); transition: text-decoration-color var(--duration-fast), color var(--duration-fast); }
 .text-button:hover:not(:disabled) { color: var(--teal-hover); text-decoration-color: currentColor; }
 .segmented button { transition: background-color var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast); }
@@ -368,20 +458,6 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .input:hover:not(:disabled, :focus) { border-color: var(--subtle); }
 /* Replaces the outline on fields: a teal border (3.2:1) plus a soft halo. */
 .input:focus-visible { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgb(27 160 152 / 22%); }
-
-/* Cards lift a little under the pointer, so it's clear which one you're reading. Cards holding a
-   form stay put: a card that moves while you type in it is unsettling. */
-@media (hover: hover) {
-  .card:not(:has(form)):hover { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
-}
-
-/* Header: the avatar and menu button respond, menu items nudge towards the pointer. */
-.avatar { transition: box-shadow var(--duration-fast), transform var(--duration-fast) var(--ease-out); }
-.avatar:hover { transform: scale(1.05); }
-.navigation summary img { transition: opacity var(--duration-fast); }
-.navigation summary:hover img, .navigation[open] summary img { opacity: 0.9; }
-.navigation a { transition: background-color var(--duration-fast), padding-left var(--duration-fast) var(--ease-out); }
-.navigation a:hover:not([aria-current="page"]) { padding-left: 16px; }
 
 /* Status lines settle in when they report a result. */
 .status-text:is(.is-success, .is-error):not(:empty) { animation: status-in var(--duration-base) var(--ease-out); }
@@ -398,37 +474,7 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 }
 .headline:has(.is-loading) .number { background-image: linear-gradient(100deg, var(--ink) 40%, #b9c2c8 50%, var(--ink) 60%); }
 
-/* Order of arrival: each direct child of the page, and each card inside a grid wrapper, gets an
-   index; cards rise in that order. Rows in lists and tables have their own short sequence. */
-.page > :nth-child(2) { --enter: 1; } .page > :nth-child(3) { --enter: 2; } .page > :nth-child(4) { --enter: 3; }
-.page > :nth-child(5) { --enter: 4; } .page > :nth-child(6) { --enter: 5; } .page > :nth-child(n + 7) { --enter: 6; }
-.page > * > :nth-child(2) { --enter-step: 1; } .page > * > :nth-child(3) { --enter-step: 2; }
-.page > * > :nth-child(n + 4) { --enter-step: 3; }
-:is(.page ul, .page ol, .page tbody) > :nth-child(2) { --row: 1; } :is(.page ul, .page ol, .page tbody) > :nth-child(3) { --row: 2; }
-:is(.page ul, .page ol, .page tbody) > :nth-child(4) { --row: 3; } :is(.page ul, .page ol, .page tbody) > :nth-child(5) { --row: 4; }
-:is(.page ul, .page ol, .page tbody) > :nth-child(6) { --row: 5; } :is(.page ul, .page ol, .page tbody) > :nth-child(n + 7) { --row: 6; }
-
 @media (prefers-reduced-motion: no-preference) {
-  /* Page content rises in, card by card. `backwards` only, so once it has arrived hover can move it. */
-  :root:not(.guide-active) :is(.page-heading, .card, .section, .chat-box) {
-    animation: rise-in var(--duration-enter) var(--ease-out) backwards;
-    animation-delay: calc((var(--enter, 0) + var(--enter-step, 0)) * var(--stagger));
-  }
-  :root:not(.guide-active) .page-heading > div > * { animation: rise-in var(--duration-enter) var(--ease-out) backwards; }
-  :root:not(.guide-active) .page-heading .lede { animation-delay: 80ms; }
-
-  /* Rows arrive whenever a list is filled, including after it is refreshed. */
-  :root:not(.guide-active) :is(.page ul, .page ol, .page tbody) > :is(li, tr) {
-    animation: row-in 380ms var(--ease-out) backwards;
-    animation-delay: calc(var(--row, 0) * 45ms + 60ms);
-  }
-
-  /* The revenue heatmap fills week by week, left to right (js/motion.js sets --n). */
-  :root:not(.guide-active) .heatmap .heat-cell {
-    animation: cell-in 420ms var(--ease-out) backwards;
-    animation-delay: calc(var(--n, 0) * 14ms);
-  }
-
   /* The header's gradient drifts very slowly between teal and sand. */
   .topbar {
     background: linear-gradient(90deg, #a9dcd6 0%, #dfe5dc 27.5%, #f5e3d2 50%, #dfe5dc 72.5%, #a9dcd6 100%) 0 0 / 200% 100%;
@@ -440,9 +486,6 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 
 }
 
-@keyframes rise-in { from { opacity: 0; transform: translateY(14px); } }
-@keyframes row-in { from { opacity: 0; transform: translateY(6px); } }
-@keyframes cell-in { from { opacity: 0; transform: scale(0.4); } }
 @keyframes header-drift { to { background-position: 100% 0; } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 /* Used by chickyMotion.leave() (js/motion.js) when a row is removed: fade, then fold away. */
@@ -450,7 +493,6 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
-  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
 /* Touch screens: 44px tap targets, and 16px text in fields because iOS zooms the page in when you
@@ -458,15 +500,65 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 @media (pointer: coarse) {
   :root { --control-height: 44px; }
   .input, select, textarea { font-size: var(--text-md); }
-  .navigation summary, .avatar { width: 44px; height: 44px; }
-  .brand { padding-block: 4px; }
   .segmented button { min-height: 44px; }
   .text-button { min-height: 44px; }
 }
 
-@media (max-width: 760px) {
+/* Tablets and up: a little more room at the sides. */
+@media (min-width: 760px) {
+  :root { --gutter: 32px; }
+}
+
+/* Wide screens: the header becomes a left sidebar that is always open. js/app-shell.js keeps its menu open
+   (adding .has-sidebar to <html>), so the Menu button is hidden here and only the six pages and your account show. */
+@media (min-width: 1100px) {
+  body.app-shell { display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); align-items: start; }
+  .app-shell .topbar {
+    grid-column: 1; grid-row: 1;
+    position: sticky; top: 0; height: 100vh; height: 100dvh;
+    flex-direction: column; align-items: stretch; gap: 6px; min-height: 0;
+    padding: max(20px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    background: var(--sidebar-gradient); animation: none;
+    border-right: 1px solid rgb(66 86 100 / 9%);
+  }
+  .app-shell .brand { margin: 0 0 14px; padding: 4px 10px; font-size: 28px; }
+  .app-shell .brand-mark { width: 38px; height: 38px; border-radius: 11px; }
+  .has-sidebar .navigation > summary { display: none; }
+  .app-shell .navigation::details-content { content-visibility: visible; }
+  .app-shell .navigation .menu-panel,
+  .app-shell .navigation[open] > .menu-panel {
+    position: static; display: grid; max-height: none; overflow: visible; padding: 0;
+    border: 0; border-radius: 0; background: transparent; box-shadow: none; animation: none;
+  }
+  .app-shell .navigation a { min-height: 48px; }
+  .app-shell .navigation a:hover:not([aria-current="page"]) { background: rgb(255 255 255 / 55%); }
+  .app-shell .navigation a[aria-current="page"] { background: var(--surface); box-shadow: 0 1px 2px rgb(66 86 100 / 10%), 0 4px 14px rgb(66 86 100 / 10%); }
+
+  .app-shell .account-menu { margin-top: auto; }
+  .app-shell .avatar {
+    width: 100%; height: auto; padding: 10px 12px; gap: 12px;
+    display: flex; align-items: center; justify-content: flex-start; border-radius: var(--radius-lg); overflow: visible;
+    background: rgb(255 255 255 / 55%); box-shadow: none;
+  }
+  .app-shell .avatar:hover, .app-shell .account-menu[open] .avatar { background: rgb(255 255 255 / 85%); }
+  .app-shell .avatar img { flex: none; width: 40px; height: 40px; border-radius: 50%; }
+  .app-shell .account-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-md); }
+  .app-shell .account-menu .menu-panel { top: auto; bottom: calc(100% + 8px); left: 0; right: 0; width: auto; }
+
+  .app-shell .page { grid-column: 2; grid-row: 1; padding: 40px 92px calc(104px + env(safe-area-inset-bottom)) 40px; gap: 28px; }
+}
+
+@media (max-width: 759px) {
+  :root { --gutter: 16px; }
   .topbar { padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); }
-  .page { width: min(100% - 32px, 1120px); padding-top: 28px; }
+  .page { gap: 20px; padding-top: 20px; }
   .page-heading { display: block; }
   .page-heading h1 { font-size: 28px; }
+  .card, .section { padding: 20px; }
+  .card-icon { top: 16px; right: 16px; width: 32px; height: 32px; }
+  .headline .number { font-size: 40px; }
+  .brand { font-size: 24px; }
+  .menu-label { display: none; }
+  .navigation summary { padding: 0 12px; }
+  .graph .chart { min-height: 280px; }
 }

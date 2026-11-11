@@ -3,8 +3,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
-  <style>@view-transition { navigation: auto; }</style>
   <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
        follows it), so the page never shows undimmed between steps. Chrome; other browsers ignore it. -->
   <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
@@ -24,23 +22,30 @@
   <link rel="stylesheet" href="./css/dashboard.css">
   <link rel="stylesheet" href="./css/assistant.css">
   <link rel="stylesheet" href="./css/guide.css">
+  <!-- Smooth scrolling (Lenis), pinned and integrity-checked. Deferred and optional: if they fail to load the page is
+       fully usable without them (js/motion.js checks for window.Lenis). See THIRD_PARTY_NOTICES.md. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/lenis@1.3.27/dist/lenis.min.js" integrity="sha384-R18XzqnxvVLEF+BYfhpmDx30v7eP83fAckyfoRzK7/Uf6nGqufcmsk0eAKo7S3RU" crossorigin="anonymous"></script>
 </head>
-<body>
+<body class="app-shell dash-v2">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <!-- On wide screens this header is the left sidebar (the menu stays open); below 1100px it is a top bar
+       and the menu opens as a sheet. One set of links either way, so the guided tour finds them in both. -->
   <header class="topbar">
+    <a class="brand" href="dashboard.html"><img class="brand-mark" src="images/icons/icon.svg" alt="" width="32" height="32"><span>Chicky</span></a>
     <details class="navigation" data-guide-id="main-menu">
-      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""></summary>
+      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""><span class="menu-label" aria-hidden="true">Menu</span></summary>
       <nav class="menu-panel" aria-label="Main navigation">
-        <a href="dashboard.html" aria-current="page">Dashboard</a>
-        <a href="forecast.html" data-guide-id="nav-forecast">Demand forecast</a>
-        <a href="prep.html" data-guide-id="nav-prep">Prep list</a>
-        <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
-        <a href="dishes.html" data-guide-id="nav-dishes">Dishes</a>
-        <a href="documents.html" data-guide-id="nav-documents">Documents</a>
+        <a href="dashboard.html" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg><span>Dashboard</span></a>
+        <a href="forecast.html" data-guide-id="nav-forecast"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 7-8"/><path d="M15 7h5v5"/></svg><span>Demand forecast</span></a>
+        <a href="prep.html" data-guide-id="nav-prep"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4.5" width="14" height="16.5" rx="2.5"/><path d="M9 4.5h6v3H9z"/><path d="M9 12.5h6M9 16.5h4"/></svg><span>Prep list</span></a>
+        <a href="data.html" data-guide-id="nav-data"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 005.5 20h13a1.5 1.5 0 001.5-1.5V15"/></svg><span>Data ingestion</span></a>
+        <a href="dishes.html" data-guide-id="nav-dishes"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5h17a8.5 8.5 0 01-17 0z"/><path d="M9 8.5c0-1.6 1.5-1.6 1.5-3.2M14 8.5c0-1.6 1.5-1.6 1.5-3.2"/></svg><span>Dishes</span></a>
+        <a href="documents.html" data-guide-id="nav-documents"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h7.5l4.5 4.5v12a1 1 0 01-1 1h-11a1 1 0 01-1-1v-15a1 1 0 011-1z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h6"/></svg><span>Documents</span></a>
       </nav>
     </details>
-    <a class="brand" href="dashboard.html">Chicky</a>
     <details class="account-menu" data-guide-id="account-menu">
-      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""></summary>
+      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""><span class="account-label" data-account-label>Account</span></summary>
       <div class="menu-panel">
         <p class="account-name">Signed in</p>
         <p class="account-email"></p>
@@ -51,78 +56,116 @@
     </details>
   </header>
 
-  <main class="page">
-    <div class="overview">
-      <section class="page-heading welcome" aria-labelledby="welcome-heading">
-        <div>
-          <h1 id="welcome-heading">Welcome</h1>
-          <p class="lede">Review this week’s performance</p>
+  <main class="page" id="main-content" tabindex="-1">
+    <!-- Row 1: say your sales (quickest everyday task) beside what needs attention. -->
+    <div class="hero">
+      <div class="hero-main">
+        <section class="page-heading welcome" aria-labelledby="welcome-heading">
+          <div>
+            <h1 id="welcome-heading">Welcome</h1>
+            <p class="lede">Review this week’s performance</p>
+          </div>
+        </section>
+
+        <!-- Sends to the voice assistant (js/assistant.js), which opens its panel to reply. -->
+        <section class="chat-box" aria-label="AI assistant" data-guide-id="assistant-chat">
+          <textarea aria-label="Message to AI assistant" placeholder="What would you like to know?"></textarea>
+          <div class="chat-toolbar">
+            <button class="icon-button" type="button" disabled title="Voice input" aria-label="Voice input"><img src="images/dashboard/icon7.svg" alt=""></button>
+            <button class="icon-button send" type="button" disabled title="Send message" aria-label="Send message"><img src="images/dashboard/icon3.svg" alt=""></button>
+          </div>
+        </section>
+      </div>
+
+      <section class="section actions card" aria-labelledby="actions-heading" data-guide-id="actions-needed">
+        <div class="section-heading">
+          <h2 id="actions-heading">Actions needed</h2>
+          <!-- Opens the Record sales form. The fill that grows from the pointer is the shared primary-button look (js/motion.js);
+               it is only a look: hovering or focusing never opens anything, only a click, tap or Enter does. -->
+          <button class="primary-button" type="button" id="record-open" data-guide-id="record-sales-button">
+            <span class="button-label">Record sales</span>
+            <svg class="button-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+          </button>
         </div>
+        <!-- Filled from GET /api/actions by js/dashboard.js. -->
+        <ul class="action-list" id="action-list" aria-labelledby="actions-heading"></ul>
+        <p class="status-text" id="actions-note" role="status" aria-live="polite">Loading&hellip;</p>
       </section>
-      <!-- Filled from the signed-in user's daily sales by js/dashboard.js. -->
-      <section class="card graph demand" aria-labelledby="demand-heading" data-guide-id="demand-chart">
+    </div>
+
+    <!-- Row 2: the week in charts. Filled from the signed-in user's daily sales by js/dashboard.js. -->
+    <div class="overview">
+      <section class="card graph demand" aria-labelledby="demand-heading" data-guide-id="demand-chart" data-spotlight>
+        <span class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 7-8"/><path d="M15 7h5v5"/></svg></span>
         <div class="headline">
-          <h2 id="demand-heading" class="card-title">Demand, latest 7 days</h2>
+          <h2 id="demand-heading" class="card-title">Demand (latest 7 days)</h2>
           <span class="number"><span id="demand-total">--</span><span class="unit"> portions</span></span>
-          <span class="note" id="demand-note">Loading sales&hellip;</span>
         </div>
         <div class="chart">
-          <canvas id="demand-chart" role="img" aria-label="Line chart of portions sold each day, all dishes combined"></canvas>
+          <div class="chart-inner">
+            <canvas id="demand-chart" role="img" aria-label="Line chart of portions sold each day, all dishes combined"></canvas>
+          </div>
         </div>
+        <p class="chart-caption note" id="demand-note">Loading sales&hellip;</p>
       </section>
       <section class="card graph by-dish" aria-labelledby="dish-heading" data-guide-id="dish-chart">
+        <span class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 12.5h17a8.5 8.5 0 01-17 0z"/><path d="M9 8.5c0-1.6 1.5-1.6 1.5-3.2M14 8.5c0-1.6 1.5-1.6 1.5-3.2"/></svg></span>
         <div class="headline">
-          <h2 id="dish-heading" class="card-title">Demand by dish</h2>
-          <span class="note" id="dish-note">Same 7 days</span>
+          <h2 id="dish-heading" class="card-title">Demand (by dish)</h2>
         </div>
-        <div class="chart">
-          <canvas id="dish-chart" role="img" aria-label="Bar chart of portions sold per dish over the same 7 days"></canvas>
+        <div class="chart" data-lenis-prevent-wheel>
+          <div class="chart-inner">
+            <canvas id="dish-chart" role="img" aria-label="Bar chart of portions sold per dish over the same 7 days, most first"></canvas>
+          </div>
         </div>
+        <p class="chart-caption note" id="dish-note">Same 7 days</p>
       </section>
     </div>
 
-    <!-- The same 7 days in a few sentences, to read or play aloud (GET /api/summary/weekly, issue #56). -->
-    <section class="card week-summary" aria-labelledby="week-heading" data-guide-id="week-summary">
-      <div class="week-summary-heading">
-        <h2 id="week-heading" class="card-title">Your week</h2>
-        <div class="week-summary-buttons" id="week-summary-buttons" hidden>
-          <button class="secondary-button" type="button" data-language="en">Play</button>
-          <button class="secondary-button" type="button" data-language="zh" lang="zh">播放中文</button>
-        </div>
-      </div>
-      <p class="week-summary-text" id="week-summary-text">Loading&hellip;</p>
-      <p class="note" id="week-summary-status" role="status" aria-live="polite"></p>
-    </section>
-
-    <!-- Revenue and margin from dish prices (GET /api/revenue), same 7 days as the charts. -->
+    <!-- Revenue and gross profit from dish prices (GET /api/revenue), with each dish's share as a treemap. Leftovers
+         above Sold out (issue #50, GET /api/waste). All for the same 7 days as the charts. -->
     <div class="money">
-      <section class="card" aria-labelledby="revenue-heading" data-guide-id="revenue-card">
+      <!-- The same 7 days in a few sentences, to read or play aloud (GET /api/summary/weekly, issue #56). -->
+      <section class="card week-summary" aria-labelledby="week-heading" data-guide-id="week-summary">
+        <div class="week-summary-heading">
+          <h2 id="week-heading" class="card-title">Your week</h2>
+          <div class="week-summary-buttons" id="week-summary-buttons" hidden>
+            <button class="secondary-button" type="button" data-language="en">Play</button>
+            <button class="secondary-button" type="button" data-language="zh" lang="zh">播放中文</button>
+          </div>
+        </div>
+        <p class="week-summary-text" id="week-summary-text">Loading&hellip;</p>
+        <p class="note" id="week-summary-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="card revenue-card" aria-labelledby="revenue-heading" data-guide-id="revenue-card" data-spotlight>
+        <span class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.4 0-2.4.7-2.4 1.8 0 2.6 5 1.3 5 3.9 0 1.1-1.1 1.8-2.6 1.8-1.2 0-2.2-.5-2.7-1.4M12 6.5V8m0 8v1.5"/></svg></span>
         <div class="headline">
-          <h2 id="revenue-heading" class="card-title">Revenue, same 7 days</h2>
-          <span class="number" id="revenue-total">--</span>
+          <h2 id="revenue-heading" class="card-title">Revenue (latest 7 days)</h2>
+          <div class="figures">
+            <div class="figure"><span class="number" id="revenue-total">--</span><span class="figure-label">Revenue</span></div>
+            <div class="figure"><span class="number" id="profit-total">--</span><span class="figure-label">Gross profit</span></div>
+          </div>
           <span class="note" id="revenue-note">Loading prices&hellip;</span>
         </div>
+        <div class="treemap-wrap" data-guide-id="revenue-treemap">
+          <ul class="treemap" id="revenue-treemap" aria-label="Revenue by dish, largest first"></ul>
+          <p class="empty-state treemap-empty" id="treemap-empty">Loading prices&hellip;</p>
+          <div class="treemap-tip" id="treemap-tip" role="tooltip" hidden></div>
+        </div>
+        <ol class="treemap-key" id="treemap-key" aria-label="Dishes too small to label on the treemap" hidden></ol>
         <p class="money-warning" id="revenue-missing" hidden></p>
       </section>
-      <section class="card" aria-labelledby="top-dishes-heading" data-guide-id="top-dishes">
-        <h2 id="top-dishes-heading" class="card-title">Top dishes by gross profit</h2>
-        <ol class="top-dishes" id="top-dishes"></ol>
-        <p class="note" id="top-dishes-note"></p>
-      </section>
-    </div>
-
-    <!-- Leftovers and sell-outs (issue #50), from GET /api/waste for the same 7 days. -->
-    <div class="money">
-      <section class="card" aria-labelledby="waste-heading" data-guide-id="waste-card">
+      <section class="card" aria-labelledby="waste-heading" data-guide-id="waste-card" data-spotlight>
+        <span class="card-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 7h14l-1.2 12.1a1.5 1.5 0 01-1.5 1.4H7.7a1.5 1.5 0 01-1.5-1.4z"/><path d="M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7M10 11v6M14 11v6"/></svg></span>
         <div class="headline">
-          <h2 id="waste-heading" class="card-title">Leftovers, same 7 days</h2>
+          <h2 id="waste-heading" class="card-title">Leftovers (latest 7 days)</h2>
           <span class="number"><span id="waste-total">--</span><span class="unit"> portions</span></span>
           <span class="note" id="waste-note">Loading&hellip;</span>
         </div>
       </section>
       <section class="card" aria-labelledby="sold-out-heading" data-guide-id="sold-out-card">
-        <h2 id="sold-out-heading" class="card-title">Sold out, same 7 days</h2>
-        <ol class="top-dishes" id="sold-out-dishes"></ol>
+        <h2 id="sold-out-heading" class="card-title">Sold out (latest 7 days)</h2>
+        <ol class="ranked" id="sold-out-dishes"></ol>
         <p class="note" id="sold-out-note"></p>
       </section>
     </div>
@@ -133,7 +176,7 @@
         <h2 id="heatmap-heading" class="card-title">Revenue by day</h2>
         <span class="note" id="heatmap-note">Loading&hellip;</span>
       </div>
-      <div class="heatmap-scroll" id="heatmap-scroll">
+      <div class="heatmap-scroll" id="heatmap-scroll" data-lenis-prevent-wheel>
         <div class="heatmap" id="heatmap" role="img"></div>
       </div>
       <div class="heatmap-legend" aria-hidden="true">
@@ -153,21 +196,11 @@
       <div class="heatmap-tooltip" id="heatmap-tooltip" role="tooltip" hidden></div>
     </section>
 
-    <section class="section actions" aria-labelledby="actions-heading" data-guide-id="actions-needed">
-      <div class="section-heading">
-        <h2 id="actions-heading">Actions needed</h2>
-        <button class="secondary-button" type="button" id="record-open" data-guide-id="record-sales-button">Record sales</button>
-      </div>
-      <!-- Filled from GET /api/actions by js/dashboard.js. -->
-      <ul class="action-list" id="action-list" aria-labelledby="actions-heading"></ul>
-      <p class="status-text" id="actions-note" role="status" aria-live="polite">Loading&hellip;</p>
-    </section>
-
     <!-- Opened by Record sales, or a "You haven't logged sales" card for that day. -->
-    <dialog class="record-dialog" id="record-dialog" aria-labelledby="record-heading">
+    <dialog class="record-dialog" id="record-dialog" aria-labelledby="record-heading" data-lenis-prevent>
       <form method="dialog" id="record-form">
         <h2 id="record-heading">Record sales</h2>
-        <p class="lede">Portions sold of each dish, and when it sold out or how many were left over. Leave a dish empty if you didn’t sell it.</p>
+        <p class="lede">Enter portions sold per dish, plus any sell-out time or leftovers. Leave a dish empty if it didn’t sell.</p>
         <div class="field record-date">
           <label for="record-date">Date</label>
           <input id="record-date" class="input" type="date" required>
@@ -181,17 +214,9 @@
       </form>
     </dialog>
 
-    <!-- Sends to the voice assistant (js/assistant.js), which opens its panel to reply. -->
-    <section class="chat-box" aria-label="AI assistant" data-guide-id="assistant-chat">
-      <textarea aria-label="Message to AI assistant" placeholder="What would you like to know?"></textarea>
-      <div class="chat-toolbar">
-        <button class="icon-button" type="button" disabled title="Voice input" aria-label="Voice input"><img src="images/dashboard/icon7.svg" alt=""></button>
-        <button class="icon-button send" type="button" disabled title="Send message" aria-label="Send message"><img src="images/dashboard/icon3.svg" alt=""></button>
-      </div>
-    </section>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js" integrity="sha384-Emf5ZVIUiarAdhkgtqK+5/Z5qIvM6QoVrS+qAVtfyZVuD5lIHrac0me485+Antp0" crossorigin="anonymous"></script>
   <script src="./js/chart-theme.js"></script>
   <script src="./js/api.js"></script>
   <script src="./js/motion.js"></script>

@@ -1,5 +1,4 @@
 /* Documents layout. Shared tokens and components are in base.css. */
-.page > .card { margin-top: 32px; }
 .page-heading .tag { white-space: nowrap; }
 #list-status:empty { display: none; }
 .editor-mode { margin-top: 16px; }
