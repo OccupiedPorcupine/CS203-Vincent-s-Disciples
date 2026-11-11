@@ -208,6 +208,15 @@
 .assistant-primary:hover { background: var(--assistant-teal-dark); }
 .assistant-secondary { border: 1px solid var(--assistant-border); color: var(--assistant-ink); background: #fff; }
 .assistant-card-note { margin: 8px 0 0; font-size: 13px; color: var(--assistant-muted); }
+.assistant-card-warning {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--warning, #7a4b00);
+  background: var(--warning-soft, #fff1d6);
+}
+.assistant-card-warning[hidden] { display: none; }
 
 .assistant-status { min-height: 18px; margin: 0; padding: 0 16px; font-size: 12px; color: var(--assistant-muted); }
 /* Today's allowance (issue #65): quiet until it runs low. */
