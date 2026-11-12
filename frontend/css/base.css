@@ -69,6 +69,7 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1); /* small overshoot: buttons popping in */
+  --duration-enter: 520ms;   /* sign-in page only: its picture and form rising in */
 }
 
 /* Base */
@@ -433,10 +434,8 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 /* Moving between pages is instant: no cross-fade, slide or view transition (DESIGN.md, "Motion"). */
 
 /* ---- Motion and polish (DESIGN.md, "Motion") ----
-   Interaction feedback (hover, press, focus) applies everywhere. Moving to a page, or arriving on one, is never
-   animated: no cross-fade, no cards rising in, no figures counting up. Ambient motion (the header's slow drift and
-   the loading shimmer) is inside `prefers-reduced-motion: no-preference`, so it doesn't exist for people who asked
-   for less motion, and is paused during the guided tour (.guide-active). */
+   Interaction feedback (hover, press, focus) applies everywhere. Nothing rises in, counts up,
+   shimmers or drifts on its own. */
 
 /* Controls: colour, lift and press. (The primary button's feedback is its fill.) */
 .secondary-button {
@@ -461,33 +460,15 @@ fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 
 /* Status lines settle in when they report a result. */
 .status-text:is(.is-success, .is-error):not(:empty) { animation: status-in var(--duration-base) var(--ease-out); }
-@keyframes status-in { from { opacity: 0; transform: translateY(-3px); } }
+@keyframes status-in { from { opacity: 0; } }
 
-/* "Loading…" text shimmers (js/motion.js adds .is-loading), and so does a card's "--" figure while
-   its caption is loading. A slow sweep, not a spinner. */
-.is-loading,
-.headline:has(.is-loading) .number {
-  background: linear-gradient(100deg, var(--muted) 40%, #b9c2c8 50%, var(--muted) 60%) 0 0 / 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.headline:has(.is-loading) .number { background-image: linear-gradient(100deg, var(--ink) 40%, #b9c2c8 50%, var(--ink) 60%); }
+/* "Loading…" text (js/motion.js adds .is-loading) is just muted, and a card's "--" figure waits in
+   the muted colour too. */
+.headline:has(.is-loading) .number { color: var(--subtle); }
 
-@media (prefers-reduced-motion: no-preference) {
-  /* The header's gradient drifts very slowly between teal and sand. */
-  .topbar {
-    background: linear-gradient(90deg, #a9dcd6 0%, #dfe5dc 27.5%, #f5e3d2 50%, #dfe5dc 72.5%, #a9dcd6 100%) 0 0 / 200% 100%;
-    animation: header-drift 28s ease-in-out infinite alternate;
-  }
-  .guide-active .topbar { animation-play-state: paused; }
+/* The sign-in page (css/styles.css) still rises in. */
+@keyframes rise-in { from { opacity: 0; transform: translateY(14px); } }
 
-  .is-loading, .headline:has(.is-loading) .number { animation: shimmer 1.6s linear infinite; }
-
-}
-
-@keyframes header-drift { to { background-position: 100% 0; } }
-@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 /* Used by chickyMotion.leave() (js/motion.js) when a row is removed: fade, then fold away. */
 .is-leaving { overflow: hidden; pointer-events: none; }
 

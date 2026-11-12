@@ -2,9 +2,11 @@
 // before the page's own script.
 //
 // Nothing here animates arriving on a page or moving between pages: content is in its final place on the first
-// frame, and figures are written as they are. What remains is feedback to something the user does, and scrolling:
-//  - "Loading…" / "Checking…" text gets .is-loading, which base.css turns into a slow shimmer (a real loading state).
-//  - chickyMotion.leave(element) fades and folds a row away when it is removed.
+// frame, and figures are written as they are (no count-up, so a number never shows a value it isn't). What remains
+// is feedback to something the user does, and scrolling:
+//  - "Loading…" / "Checking…" text gets .is-loading, which base.css shows in the muted colour.
+//  - chickyMotion.leave(element) fades and folds a row away when it is removed; it skips the animation with
+//    prefers-reduced-motion.
 //  - Primary buttons get the fill that grows from the pointer (the look is .primary-button in css/base.css).
 //  - Pages that load Lenis (everything signed-in) get smooth scrolling for a mouse wheel, from the one shared set-up
 //    below, and cards marked [data-spotlight] get a pointer-following light.

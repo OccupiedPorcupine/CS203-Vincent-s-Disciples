@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Phone app and reminders">
+  <rect width="64" height="64" rx="16" fill="#d9efec"/>
+  <g fill="none" stroke="#0f7d77" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="15" y="11" width="22" height="42" rx="5"/>
+    <path d="M23 46h6"/>
+    <path d="M44 16a7 7 0 0 1 7 7v5.5l2.5 4H34.5l2.5-4V23a7 7 0 0 1 7-7z" fill="#d9efec" stroke="#1ba098"/>
+    <path d="M41.5 36.5a2.6 2.6 0 0 0 5 0" stroke="#1ba098"/>
+  </g>
+</svg>

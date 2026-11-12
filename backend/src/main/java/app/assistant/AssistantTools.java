@@ -57,6 +57,7 @@ public class AssistantTools {
     static final String LIST_DISHES = "list_dishes";
     static final String GET_SALES = "get_sales";
     static final String PROPOSE_SALES_ENTRY = "propose_sales_entry";
+    static final String REPEAT_CHECK = "repeat_check";
     static final String GET_GUIDE = "get_guide";
     static final String GUIDE_USER = "guide_user";
     static final String PROPOSE_PRICE_CHANGE = "propose_price_change";
@@ -108,6 +109,10 @@ public class AssistantTools {
         List<ProposedClosure> closures;
         List<GuideStep> guide;
         ProposedNote note;
+        // Repeated-quantity checks (ProposalValidator.repeatedQuantities) the model was told to ask
+        // the user about in an earlier turn of this conversation. repeats_confirmed only counts for
+        // these, so the model can't ask and answer the question itself in one turn.
+        final Set<String> repeatChecksAsked = new HashSet<>();
         // Document chunks found this turn, with the message or by search_documents (issue #153).
         final List<RetrievedChunk> documents = new ArrayList<>();
 
@@ -194,7 +199,9 @@ public class AssistantTools {
                                 + "including when a dish sold out and portions left over. "
                                 + "This does NOT save anything; the user checks the card and confirms it. "
                                 + "Include every entry from the message in one call. Use dish_id for an existing dish, "
-                                + "or new_dish_name (with dish_id null) for a dish the user doesn't have yet.",
+                                + "or new_dish_name (with dish_id null) for a dish the user doesn't have yet. "
+                                + "Set repeats_confirmed to false unless the user has just said yes when you asked whether "
+                                + "the same quantity on several days is right.",
                         schema("""
                                 {"type": "object",
                                  "properties": {
@@ -209,8 +216,9 @@ public class AssistantTools {
                                        "sold_out_at": {"type": ["string", "null"], "description": "HH:MM, 24-hour, when the dish sold out; null if not mentioned"},
                                        "leftover": {"type": ["integer", "null"], "description": "Portions left over (not sold); null if not mentioned"}},
                                      "required": ["dish_id", "new_dish_name", "spoken_name", "date", "quantity", "sold_out_at", "leftover"],
-                                     "additionalProperties": false}}},
-                                 "required": ["entries"],
+                                     "additionalProperties": false}},
+                                   "repeats_confirmed": {"type": "boolean", "description": "true only after the user said yes when asked whether the same quantity on several days is right"}},
+                                 "required": ["entries", "repeats_confirmed"],
                                  "additionalProperties": false}
                                 """)),
                 new ToolSpec(PROPOSE_PRICE_CHANGE,
@@ -474,6 +482,25 @@ public class AssistantTools {
             return output;
         }
 
+        // The same quantity on many days: ask the user first, then accept it in a later turn.
+        boolean repeatsConfirmed = arguments.path("repeats_confirmed").asBoolean();
+        List<ProposalValidator.RepeatedQuantity> unchecked = ProposalValidator.repeatedQuantities(result.entries()).stream()
+                .filter(repeat -> !(repeatsConfirmed && context.repeatChecksAsked.contains(repeat.key())))
+                .toList();
+        if (!unchecked.isEmpty()) {
+            output.put("ok", false);
+            ArrayNode check = output.putArray("check_with_user");
+            unchecked.forEach(repeat -> check.add(repeat.dishName() + " has the same quantity (" + repeat.quantity() + ") on "
+                    + repeat.dates().size() + " days, " + repeat.dates().getFirst() + " to " + repeat.dates().getLast() + "."));
+            ArrayNode keys = output.putArray(REPEAT_CHECK);
+            unchecked.forEach(repeat -> keys.add(repeat.key()));
+            output.put("note", "Nothing was shown to the user. Before proposing, check with the user in their language, e.g. "
+                    + "\"Chicken rice is 40 on all 5 days from 3 to 7 Nov, the same every day. Is that correct?\" "
+                    + "If they say yes, call propose_sales_entry again with the same entries and repeats_confirmed true. "
+                    + "If they give different numbers, propose those instead.");
+            return output;
+        }
+
         context.proposal = result.entries();
         context.priceChange = null;
         output.put("ok", true);
@@ -481,6 +508,23 @@ public class AssistantTools {
         output.put("note", "Shown to the user as a confirm card. Not saved until they confirm. "
                 + "Mention any entry that replaces an existing quantity (previousQuantity), and any sold-out time or leftovers.");
         return output;
+    }
+
+    // The repeated-quantity checks asked in earlier turns, from the propose_sales_entry outputs
+    // in the conversation. Only tool outputs count: the user can't write one.
+    public static Set<String> repeatChecksIn(List<JsonNode> items, JsonMapper jsonMapper) {
+        Set<String> keys = new HashSet<>();
+        for (JsonNode item : items) {
+            if (!"function_call_output".equals(item.path("type").asString())) continue;
+            String output = item.path("output").asString();
+            if (!output.contains(REPEAT_CHECK)) continue;
+            try {
+                jsonMapper.readTree(output).path(REPEAT_CHECK).forEach(key -> keys.add(key.asString()));
+            } catch (RuntimeException unreadable) {
+                // Not a tool result this code wrote; ignore it.
+            }
+        }
+        return keys;
     }
 
     // Only what a spoken answer needs, to keep the model's input short.

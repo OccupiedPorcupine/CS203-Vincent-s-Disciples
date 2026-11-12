@@ -22,6 +22,11 @@ import java.util.*;
 // quantity, sold-out time or leftover count is taken from the day's record: "sold out of char siew
 // at one" keeps the quantity already recorded, and a corrected quantity keeps the sold-out time.
 // Entries the user confirms (validate) are saved exactly as given.
+//
+// Model proposals get two more checks, so a message like "save 999 for every day this month"
+// can't become a card: a quantity far above what the dish has sold lately, and a proposal that
+// replaces many days already recorded, are sent back to the model to ask the user. The same
+// quantity on many days isn't refused; see repeatedQuantities.
 @Component
 public class ProposalValidator {
 
@@ -29,6 +34,18 @@ public class ProposalValidator {
     public static final int MAX_DAYS_BACK = 365;
     public static final int MAX_ENTRIES = 50;
     private static final int MAX_NAME_LENGTH = 100;
+    // A quantity is implausible above HISTORY_FACTOR times the dish's best day in the last
+    // HISTORY_DAYS (and at least HISTORY_MARGIN above it). With fewer than HISTORY_MIN_DAYS of
+    // history, above NO_HISTORY_MAX.
+    static final int HISTORY_DAYS = 28;
+    static final int HISTORY_MIN_DAYS = 3;
+    static final int HISTORY_FACTOR = 3;
+    static final int HISTORY_MARGIN = 50;
+    static final int NO_HISTORY_MAX = 500;
+    // More recorded days than this replaced in one proposal is sent back to the model.
+    static final int MAX_REPLACED_DAYS = 3;
+    // The same dish with the same quantity on more dates than this is checked with the user.
+    static final int MAX_SAME_QUANTITY_DAYS = 3;
 
     private final DishRepository dishRepository;
     private final DishAliasRepository dishAliasRepository;
@@ -67,6 +84,7 @@ public class ProposalValidator {
         }
 
         Set<String> seen = new HashSet<>();
+        List<String> replaced = new ArrayList<>();
 
         for (ProposalEntryInput input : inputs) {
             String label = describe(input);
@@ -116,6 +134,17 @@ public class ProposalValidator {
                 continue;
             }
 
+            if (fillFromRecord && input.quantity() != null) {
+                Optional<String> implausible = implausibleQuantity(dish, label, input.date(), quantity);
+                if (implausible.isPresent()) {
+                    problems.add(implausible.get());
+                    continue;
+                }
+                if (recorded.isPresent() && recorded.get().getQuantitySold() != quantity) {
+                    replaced.add(label + " on " + input.date());
+                }
+            }
+
             String dishKey = dish.map(d -> "id:" + d.getId())
                     .orElseGet(() -> "new:" + DishAlias.normalize(input.newDishName()));
             if (!seen.add(dishKey + "@" + input.date())) {
@@ -135,7 +164,53 @@ public class ProposalValidator {
                     leftoverQuantity));
         }
 
+        if (replaced.size() > MAX_REPLACED_DAYS) {
+            problems.add("This would replace " + replaced.size() + " days that are already recorded (" + String.join(", ", replaced)
+                    + "). Ask the user to confirm the number for each day, or to correct them on the Data page.");
+        }
         return new Result(entries, problems);
+    }
+
+    // Compared with the dish's best day in the HISTORY_DAYS before the date.
+    private Optional<String> implausibleQuantity(Optional<Dish> dish, String label, LocalDate date, int quantity) {
+        List<Integer> recent = dish.map(d -> dailySaleRepository.findByDishIdOrderBySaleDateAsc(d.getId()).stream()
+                        .filter(sale -> sale.getSaleDate().isBefore(date) && !sale.getSaleDate().isBefore(date.minusDays(HISTORY_DAYS)))
+                        .map(DailySale::getQuantitySold)
+                        .toList())
+                .orElse(List.of());
+        if (recent.size() < HISTORY_MIN_DAYS) {
+            return quantity > NO_HISTORY_MAX
+                    ? Optional.of(label + ": " + quantity + " portions is more than " + NO_HISTORY_MAX
+                    + " in a day. Ask the user to check the number.")
+                    : Optional.empty();
+        }
+        int best = Collections.max(recent);
+        return quantity > Math.max(best * HISTORY_FACTOR, best + HISTORY_MARGIN)
+                ? Optional.of(label + ": " + quantity + " portions is far above its best day in the last " + HISTORY_DAYS
+                + " days (" + best + "). Ask the user to check the number.")
+                : Optional.empty();
+    }
+
+    // The same dish with the same quantity on several dates in one proposal, e.g. 999 for every
+    // day this month. It can be true (a stall that cooks a fixed amount and sells out), so the
+    // tool asks the model to check with the user rather than refusing it.
+    public record RepeatedQuantity(String dishName, int quantity, List<LocalDate> dates, String key) {}
+
+    public static List<RepeatedQuantity> repeatedQuantities(List<ProposedEntry> entries) {
+        Map<String, List<ProposedEntry>> groups = new LinkedHashMap<>();
+        for (ProposedEntry entry : entries) {
+            String dish = entry.dishId() != null ? "id:" + entry.dishId() : "new:" + DishAlias.normalize(entry.dishName());
+            groups.computeIfAbsent(dish + "x" + entry.quantity(), key -> new ArrayList<>()).add(entry);
+        }
+        List<RepeatedQuantity> repeated = new ArrayList<>();
+        groups.forEach((group, sameQuantity) -> {
+            List<LocalDate> dates = sameQuantity.stream().map(ProposedEntry::date).distinct().sorted().toList();
+            if (dates.size() > MAX_SAME_QUANTITY_DAYS) {
+                String key = group + "@" + dates.stream().map(LocalDate::toString).reduce((a, b) -> a + "," + b).orElse("");
+                repeated.add(new RepeatedQuantity(sameQuantity.getFirst().dishName(), sameQuantity.getFirst().quantity(), dates, key));
+            }
+        });
+        return repeated;
     }
 
     // A "new" dish whose name the user already has (as a dish or an alias) is the existing dish,

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Stall documents">
+  <rect width="64" height="64" rx="16" fill="#d9efec"/>
+  <g fill="none" stroke="#0f7d77" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 13h17l9 9v13"/><path d="M16 13v37h17"/>
+    <path d="M33 13v9h9"/>
+    <path d="M21 28h12M21 34h8"/>
+    <circle cx="42" cy="42" r="7.5" fill="#d9efec" stroke="#1ba098"/>
+    <path d="M47.5 47.5l4.5 4.5" stroke="#1ba098"/>
+  </g>
+</svg>

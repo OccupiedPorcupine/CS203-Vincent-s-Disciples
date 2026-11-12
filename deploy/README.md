@@ -148,6 +148,31 @@ curl -s https://chicky-zeta.vercel.app/api/health   # up to ~15 s if Vercel was 
 
 After a merge that adds a migration, make sure both hosts run the new code before merging the next one.
 
+### Checking the setup
+
+`/api/health` only says whether the database and ML service answer. To see whether everything else
+works, each backend tries its integrations after starting and logs one line per integration, saying
+`OK`, `OFF` (not set up; the app works without it) or `PROBLEM`, with the reason:
+
+```bash
+docker compose logs backend | grep "Setup check"      # on EC2
+vercel logs -e production --since 1h | grep "Setup check"
+```
+
+| Check | What it does |
+|---|---|
+| `email` | Logs in to the SMTP server without sending anything |
+| `ml` | Calls the ML service's `/health` |
+| `assistant` | Asks OpenAI about the chat model, which costs nothing |
+| `google sign-in` | Checks the client ID's form and names the origin the OAuth client must allow |
+| `telegram` | Checks which bot the token is for and whether its webhook points at this host |
+| `chat reminders` | Checks that `CRON_SECRET` is set |
+
+Signed in as an admin, run the same checks with `GET /api/admin/setup-checks`. To check that email
+really arrives, use `POST /api/admin/setup-checks/email`: it sends a test email to your own address
+straight away. Reset emails are sent in the background, so a provider error only shows in the log.
+To add a check for a new integration, add a `@Component` that implements `app.diagnostics.SetupCheck`.
+
 ### Failing over to Vercel
 
 If EC2 is down:
