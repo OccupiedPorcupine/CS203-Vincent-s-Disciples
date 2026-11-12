@@ -41,6 +41,9 @@ public final class SalesFileReader {
                             Map<String, FilePrice> prices) {}
 
     static final int MAX_ERRORS = 50;
+    // Upper bound on data rows in one upload, so one file can't make the server parse and import
+    // an unbounded number of rows (about 27 years of daily sales for 5 dishes).
+    static final int MAX_ROWS = 50_000;
     static final int MAX_QUANTITY = 100_000;
     static final BigDecimal MAX_PRICE = new BigDecimal("10000");
     private static final int HEADER_SEARCH_ROWS = 10;
@@ -148,6 +151,10 @@ public final class SalesFileReader {
     private static SalesFile readTable(String sheet, int rowCount, IntFunction<Row> rows, LocalDate today) {
         Header header = findHeader(rowCount, rows);
         if (header == null) return missingColumns();
+        if (rowCount - header.row() - 1 > MAX_ROWS) {
+            return fileError("The file has more than " + String.format(Locale.ENGLISH, "%,d", MAX_ROWS)
+                    + " rows. Split it into smaller files and upload them one at a time.");
+        }
 
         List<SalesRow> sales = new ArrayList<>();
         Errors errors = new Errors();
