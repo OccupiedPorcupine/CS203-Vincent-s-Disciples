@@ -3,6 +3,9 @@ const forecastDateInput = document.getElementById("forecast-date");
 const forecastDateLabel = document.getElementById("forecast-date-label");
 const forecastForm = document.getElementById("forecast-form");
 const forecastButton = document.getElementById("forecast-button");
+const forecastLabel = forecastButton.querySelector(".button-label");
+const historyCaption = document.getElementById("history-caption");
+const historyCanvas = document.getElementById("history-chart");
 const dishSelect = document.getElementById("dish-select");
 const historyNote = document.getElementById("history-note");
 const forecastStatus = document.getElementById("forecast-status");
@@ -20,46 +23,9 @@ const toggleButtons = document.querySelectorAll(".toggle-button");
 const salesCache = new Map();
 let currentView = "seven-days";
 
-const chartContext = document
-    .getElementById("history-chart")
-    .getContext("2d");
-
-const historyChart = new Chart(chartContext, {
-    type: "line",
-
-    data: {
-        labels: [],
-
-        datasets: [{
-            label: "Portions sold",
-            data: [],
-            ...chickyChart.recordedLine
-        }]
-    },
-
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-
-        plugins: {
-            legend: {
-                display: false
-            }
-        },
-
-        scales: {
-            y: {
-                beginAtZero: true
-            },
-
-            x: {
-                grid: {
-                    display: false
-                }
-            }
-        }
-    }
-});
+// The same recorded-values line chart as the dashboard's demand card (js/chart-theme.js). Only past sales are on it:
+// the forecast and its likely range are written in the card above, not plotted.
+let historyChart = null;
 
 // Sale dates are plain "YYYY-MM-DD" strings; doing the arithmetic in UTC keeps them from
 // shifting a day in the browser's time zone.
@@ -97,14 +63,19 @@ function buildHistory(sales, view) {
                 ? formatDay(day, { day: "numeric", month: "short" })
                 : formatDay(day, { weekday: "short", day: "numeric" })
         ),
+        dates: days.map(day => formatDay(day, { weekday: "long", day: "numeric", month: "short" })),
         values: days.map(day => quantityByDate.get(day) ?? null),
-        recorded: days.filter(day => quantityByDate.has(day)).length
+        recorded: days.filter(day => quantityByDate.has(day)).length,
+        range: view === "same-weekday"
+            ? `Same weekday, last 4 weeks (${formatDay(days[0], { weekday: "long" })}s)`
+            : `${formatDay(days[0], { day: "numeric", month: "short" })} to ${formatDay(days.at(-1), { day: "numeric", month: "short" })}`
     };
 }
 
 async function updateHistoryChart() {
     const dishId = dishSelect.value;
-    let history = { labels: [], values: [] };
+    const dishName = dishSelect.selectedOptions[0]?.textContent ?? "";
+    let history = { labels: [], dates: [], values: [], range: "" };
 
     if (dishId) {
         try {
@@ -124,10 +95,13 @@ async function updateHistoryChart() {
         }
     }
 
-    historyChart.data.labels = history.labels;
-    historyChart.data.datasets[0].data = history.values;
-
-    historyChart.update();
+    // The dish stays named under the chart while you move over it, with the unit and the days shown.
+    historyCaption.textContent = history.range ? `${dishName} · Portions per day · ${history.range}` : "";
+    historyChart = chickyChart.recordedChart(historyCanvas, { labels: history.labels, dates: history.dates, values: history.values, averageOf: "the average of these days" });
+    const spoken = history.labels.map((label, index) => `${label} ${history.values[index] ?? "no sales"}`).join(", ");
+    historyCanvas.setAttribute("aria-label", history.labels.length
+        ? `Line chart of portions of ${dishName} sold on past days. ${spoken}.`
+        : "Line chart of portions sold on past days for the chosen dish: nothing to show yet.");
 }
 
 async function loadDishes() {
@@ -188,16 +162,22 @@ forecastDateInput.max = addDays(todayInSingapore, MAX_DAYS_AHEAD);
 
 loadDishes();
 
+// True while a forecast is being worked out, so Enter in the date box or a double click can't send it twice.
+let generating = false;
+
 forecastForm.addEventListener("submit", async (event) => {
     event.preventDefault();
+
+    if (generating) return;
 
     const dishId = Number(dishSelect.value);
     const forecastDate = forecastDateInput.value;
 
     if (forecastButton.disabled) return;
 
+    generating = true;
     forecastButton.disabled = true;
-    forecastButton.textContent = "Generating…";
+    forecastLabel.textContent = "Generating…";
     showStatus("Working out expected demand…");
     showForecastDetails(null);
     window.chickyAssistant?.setForecast(null);
@@ -241,7 +221,8 @@ forecastForm.addEventListener("submit", async (event) => {
             "error"
         );
     } finally {
-        forecastButton.textContent = "Generate forecast";
+        forecastLabel.textContent = "Generate forecast";
+        generating = false;
         updateForecastButton();
     }
 });

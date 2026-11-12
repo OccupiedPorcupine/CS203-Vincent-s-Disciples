@@ -6,7 +6,6 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   align-items: end;
   gap: 16px 24px;
-  margin-top: 32px;
 }
 .controls .status-text { grid-column: 1 / -1; margin-top: -8px; }
 .controls .status-text:empty { display: none; }
@@ -15,8 +14,7 @@
 .prep-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 32px;
-  margin-top: 32px;
+  gap: 28px;
   align-items: start;
 }
 .prep-row {

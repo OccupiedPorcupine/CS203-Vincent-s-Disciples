@@ -3,18 +3,29 @@
 (() => {
   const menus = [...document.querySelectorAll(".topbar details")];
 
+  // The page menu (.navigation) is the permanent left sidebar on wide screens: it stays open there and ignores the
+  // one-at-a-time and outside-click rules. Below that width it is an ordinary drop-down again. (css/base.css lays it out;
+  // .has-sidebar on <html> tells the CSS that this script opened it, so without scripts the Menu button stays.)
+  const wide = window.matchMedia("(min-width: 1100px)");
+  const isSidebar = menu => menu.classList.contains("navigation");
+  const pinned = menu => wide.matches && isSidebar(menu);
+  const syncPinned = () => menus.filter(isSidebar).forEach(menu => { menu.open = wide.matches; });
+  syncPinned();
+  wide.addEventListener("change", syncPinned);
+  document.documentElement.classList.toggle("has-sidebar", menus.some(isSidebar));
+
   menus.forEach(menu => menu.addEventListener("toggle", () => {
-    if (menu.open) menus.filter(other => other !== menu).forEach(other => { other.open = false; });
+    if (menu.open) menus.filter(other => other !== menu && !pinned(other)).forEach(other => { other.open = false; });
   }));
 
   document.addEventListener("click", event => {
     // The guided tour opens the menu to point inside it; a click on its shade shouldn't close it.
     if (event.target.closest(".guide-layer")) return;
-    menus.filter(menu => menu.open && !menu.contains(event.target)).forEach(menu => { menu.open = false; });
+    menus.filter(menu => menu.open && !pinned(menu) && !menu.contains(event.target)).forEach(menu => { menu.open = false; });
   });
 
   document.addEventListener("keydown", event => {
-    const open = menus.find(menu => menu.open);
+    const open = menus.find(menu => menu.open && !pinned(menu));
     if (event.key !== "Escape" || !open) return;
     open.open = false;
     open.querySelector("summary").focus();
@@ -30,6 +41,7 @@
   apiRequest("/api/profile")
     .then(profile => {
       account.querySelector(".account-name").textContent = profile.name || "Signed in";
+      account.querySelectorAll("[data-account-label]").forEach(label => { label.textContent = profile.name || "Account"; });
       account.querySelector(".account-email").textContent = profile.email || "";
       if (profile.emailVerified === false) showUnconfirmedEmail();
     })

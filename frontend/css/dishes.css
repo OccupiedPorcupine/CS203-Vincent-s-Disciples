@@ -1,6 +1,6 @@
 /* Dishes layout. Shared tokens and components are in base.css. */
 /* One row per dish. */
-.price-table { margin-top: 32px; border-top: 1px solid var(--divider); }
+.price-table { margin-top: 0; border-top: 1px solid var(--divider); }
 .price-row {
   display: grid;
   grid-template-columns: minmax(180px, 1.6fr) 120px 120px minmax(120px, 1fr) auto;

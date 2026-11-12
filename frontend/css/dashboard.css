@@ -1,40 +1,131 @@
-/* Dashboard layout. Shared tokens and components are in base.css. */
-.overview {
-  display: grid;
-  grid-template-columns: minmax(0, 4fr) minmax(0, 3fr);
-  grid-template-rows: auto 380px;
-  gap: 32px 48px;
-}
-.welcome { grid-column: 1; grid-row: 1; align-self: end; }
-.demand { grid-column: 1; grid-row: 2; }
-.by-dish { grid-column: 2; grid-row: 1 / 3; }
+/* Dashboard layout. The shell (sidebar, page frame), cards, buttons, charts' card pieces and tokens are shared: see base.css.
+   What is here is only this page's own arrangement: the hero, the week, the money grid with its treemap, the heatmap and
+   the Record sales dialog. */
 
-.graph {
-  display: flex;
-  flex-direction: column;
-  min-width: 0; /* lets the chart canvas shrink with the grid column on narrow screens */
-  min-height: 0;
-}
-.graph .chart { position: relative; flex: 1; min-height: 0; margin-top: 16px; }
+.dash-v2 { --amount-min: 16px; --amount-max: 30px; }   /* the treemap's revenue figures run between these, by share */
 
-/* The weekly summary: a few sentences with Play buttons in English and Chinese. */
-.week-summary { margin-top: 32px; }
+/* ---- Row 1: say your sales + what needs attention ---- */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.hero-main {
+  display: flex; flex-direction: column; gap: 24px;
+  padding: 28px; border: 1px solid var(--card-line); border-radius: 20px;
+  background: linear-gradient(135deg, #e3f3f0 0%, var(--sand-soft) 85%);
+}
+.hero-main .chat-box { display: flex; flex: 1; flex-direction: column; }
+.hero-main .chat-box textarea { flex: 1; min-height: 52px; }
+.dash-v2 .welcome { display: block; }
+.dash-v2 .welcome h1 { font-size: 36px; line-height: 1.2; }
+.dash-v2 .welcome .lede { margin-top: 6px; font-size: 17px; color: var(--ink); }
+
+.dash-v2 .section.actions { padding: 22px 24px 20px; }
+.actions .section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; }
+.action-list { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.action-item {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 14px 16px; border: 1px solid var(--divider); border-radius: var(--radius-lg); background: #fffdfa;
+  transition: background-color var(--duration-fast), border-color var(--duration-fast);
+}
+.action-item:hover { border-color: #cfe7e4; background-color: var(--teal-tint); }
+.action-text { flex: 1 1 220px; min-width: 0; }
+.action-text strong { display: block; font-weight: 400; font-size: var(--text-md); }
+.action-text span { display: block; margin-top: 2px; color: var(--muted); font-size: var(--text-sm); }
+.action-buttons { display: flex; flex: none; align-items: center; gap: 12px; }
+.dash-v2 .actions .status-text { margin-top: 12px; }
+.dash-v2 .actions .status-text:empty { display: none; }
+
+/* ---- Row 2: the week in charts ---- */
+.overview { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+/* ---- Your week: the same 7 days in plain words ---- */
+.dash-v2 .week-summary { border-color: var(--sand-line); background: var(--sand-soft); }
+.dash-v2 .week-summary .card-title { color: var(--ink); }
 .week-summary-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.week-summary-buttons { display: flex; gap: 8px; }
+.week-summary-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .week-summary-buttons[hidden] { display: none; }
-.week-summary-text { margin-top: 12px; max-width: 70ch; font-size: var(--text-lg); line-height: 1.5; }
-.week-summary .note { margin-top: 8px; color: var(--muted); font-size: var(--text-sm); }
+.week-summary-text { margin-top: 12px; max-width: 64ch; font-size: 20px; line-height: 1.6; }
+.week-summary .note { margin-top: 8px; color: var(--ink); font-size: var(--text-sm); }
 
-.money { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 3fr); gap: 32px 48px; margin-top: 32px; }
-.money .note { color: var(--muted); font-size: var(--text-sm); }
+/* ---- Revenue (with its treemap), then Leftovers above Sold out ---- */
+.money { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.money .note { color: var(--muted); font-size: 15px; }
 .money-warning { margin-top: 12px; color: var(--warning); font-size: var(--text-sm); }
 .money-warning a { color: var(--teal-strong); }
-.top-dishes { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); }
-.top-dishes li { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--divider); }
-.top-dishes li span:last-child { color: var(--muted); text-align: right; }
 
-/* Revenue by day: 53 weeks of columns, Monday to Sunday down each column, like GitHub. */
-.heatmap-card { position: relative; margin-top: 32px; }
+.figures { display: flex; flex-wrap: wrap; gap: 6px 28px; margin-top: 8px; }
+.figure { display: grid; gap: 2px; }
+.dash-v2 .figure .number { margin-top: 0; font-size: 32px; font-variant-numeric: tabular-nums; }
+.figure-label { color: var(--muted); font-size: 13px; }
+/* The revenue card is deliberately compact: tighter padding, and a treemap that is taller than wide but not much. */
+.dash-v2 .revenue-card { padding: 18px 20px; }
+.revenue-card .card-icon { top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 10px; }
+.revenue-card .card-icon svg { width: 18px; height: 18px; }
+.revenue-card .card-title { padding-right: 40px; }
+.revenue-card .headline .note { margin-top: 4px; min-height: 1.4em; font-size: 14px; }
+
+/* The treemap: taller than wide (5:6), and its tiles are placed by js/dashboard.js (a binary-split layout), so each
+   has a left, top, width and height. The revenue figure's size runs between two tokens, by the dish's share. */
+.treemap-wrap { position: relative; width: 100%; max-width: 460px; aspect-ratio: 10 / 10.7; margin: 12px auto 0; }
+.treemap { position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: 0; padding: 0; list-style: none; }
+.tile { position: absolute; padding: 1px; }   /* 1px each side: a 2px gutter between neighbours */
+.tile:focus-visible { z-index: 2; outline: none; }
+.tile-body {
+  display: flex; flex-direction: column; gap: 2px; height: 100%; padding: 8px 10px;
+  border-radius: var(--radius-sm); overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgb(15 125 119 / 28%);   /* a clear edge even on the lightest tint */
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+}
+.tile:focus-visible .tile-body { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+@media (hover: hover) and (pointer: fine) {
+  .tile:hover .tile-body { box-shadow: inset 0 0 0 2px color-mix(in srgb, currentColor 40%, transparent); }
+}
+/* Name and share are the same size on every tile; only the revenue figure scales (--scale is 0 to 1, set from the share). */
+.tile-name { font-size: 14px; line-height: 1.25; overflow-wrap: normal; word-break: normal; }
+.tile-value {
+  margin-top: auto; white-space: nowrap; line-height: 1.1; font-variant-numeric: tabular-nums;
+  font-size: calc(var(--amount-min) + (var(--amount-max) - var(--amount-min)) * var(--scale, 0));
+}
+.tile-share { font-size: 13px; line-height: 1.2; }
+/* Too small for all three: just the dish's number, and the dish is in the list under the treemap. */
+.tile-key { display: none; font-size: 12px; line-height: 1; }
+.tile[data-compact] .tile-body { align-items: center; justify-content: center; padding: 0; }
+.tile[data-compact] :is(.tile-name, .tile-value, .tile-share) { display: none; }
+.tile[data-compact] .tile-key { display: block; }
+.tile[data-tiny] .tile-key { display: none; }
+.tile[data-tight] .tile-body { padding: 6px; }
+/* Wide and shallow: the name on the left, the figure and share stacked on the right. */
+.tile[data-row] .tile-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 10px; row-gap: 0; }
+.tile[data-row] .tile-name { grid-column: 1; grid-row: 1 / span 2; align-self: start; }
+.tile[data-row] .tile-value { grid-column: 2; grid-row: 1; margin-top: 0; text-align: right; }
+.tile[data-row] .tile-share { grid-column: 2; grid-row: 2; text-align: right; }
+.treemap-empty {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0; margin: 0; padding: 16px;
+  display: grid; place-items: center; border-radius: var(--radius-md); background: var(--neutral-soft); color: var(--ink);
+}
+.treemap-tip {
+  position: absolute; z-index: 5; display: grid; gap: 2px; max-width: 260px; padding: 8px 12px;
+  border-radius: var(--radius-md); background: var(--ink); color: #fff; font-size: 13px; pointer-events: none;
+}
+.treemap-tip strong { font-size: 14px; font-weight: 400; }
+/* Dishes whose tile is too small for a name, figure and share: always listed here, never only on hover. */
+.treemap-key { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 16px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.treemap-key li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.key-swatch { flex: none; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 6px; font-size: 12px; box-shadow: inset 0 0 0 1px rgb(15 125 119 / 28%); }
+.key-name { min-width: 0; overflow-wrap: anywhere; }
+.key-figures { margin-left: auto; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.ranked { display: grid; margin: 0; padding: 0; list-style: none; font-size: var(--text-md); }
+.ranked li {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px;
+  padding: 12px 0; border-bottom: 1px solid var(--divider);
+}
+.ranked li:first-child { padding-top: 4px; }
+/* The row under the pointer is lit by CSS, so it is always the row that is actually there. */
+.ranked li { margin-inline: -8px; padding-inline: 8px; border-radius: var(--radius-sm); transition: background-color var(--duration-fast); }
+@media (hover: hover) and (pointer: fine) { .ranked li:hover { background: var(--teal-tint); } }
+.ranked li span:last-child { margin-left: auto; color: var(--muted); font-size: var(--text-sm); text-align: right; }
+.money .ranked + .note { margin-top: 10px; }
+
+/* ---- Revenue by day: 53 weeks of columns, Monday to Sunday down each column, like GitHub ---- */
+.heatmap-card { margin: 0; }
 .heatmap-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .heatmap-heading .note { color: var(--muted); font-size: var(--text-sm); }
 .heatmap-scroll { overflow-x: auto; margin-top: 16px; padding-bottom: 4px; }
@@ -82,86 +173,72 @@
 }
 .heatmap-tooltip strong { font-weight: 600; }
 
-/* Actions needed: one row per card from GET /api/actions. */
-.action-list { display: grid; margin: 20px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--divider); }
-.action-item {
-  transition: background-color var(--duration-fast);
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 4px;
-  border-bottom: 1px solid var(--divider);
-}
-.action-item:hover { background-color: rgb(235 246 245 / 55%); }
-.action-text { flex: 1; min-width: 0; }
-.action-text strong { display: block; font-weight: 400; }
-.action-text span { display: block; margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
-.action-buttons { display: flex; flex: none; align-items: center; gap: 8px; }
-
+/* ---- Record sales dialog ---- */
 .record-dialog {
-  width: min(440px, calc(100% - 32px));
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  width: min(520px, calc(100% - 32px));
+  padding: 28px;
+  border: 1px solid var(--card-line);
+  border-radius: 20px;
   background: var(--surface);
   box-shadow: var(--shadow-float);
   color: var(--ink);
 }
-.record-dialog::backdrop { background: rgb(0 0 0 / 0.3); }
-.record-dialog h2 { font-size: var(--text-lg); }
-.record-dialog .lede { margin-top: 4px; color: var(--muted); font-size: var(--text-sm); }
+@media (prefers-reduced-motion: no-preference) {
+  .record-dialog[open] { animation: dialog-in 280ms var(--ease-out); }
+}
+@keyframes dialog-in { from { opacity: 0; transform: translateY(18px) scale(0.98); } }
+.record-dialog::backdrop { background: rgb(66 86 100 / 38%); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+.record-dialog h2 { font-size: 24px; }
+.record-dialog .lede { margin-top: 6px; color: var(--muted); font-size: var(--text-sm); }
 .record-date { margin-top: 16px; }
 .record-list { display: grid; gap: 12px; max-height: 50vh; overflow: auto; margin-top: 16px; }
 /* Each dish: its name, then portions sold, sold-out time and leftovers side by side. */
 .record-row { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 5fr) minmax(0, 3fr); gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--divider); font-size: var(--text-sm); }
 .record-row legend { float: left; grid-column: 1 / -1; width: 100%; margin-bottom: 4px; font-weight: 500; }
 .record-field { display: grid; gap: 4px; color: var(--muted); font-size: var(--text-xs); }
-.actions .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .record-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
-/* The assistant's large input box: an assistant surface, so it uses the UI font (see DESIGN.md). */
+/* ---- The assistant's large input box: an assistant surface, so it uses the UI font (see DESIGN.md) ---- */
 .chat-box {
-  width: min(480px, 100%);
-  margin: 48px auto 0;
-  padding: 16px;
-  border: 1px solid var(--border);
+  width: 100%;
+  margin: 0;
+  padding: 16px 16px 12px;
+  border: 1px solid #cfe7e4;
   border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: 0 1px 2px rgb(66 86 100 / 6%), 0 8px 22px rgb(66 86 100 / 7%);
   font-family: var(--font-ui);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-base) var(--ease-out);
 }
-.chat-box { transition: border-color var(--duration-fast), box-shadow var(--duration-base) var(--ease-out); }
-.chat-box:hover { box-shadow: 0 6px 20px rgb(66 86 100 / 8%); }
-.chat-box:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-tint), 0 10px 28px rgb(15 125 119 / 12%); }
+.chat-box:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px rgb(27 160 152 / 22%), 0 10px 28px rgb(15 125 119 / 12%); }
 .chat-box textarea {
   display: block;
   width: 100%;
-  height: 34px;
+  height: 52px;
   padding: 0;
   border: 0;
   outline: none;
   resize: none;
   background: transparent;
-  font: var(--text-md)/22px var(--font-ui);
+  font: 17px/26px var(--font-ui);
 }
 .chat-box textarea::placeholder { color: var(--muted); opacity: 1; }
-.chat-toolbar { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.chat-toolbar { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 .icon-button {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
+  transition: background-color var(--duration-fast), transform var(--duration-fast) var(--ease-out);
 }
-.icon-button { transition: background-color var(--duration-fast), transform var(--duration-fast) var(--ease-out); }
 .icon-button:hover:not(:disabled) { background: var(--neutral-soft); }
 .icon-button:active:not(:disabled) { transform: scale(0.92); }
-.send:not(:disabled) { animation: send-ready 300ms var(--ease-spring); }
-@keyframes send-ready { from { transform: scale(0.8); } }
 .icon-button:disabled { cursor: not-allowed; }
 .icon-button img { display: block; }
 .attachment { position: relative; overflow: hidden; }
@@ -174,19 +251,53 @@
 .send:disabled img { filter: none; opacity: 0.5; }
 
 @media (pointer: coarse) {
-  .icon-button { width: 44px; height: 44px; }
-  .chat-box textarea { height: 44px; }
   .heatmap-table summary { display: flex; align-items: center; min-height: 44px; }
 }
 
-@media (max-width: 800px) {
-  .overview { grid-template-columns: 1fr; grid-template-rows: auto 300px 300px; gap: 24px; }
-  .welcome, .demand, .by-dish { grid-column: 1; }
-  .demand { grid-row: 2; }
-  .by-dish { grid-row: 3; }
-  .money { grid-template-columns: 1fr; gap: 24px; }
-  .week-summary { margin-top: 24px; }
-  .week-summary-text { font-size: var(--text-md); }
-  .action-item { flex-wrap: wrap; }
-  .action-buttons { width: 100%; justify-content: flex-end; }
+/* ---- Tablet and up: two columns where they help ---- */
+@media (min-width: 760px) {
+  .overview { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+  /* Revenue is a compact column on the left. Beside it, top to bottom: the week, Leftovers, then Sold out. (In the page the
+     week still comes first, then revenue, Leftovers and Sold out, so the reading order is unchanged.) */
+  .money { grid-template-columns: minmax(340px, 41fr) minmax(0, 59fr); grid-template-rows: auto auto 1fr; gap: 20px 28px; }
+  .money > .week-summary { grid-column: 2; grid-row: 1; }
+  .money > .revenue-card { grid-column: 1; grid-row: 1 / span 3; }
+  .money > [aria-labelledby="waste-heading"] { grid-column: 2; grid-row: 2; }
+  .money > [aria-labelledby="sold-out-heading"] { grid-column: 2; grid-row: 3; }
+  /* The three cards beside the compact revenue card are a little tighter, so together they are about as tall as it is. */
+  .money > :not(.revenue-card) { padding: 16px 20px; }
+  .money > .week-summary .week-summary-text { margin-top: 6px; font-size: 17px; line-height: 1.5; }
+  .money > .week-summary .note { margin-top: 4px; }
+  .money > :not(.revenue-card) .headline .number { font-size: 36px; }
+  .money > :not(.revenue-card) .ranked li { padding-block: 8px; }
+  .money > :not(.revenue-card) .ranked li:first-child { padding-top: 2px; }
+}
+@media (min-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); align-items: stretch; }
+}
+
+/* ---- Wide screens ---- */
+@media (min-width: 1100px) {
+  .dash-v2 .hero { gap: 28px; }
+  .overview, .money { gap: 28px; }
+}
+
+/* ---- Phones ---- */
+@media (max-width: 759px) {
+  .dash-v2 .welcome h1 { font-size: 28px; }
+  .hero-main { padding: 20px; gap: 20px; }
+  .week-summary-text { font-size: var(--text-md); line-height: 1.6; }
+  /* Top-aligned and stopping above the assistant button, so Save is never underneath it; the sheet scrolls
+     inside itself and keeps its buttons in view. */
+  .record-dialog {
+    padding: 20px; margin: max(12px, env(safe-area-inset-top)) auto auto;
+    max-height: calc(100dvh - 104px - env(safe-area-inset-bottom)); overflow: auto;
+  }
+  .record-list { max-height: none; overflow: visible; }
+  .record-actions { position: sticky; bottom: -20px; margin: 8px -20px -20px; padding: 12px 20px 20px; background: var(--surface); }
+  .action-buttons { width: 100%; }
+  .dash-v2 .actions .section-heading { display: grid; }
+  .dash-v2 .actions .primary-button { width: 100%; justify-content: center; }
+  .dash-v2 .figure .number { font-size: 36px; }
+  .figures { column-gap: 28px; }
 }

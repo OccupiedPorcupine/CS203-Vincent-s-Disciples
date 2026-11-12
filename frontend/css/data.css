@@ -1,5 +1,4 @@
 /* Data ingestion layout. Shared tokens and components are in base.css. */
-.page > .card { margin-top: 32px; }
 #upload-form { margin-top: 16px; }
 
 .source-table { margin-top: 16px; border-top: 1px solid var(--divider); }
@@ -79,7 +78,6 @@
 }
 
 @media (max-width: 760px) {
-  .page > .card { margin-top: 24px; }
   .page-heading .tag { margin-top: 16px; }
   .source-header { display: none; }
   .source-row { grid-template-columns: 1fr auto; gap: 8px 16px; }

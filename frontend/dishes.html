@@ -3,8 +3,6 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <!-- Page-to-page fade (see css/base.css). Inline so it is in force before the first paint. -->
-  <style>@view-transition { navigation: auto; }</style>
   <!-- Mid-tour, hold the first paint until js/guide.js has put the tour's spotlight back (#guide-ready
        follows it), so the page never shows undimmed between steps. Chrome; other browsers ignore it. -->
   <script>try { if (sessionStorage.getItem("chicky-guide-tour")) { const hold = document.createElement("link"); hold.rel = "expect"; hold.href = "#guide-ready"; hold.setAttribute("blocking", "render"); document.head.append(hold); } } catch (error) {}</script>
@@ -24,23 +22,30 @@
   <link rel="stylesheet" href="./css/dishes.css">
   <link rel="stylesheet" href="./css/assistant.css">
   <link rel="stylesheet" href="./css/guide.css">
+  <!-- Smooth scrolling (Lenis), pinned and integrity-checked. Deferred and optional: if it fails to load the page scrolls
+       natively (js/motion.js). See THIRD_PARTY_NOTICES.md. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/lenis@1.3.27/dist/lenis.min.js" integrity="sha384-R18XzqnxvVLEF+BYfhpmDx30v7eP83fAckyfoRzK7/Uf6nGqufcmsk0eAKo7S3RU" crossorigin="anonymous"></script>
 </head>
-<body>
+<body class="app-shell">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <!-- On wide screens this header is the left sidebar (the menu stays open); below 1100px it is a top bar
+       and the menu opens as a sheet. One set of links either way, so the guided tour finds them in both. -->
   <header class="topbar">
+    <a class="brand" href="dashboard.html"><img class="brand-mark" src="images/icons/icon.svg" alt="" width="32" height="32"><span>Chicky</span></a>
     <details class="navigation" data-guide-id="main-menu">
-      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""></summary>
+      <summary aria-label="Menu"><img src="images/dashboard/sidebar.svg" alt=""><span class="menu-label" aria-hidden="true">Menu</span></summary>
       <nav class="menu-panel" aria-label="Main navigation">
-        <a href="dashboard.html" data-guide-id="nav-dashboard">Dashboard</a>
-        <a href="forecast.html" data-guide-id="nav-forecast">Demand forecast</a>
-        <a href="prep.html" data-guide-id="nav-prep">Prep list</a>
-        <a href="data.html" data-guide-id="nav-data">Data ingestion</a>
-        <a href="dishes.html" aria-current="page">Dishes</a>
-        <a href="documents.html" data-guide-id="nav-documents">Documents</a>
+        <a href="dashboard.html" data-guide-id="nav-dashboard"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg><span>Dashboard</span></a>
+        <a href="forecast.html" data-guide-id="nav-forecast"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 7-8"/><path d="M15 7h5v5"/></svg><span>Demand forecast</span></a>
+        <a href="prep.html" data-guide-id="nav-prep"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4.5" width="14" height="16.5" rx="2.5"/><path d="M9 4.5h6v3H9z"/><path d="M9 12.5h6M9 16.5h4"/></svg><span>Prep list</span></a>
+        <a href="data.html" data-guide-id="nav-data"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 005.5 20h13a1.5 1.5 0 001.5-1.5V15"/></svg><span>Data ingestion</span></a>
+        <a href="dishes.html" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5h17a8.5 8.5 0 01-17 0z"/><path d="M9 8.5c0-1.6 1.5-1.6 1.5-3.2M14 8.5c0-1.6 1.5-1.6 1.5-3.2"/></svg><span>Dishes</span></a>
+        <a href="documents.html" data-guide-id="nav-documents"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h7.5l4.5 4.5v12a1 1 0 01-1 1h-11a1 1 0 01-1-1v-15a1 1 0 011-1z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h6"/></svg><span>Documents</span></a>
       </nav>
     </details>
-    <a class="brand" href="dashboard.html">Chicky</a>
     <details class="account-menu" data-guide-id="account-menu">
-      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""></summary>
+      <summary class="avatar" aria-label="Your account"><img src="images/dashboard/avatar.png" alt=""><span class="account-label" data-account-label>Account</span></summary>
       <div class="menu-panel">
         <p class="account-name">Signed in</p>
         <p class="account-email"></p>
@@ -51,15 +56,15 @@
     </details>
   </header>
 
-  <main class="page">
+  <main class="page" id="main-content" tabindex="-1">
     <section class="page-heading">
       <div>
         <h1>Dishes</h1>
-        <p class="lede">What each portion sells for and costs to make, in S$. A new price applies from today, so earlier sales keep the price they had. A dish’s first price also counts for the sales already recorded.</p>
+        <p class="lede">Price and cost per portion, in S$. A new price applies from today; earlier sales keep theirs. A dish’s first price also covers sales already recorded.</p>
       </div>
     </section>
 
-    <section id="price-section" aria-labelledby="price-heading" data-guide-id="price-list">
+    <section id="price-section" class="card" aria-labelledby="price-heading" data-guide-id="price-list">
       <h2 id="price-heading" class="visually-hidden">Dish prices</h2>
       <div class="price-table" role="table" aria-label="Dish prices">
         <div class="price-row price-header" role="row">

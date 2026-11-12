@@ -16,7 +16,6 @@ window.chickyGuide = (() => {
   // Milliseconds, in step with the --duration-* tokens in css/base.css.
   const OPEN_MS = 650;
   const MOVE_MS = 450;
-  const LEAVE_MS = 250;
   const CLOSE_MS = 300;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -30,7 +29,6 @@ window.chickyGuide = (() => {
   let tween = null;
   let arrived = false;
   let leaving = false;
-  let leaveTimer = 0;
 
   function start(newSteps) {
     if (!newSteps?.length) return;
@@ -107,19 +105,13 @@ window.chickyGuide = (() => {
     showCurrent();
   }
 
-  // Fades the bubble, then goes to the page with the next step. The spotlight stays put; the
-  // next page carries on from it (see onPageHide). A tour that starts on a page without a step
-  // dims the screen and closes in on the middle first.
+  // The next step is on another page: go there straight away. The spotlight's position is saved when this page is
+  // hidden (see writeState) and the next page's tour picks it up, so nothing has to wait for an animation here.
   function leaveFor(url) {
-    let wait = LEAVE_MS;
-    if (!layer) {
-      build({ dimmed: false });
-      animate(viewport(), OPEN_MS, collapse(viewport()));
-      wait = OPEN_MS;
-    }
+    if (!layer) build({ dimmed: false });
     leaving = true;
     layer.classList.add("is-leaving");
-    leaveTimer = setTimeout(() => { location.href = url; }, animated() ? wait : 0);
+    location.href = url;
   }
 
   // Saves where the spotlight is however the page is left: Next, Back, or the user clicking the
@@ -128,20 +120,9 @@ window.chickyGuide = (() => {
     if (layer && shown) writeState(shown);
   }
 
-  // The page cross-fade (base.css) would show the next page's shade without its blur until the
-  // fade ends, then snap. The tour already carries the shade over frame for frame, so it skips it.
-  function skipPageFade(event) {
-    if (!layer || !event.viewTransition) return;
-    event.viewTransition.ready.catch(() => {});
-    event.viewTransition.skipTransition();
-  }
-  window.addEventListener("pageswap", skipPageFade);
-  window.addEventListener("pagereveal", skipPageFade);
-
   function end() {
     clearState();
     window.chickyAssistant?.stopSpeaking();
-    clearTimeout(leaveTimer);
     cancelAnimationFrame(frame);
     window.removeEventListener("resize", schedulePosition);
     window.removeEventListener("scroll", schedulePosition, true);

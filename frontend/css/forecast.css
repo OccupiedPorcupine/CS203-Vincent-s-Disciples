@@ -1,7 +1,6 @@
 /* Demand forecast layout. Shared tokens and components are in base.css. */
 
 /* Controls */
-.page-heading + .card { margin-top: 32px; }
 .controls {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -14,13 +13,12 @@
 .content-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 32px;
-  margin-top: 32px;
+  gap: 28px;
 }
 .side-column { display: flex; flex-direction: column; gap: 24px; }
 
 /* Chart card */
-.chart-card { display: flex; flex-direction: column; min-height: 420px; }
+.chart-card { min-height: 420px; }
 .chart-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -31,8 +29,7 @@
 }
 .history-note { color: var(--muted); font-size: var(--text-sm); }
 .headline .note:empty { display: none; }
-/* The chart fills whatever height the card has (it stretches to match the side column). */
-.chart { position: relative; flex: 1; width: 100%; min-height: 260px; }
+/* The chart (.graph, .chart in base.css) fills whatever height the card has: it stretches to match the side column. */
 
 /* Factors card */
 .factors { display: grid; grid-template-columns: 1fr 1fr; }
@@ -53,7 +50,6 @@
 
 @media (max-width: 760px) {
   .controls { grid-template-columns: 1fr; }
-  .page-heading + .card { margin-top: 24px; }
   /* minmax(0, …) as above: with a plain 1fr the column can't shrink below the chart's drawn width,
      which scrolled a 360px phone sideways. */
   .content-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
